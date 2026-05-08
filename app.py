@@ -112,7 +112,7 @@ def verify_key():
 @app.route('/logout', methods=['POST'])
 def logout():
     resp = jsonify({'status': 'ok'})
-    resp.delete_cookie('access_key', path='/')
+    resp.delete_cookie('access_key')
     return resp
 
 

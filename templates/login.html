@@ -297,25 +297,6 @@
 let pollInterval = null;
 let pendingKey   = '';
 
-// ── Auto-login from localStorage on page load ─────────────────────────────────
-(async function autoLogin() {
-  try {
-    const saved = localStorage.getItem('weyn_access_key');
-    if (!saved) return;
-    const r = await fetch('/verify-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: saved }),
-    });
-    const d = await r.json();
-    if (d.status === 'approved') {
-      window.location.href = '/';
-    } else if (d.status === 'rejected' || d.status === 'revoked') {
-      localStorage.removeItem('weyn_access_key');
-    }
-  } catch(e) {}
-})();
-
 function switchTab(name) {
   document.getElementById('tab-login').classList.toggle('active', name === 'login');
   document.getElementById('tab-request').classList.toggle('active', name === 'request');
@@ -448,7 +429,6 @@ function startPolling(key) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key }),
           });
-          try { localStorage.setItem('weyn_access_key', key); } catch(e) {}
           window.location.href = '/';
         }, 1200);
       } else if (d.status === 'rejected') {
@@ -518,7 +498,6 @@ async function verifyKey() {
     const d = await r.json();
 
     if (d.status === 'approved') {
-      try { localStorage.setItem('weyn_access_key', key); } catch(e) {}
       showMsg('loginMsg', `✓ Welcome, ${d.name}!`, 'success');
       setTimeout(() => window.location.href = '/', 800);
     } else if (d.status === 'pending') {
