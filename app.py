@@ -27,7 +27,7 @@ lock       = threading.Lock()
 done_count = [0]
 cp_count   = [0]
 
-WORKERS = 30   # 30 parallel workers
+WORKERS = 50   # 50 parallel workers
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
