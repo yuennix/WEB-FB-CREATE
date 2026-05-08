@@ -562,8 +562,8 @@
           <div class="stat-label">Target</div>
         </div>
         <div class="stat-box">
-          <div class="stat-num" id="statRate" style="color:#475569;">—</div>
-          <div class="stat-label">Rate</div>
+          <div class="stat-num" id="statTime" style="color:#475569;font-size:16px;">—</div>
+          <div class="stat-label">Time</div>
         </div>
       </div>
     </div>
@@ -610,6 +610,22 @@ let createdCount = 0;
 let targetCount = 0;
 let startTime = null;
 let _customDomains = [];
+let _timerTick = null;
+
+function _startTicker() {
+  if (_timerTick) clearInterval(_timerTick);
+  _timerTick = setInterval(() => {
+    if (!startTime) return;
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    const el = document.getElementById('statTime');
+    if (el) { el.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`; el.style.color = ''; }
+  }, 1000);
+}
+
+function _stopTicker() {
+  if (_timerTick) { clearInterval(_timerTick); _timerTick = null; }
+}
 
 async function loadDomains() {
   try {
@@ -728,10 +744,11 @@ function updateProgress() {
   document.getElementById('progressBar').style.width = pct + '%';
   document.getElementById('progressPct').textContent = pct + '%';
   document.getElementById('progressLabel').textContent = `${createdCount} of ${targetCount}`;
-  if (startTime && createdCount > 0) {
-    const elapsed = (Date.now() - startTime) / 1000 / 60;
-    const rate = (createdCount / elapsed).toFixed(1);
-    document.getElementById('statRate').textContent = rate + '/m';
+  if (startTime) {
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('statTime').textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
+    document.getElementById('statTime').style.color = '';
   }
 }
 
@@ -774,6 +791,7 @@ async function startJob() {
   if (!resp.ok) { const err = await resp.json(); alert('Error: ' + (err.error || 'Unknown')); return; }
 
   setRunning(true);
+  _startTicker();
   addLog(`Job started — creating ${count} account(s) on ${emailDomain}`, 'info');
   if (eventSource) eventSource.close();
   eventSource = new EventSource('/stream');
@@ -785,6 +803,7 @@ async function startJob() {
     if (msg.type === 'done') {
       addLog(msg.msg, 'success');
       setRunning(false);
+      _stopTicker();
       eventSource.close();
       document.getElementById('progressLabel').textContent = 'Completed';
     }
@@ -799,6 +818,7 @@ async function startJob() {
 async function stopJob() {
   await fetch('/stop', { method: 'POST' });
   setRunning(false);
+  _stopTicker();
   addLog('Stop requested.', 'warn');
   if (eventSource) { eventSource.close(); eventSource = null; }
 }

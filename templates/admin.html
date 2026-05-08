@@ -575,7 +575,7 @@
       <div class="cr-stats">
         <div class="cr-stat"><div class="cr-stat-num" id="c-statCreated">0</div><div class="cr-stat-lbl">Created</div></div>
         <div class="cr-stat"><div class="cr-stat-num" id="c-statTotal" style="color:#475569;">—</div><div class="cr-stat-lbl">Target</div></div>
-        <div class="cr-stat"><div class="cr-stat-num" id="c-statRate" style="color:#475569;">—</div><div class="cr-stat-lbl">Rate</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statTime" style="color:#475569;font-size:16px;">—</div><div class="cr-stat-lbl">Time</div></div>
       </div>
     </div>
 
@@ -847,6 +847,22 @@ let cCreatedCount  = 0;
 let cTargetCount   = 0;
 let cStartTime     = null;
 let _cCustomDomains = [];
+let _cTimerTick = null;
+
+function _cStartTicker() {
+  if (_cTimerTick) clearInterval(_cTimerTick);
+  _cTimerTick = setInterval(() => {
+    if (!cStartTime) return;
+    const secs = Math.floor((Date.now() - cStartTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    const el = document.getElementById('c-statTime');
+    if (el) { el.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`; el.style.color = ''; }
+  }, 1000);
+}
+
+function _cStopTicker() {
+  if (_cTimerTick) { clearInterval(_cTimerTick); _cTimerTick = null; }
+}
 
 async function cLoadDomains() {
   try {
@@ -952,10 +968,11 @@ function cAddAccount(data) {
   document.getElementById('c-progressBar').style.width = pct + '%';
   document.getElementById('c-progressPct').textContent = pct + '%';
   document.getElementById('c-progressLabel').textContent = `${cCreatedCount} of ${cTargetCount}`;
-  if (cStartTime && cCreatedCount > 0) {
-    const elapsed = (Date.now() - cStartTime) / 1000 / 60;
-    document.getElementById('c-statRate').textContent = (cCreatedCount / elapsed).toFixed(1) + '/m';
-    document.getElementById('c-statRate').style.color = '';
+  if (cStartTime) {
+    const secs = Math.floor((Date.now() - cStartTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('c-statTime').textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
+    document.getElementById('c-statTime').style.color = '';
   }
 }
 
@@ -1010,6 +1027,7 @@ async function cStartJob() {
   if (!resp.ok) { const err = await resp.json(); toast('Error: ' + (err.error || 'Unknown'), true); return; }
 
   cSetRunning(true);
+  _cStartTicker();
   cAddLog(`Started — ${count} account(s) on ${emailDomain}`, 'info');
 
   if (cEventSource) cEventSource.close();
@@ -1022,6 +1040,7 @@ async function cStartJob() {
     if (msg.type === 'done') {
       cAddLog(msg.msg, 'success');
       cSetRunning(false);
+      _cStopTicker();
       cEventSource.close();
       document.getElementById('c-progressLabel').textContent = 'Completed';
     }
@@ -1036,6 +1055,7 @@ async function cStartJob() {
 async function cStopJob() {
   await fetch('/stop', { method: 'POST' });
   cSetRunning(false);
+  _cStopTicker();
   cAddLog('Stop requested.', 'warn');
   if (cEventSource) { cEventSource.close(); cEventSource = null; }
 }
