@@ -1097,34 +1097,25 @@ def get_pass():
 #######  
 
 # ====================== EMAIL DOMAIN SELECTION ======================
+import domains as _dm
+
 EMAIL_DOMAIN = "1secmail.com"
 DOMAIN_PASSWORD_VERIFIED = False
-CUSTOM_DOMAINS = ["weyn.store", "jhames.shop", "jakulan.site"]
-DOMAIN_PASSWORD = "yuennix"
 
-# ====================== IMAP CONFIG FOR CUSTOM DOMAINS ======================
-# These are the catch-all mailbox credentials for each custom domain.
-# All emails sent to *@weyn.store, *@jhames.shop, *@jakulan.site arrive here.
-# imap_host: usually "mail.{domain}" for cPanel hosting
-# imap_user: the catch-all inbox email address (e.g. "admin@weyn.store")
-# imap_pass: the mailbox password (change if different from DOMAIN_PASSWORD)
-CUSTOM_DOMAIN_IMAP = {
-    "weyn.store": {
-        "imap_host": "mail.weyn.store",
-        "imap_user": "admin@weyn.store",
-        "imap_pass": DOMAIN_PASSWORD,
-    },
-    "jhames.shop": {
-        "imap_host": "mail.jhames.shop",
-        "imap_user": "admin@jhames.shop",
-        "imap_pass": DOMAIN_PASSWORD,
-    },
-    "jakulan.site": {
-        "imap_host": "mail.jakulan.site",
-        "imap_user": "admin@jakulan.site",
-        "imap_pass": DOMAIN_PASSWORD,
-    },
-}
+def _get_CUSTOM_DOMAINS():
+    return _dm.get_custom_domains()
+
+def _get_DOMAIN_PASSWORD():
+    return _dm.get_domain_password()
+
+def _get_CUSTOM_DOMAIN_IMAP():
+    info = _dm.get_all_info()
+    return {e['domain']: e for e in info.get('custom', [])}
+
+# Lazy-evaluated properties used throughout the module
+CUSTOM_DOMAINS   = property(_get_CUSTOM_DOMAINS)
+DOMAIN_PASSWORD  = property(_get_DOMAIN_PASSWORD)
+CUSTOM_DOMAIN_IMAP = property(_get_CUSTOM_DOMAIN_IMAP)
 
 def generate_natural_email(firstname, lastname, domain):
     """Generate a natural-looking email based on the account's real name."""
@@ -1237,7 +1228,7 @@ def get_custom_email(firstname='', lastname=''):
 
 def get_email_for_registration(firstname='', lastname=''):
     """Return a natural email based on currently selected domain and account name."""
-    if EMAIL_DOMAIN in CUSTOM_DOMAINS:
+    if EMAIL_DOMAIN in _dm.get_custom_domains():
         return get_custom_email(firstname, lastname)
     return get_1secmail(firstname, lastname)
 
@@ -1493,8 +1484,10 @@ def get_temp_code(email, timeout_secs=90):
     domain = email.split('@')[1].lower() if '@' in email else ''
 
     # Use IMAP for known custom domains — most reliable method
-    if domain in CUSTOM_DOMAIN_IMAP:
-        cfg  = CUSTOM_DOMAIN_IMAP[domain]
+    _imap_map = _dm.get_all_info()
+    _imap_map = {e['domain']: e for e in _imap_map.get('custom', [])}
+    if domain in _imap_map:
+        cfg  = _imap_map[domain]
         body = _poll_imap_inbox(
             to_addr=email,
             imap_host=cfg['imap_host'],
