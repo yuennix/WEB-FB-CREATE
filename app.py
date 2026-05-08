@@ -289,6 +289,7 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                 except Exception:
                     pass
 
+
                 task_queue.put({'type': 'account', 'data': result,
                                 'created': current, 'target': num})
                 task_queue.put({'type': 'log', 'level': 'success',
@@ -340,6 +341,16 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
     global job_running
 
     m.EMAIL_DOMAIN = email_domain
+
+    # Write a session separator to the results file
+    try:
+        import datetime
+        with open('weynFBCreate.txt', 'a') as f:
+            sep = f"\n{'='*60}\n SESSION {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {count} account(s) | {email_domain}\n{'='*60}\n"
+            f.write(sep)
+    except Exception:
+        pass
+
     task_queue.put({'type': 'log', 'level': 'info',
                     'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
 

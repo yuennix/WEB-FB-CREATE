@@ -248,60 +248,90 @@
     flex: 1;
     overflow-y: auto;
     background: #070b10;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-
-  thead th {
+  .acct-card {
     background: #0d1117;
-    color: #00ff88;
-    text-transform: uppercase;
+    border: 1px solid #00ff8818;
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    transition: border-color .2s;
+  }
+  .acct-card:hover { border-color: #00ff8840; }
+
+  .acct-num {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 10px;
+    color: #333;
     letter-spacing: 1px;
-    font-size: 10px;
-    padding: 10px 14px;
-    text-align: left;
-    border-bottom: 1px solid #00ff8820;
-    position: sticky;
-    top: 0;
-    z-index: 1;
   }
 
-  tbody tr {
-    border-bottom: 1px solid #ffffff08;
-    transition: background .15s;
+  .acct-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
   }
-  tbody tr:hover { background: #ffffff05; }
 
-  tbody td {
-    padding: 9px 14px;
-    color: #ccc;
+  .acct-field-label {
+    font-size: 9px;
+    color: #444;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    width: 58px;
+    flex-shrink: 0;
+  }
+
+  .acct-field-value {
+    font-size: 12px;
     word-break: break-all;
+    flex: 1;
+    min-width: 0;
   }
 
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: 0.5px;
-  }
-  .badge-success { background: #00ff8820; color: #00ff88; border: 1px solid #00ff8840; }
+  .acct-name  { color: #e0e0e0; font-weight: bold; }
+  .acct-email { color: #00b4ff; }
+  .acct-pass  { color: #888; }
+  .acct-uid   { color: #00ff88; }
 
   .copy-btn {
-    background: none;
-    border: none;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
     color: #444;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 2px 7px;
     font-size: 11px;
-    transition: color .2s;
+    transition: all .15s;
+    flex-shrink: 0;
+    line-height: 1.6;
   }
-  .copy-btn:hover { color: #00ff88; }
+  .copy-btn:hover { color: #00ff88; border-color: #00ff8860; background: #00ff8808; }
+  .copy-btn.copied { color: #00ff88; border-color: #00ff88; }
+
+  .acct-copy-all {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #2a2a2a;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+    transition: color .15s;
+  }
+  .acct-copy-all:hover { color: #00ff88; }
 
   .empty-state {
     display: flex;
@@ -473,20 +503,6 @@
           <div class="empty-icon">⬡</div>
           <div class="empty-text">No accounts created yet</div>
         </div>
-        <table id="acctTable" style="display:none;">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Password</th>
-              <th>UID</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="acctBody"></tbody>
-        </table>
       </div>
     </div>
 
@@ -571,25 +587,53 @@ function addLog(msg, level) {
 
 function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
-  const table = document.getElementById('acctTable');
-  table.style.display = '';
+  const panel = document.getElementById('accounts-panel');
 
-  const row = document.getElementById('acctBody').insertRow();
-  const copyData = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
-  row.innerHTML = `
-    <td style="color:#555">${data.num}</td>
-    <td style="color:#e0e0e0">${escHtml(data.name)}</td>
-    <td style="color:#00b4ff">${escHtml(data.email)}</td>
-    <td style="color:#888;font-size:11px">${escHtml(data.password)}</td>
-    <td style="color:#00ff88">${escHtml(data.uid)}</td>
-    <td><span class="badge badge-success">OK</span></td>
-    <td><button class="copy-btn" title="Copy all info" onclick="copyText('${escAttr(copyData)}')">⎘</button></td>
+  const card = document.createElement('div');
+  card.className = 'acct-card';
+  const copyAll = `${data.name}\n${data.email}\n${data.password}\n${data.uid}`;
+  card.innerHTML = `
+    <span class="acct-num">#${data.num}</span>
+    <div class="acct-row">
+      <span class="acct-field-label">Name</span>
+      <span class="acct-field-value acct-name">${escHtml(data.name)}</span>
+    </div>
+    <div class="acct-row">
+      <span class="acct-field-label">Email</span>
+      <span class="acct-field-value acct-email">${escHtml(data.email)}</span>
+      <button class="copy-btn" title="Copy email" onclick="copyField(this, '${escAttr(data.email)}')">copy</button>
+    </div>
+    <div class="acct-row">
+      <span class="acct-field-label">Password</span>
+      <span class="acct-field-value acct-pass">${escHtml(data.password)}</span>
+    </div>
+    <div class="acct-row">
+      <span class="acct-field-label">UID</span>
+      <span class="acct-field-value acct-uid">${escHtml(data.uid)}</span>
+    </div>
+    <button class="acct-copy-all" title="Copy all" onclick="copyField(this, '${escAttr(copyAll)}')">⎘</button>
   `;
+  panel.appendChild(card);
 
   createdCount++;
   document.getElementById('statCreated').textContent = createdCount;
   document.getElementById('accountCount').textContent = `(${createdCount})`;
   updateProgress();
+}
+
+function copyField(btn, text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.classList.add('copied');
+  btn.textContent = '✓';
+  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1200);
 }
 
 function updateProgress() {
@@ -640,9 +684,8 @@ async function startJob() {
   document.getElementById('progressLabel').textContent = 'Starting...';
 
   document.getElementById('log-panel').innerHTML = '';
-  document.getElementById('acctBody').innerHTML  = '';
-  document.getElementById('acctEmpty').style.display = '';
-  document.getElementById('acctTable').style.display = 'none';
+  const panel = document.getElementById('accounts-panel');
+  panel.innerHTML = '<div class="empty-state" id="acctEmpty"><div class="empty-icon">⬡</div><div class="empty-text">No accounts created yet</div></div>';
   document.getElementById('accountCount').textContent = '(0)';
 
   const resp = await fetch('/start', {
