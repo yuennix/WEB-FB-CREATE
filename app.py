@@ -27,7 +27,7 @@ lock       = threading.Lock()
 done_count = [0]
 cp_count   = [0]
 
-WORKERS = 20   # 20 parallel workers
+WORKERS = 30   # 30 parallel workers
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -41,6 +41,29 @@ def index():
             auth.touch_key(key)
             return render_template('index.html')
     return render_template('login.html')
+
+
+@app.route('/generate-key', methods=['POST'])
+def generate_key():
+    data   = request.json or {}
+    name   = (data.get('name') or '').strip()
+    reason = (data.get('reason') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    key, user_id = auth.generate_key(name, reason)
+    return jsonify({'key': key, 'user_id': user_id})
+
+
+@app.route('/notify-admin', methods=['POST'])
+def notify_admin():
+    data = request.json or {}
+    key  = (data.get('key') or '').strip().upper()
+    if not key:
+        return jsonify({'error': 'Key is required'}), 400
+    ok = auth.notify_admin(key)
+    if ok:
+        return jsonify({'status': 'sent'})
+    return jsonify({'error': 'Key not found'}), 404
 
 
 @app.route('/request-access', methods=['POST'])

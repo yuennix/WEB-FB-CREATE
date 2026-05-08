@@ -22,7 +22,7 @@
     border-radius: 12px;
     padding: 40px 36px;
     width: 100%;
-    max-width: 420px;
+    max-width: 440px;
     box-shadow: 0 0 40px #00ff8808;
   }
 
@@ -32,7 +32,6 @@
 
   .tabs {
     display: flex;
-    gap: 0;
     margin-bottom: 28px;
     border-bottom: 1px solid #00ff8820;
   }
@@ -55,7 +54,7 @@
 
   label { font-size: 10px; color: #666; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 5px; }
 
-  input[type="text"], input[type="password"], textarea {
+  input[type="text"], textarea {
     width: 100%;
     background: #161b22;
     border: 1px solid #30363d;
@@ -81,10 +80,17 @@
     cursor: pointer;
     letter-spacing: 1px;
     transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
   .btn-primary { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #000; }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
   .btn-primary:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-secondary { background: transparent; border: 1px solid #00ff8840; color: #00ff88; }
+  .btn-secondary:hover:not(:disabled) { background: #00ff8810; border-color: #00ff88; }
+  .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
 
   .msg {
     font-size: 12px;
@@ -99,50 +105,88 @@
   .msg-warn    { background: #ffaa0012; border: 1px solid #ffaa0030; color: #ffaa00; }
   .msg-info    { background: #0088ff12; border: 1px solid #0088ff30; color: #66aaff; }
 
-  .key-box {
+  /* ── Key display box ── */
+  .key-reveal {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
     background: #070b10;
-    border: 1px solid #00ff8830;
-    border-radius: 6px;
-    padding: 12px;
-    font-size: 13px;
+    border: 1px solid #00ff8840;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .key-reveal.show { display: flex; }
+  .key-label { font-size: 9px; color: #555; letter-spacing: 2px; text-transform: uppercase; }
+  .key-value {
+    font-size: 15px;
     color: #00ff88;
-    text-align: center;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     word-break: break-all;
-    cursor: pointer;
-    transition: background .2s;
-    display: none;
-  }
-  .key-box:hover { background: #00ff8810; }
-  .key-box.show { display: block; }
-
-  .uid-box {
-    font-size: 10px;
-    color: #555;
     text-align: center;
-    display: none;
-    letter-spacing: 1px;
+    font-weight: bold;
+    text-shadow: 0 0 10px #00ff8840;
+    cursor: pointer;
+    padding: 4px 0;
   }
-  .uid-box.show { display: block; }
+  .key-value:hover { text-shadow: 0 0 16px #00ff88; }
+  .key-uid { font-size: 10px; color: #444; text-align: center; letter-spacing: 1px; }
+  .copy-hint { font-size: 9px; color: #333; text-align: center; letter-spacing: 1px; }
 
-  .hint { font-size: 10px; color: #444; text-align: center; letter-spacing: 0.5px; }
+  /* ── Step indicator ── */
+  .steps {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 0;
+  }
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    position: relative;
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold;
+    border: 1px solid #30363d;
+    color: #444;
+    background: #0d1117;
+    transition: all .3s;
+    position: relative; z-index: 1;
+  }
+  .step.active .step-num { border-color: #00ff88; color: #00ff88; box-shadow: 0 0 8px #00ff8830; }
+  .step.done .step-num { border-color: #00ff88; background: #00ff88; color: #000; }
+  .step-lbl { font-size: 9px; color: #333; letter-spacing: 0.5px; text-align: center; transition: color .3s; }
+  .step.active .step-lbl, .step.done .step-lbl { color: #00ff8880; }
+  .step-line { flex: 1; height: 1px; background: #30363d; margin-top: -14px; transition: background .3s; }
+  .step-line.done { background: #00ff8860; }
 
   .spinner {
-    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #00000030;
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+  .spinner-green {
     width: 12px; height: 12px;
     border: 2px solid #00ff8830;
     border-top-color: #00ff88;
     border-radius: 50%;
     animation: spin .7s linear infinite;
-    vertical-align: middle;
-    margin-right: 6px;
+    flex-shrink: 0;
     display: none;
   }
-  .spinner.show { display: inline-block; }
+  .spinner-green.show { display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .poll-row { display: none; flex-direction: column; gap: 10px; }
-  .poll-row.show { display: flex; }
+  .hint { font-size: 10px; color: #444; text-align: center; letter-spacing: 0.5px; }
+  .divider { height: 1px; background: #00ff8815; }
 </style>
 </head>
 <body>
@@ -154,12 +198,85 @@
   </div>
 
   <div class="tabs">
-    <div class="tab active" id="tab-login" onclick="switchTab('login')">Enter Key</div>
-    <div class="tab" id="tab-request" onclick="switchTab('request')">Request Access</div>
+    <div class="tab active" id="tab-request" onclick="switchTab('request')">Get Access</div>
+    <div class="tab" id="tab-login" onclick="switchTab('login')">I Have a Key</div>
   </div>
 
-  <!-- ENTER KEY PANEL -->
-  <div class="panel active" id="panel-login">
+  <!-- ══════════════════════════════════════
+       GET ACCESS PANEL  (2-step)
+  ══════════════════════════════════════ -->
+  <div class="panel active" id="panel-request">
+
+    <!-- Step indicator -->
+    <div class="steps" id="stepIndicator">
+      <div class="step active" id="step1">
+        <div class="step-num">1</div>
+        <div class="step-lbl">Generate Key</div>
+      </div>
+      <div class="step-line" id="stepLine"></div>
+      <div class="step" id="step2">
+        <div class="step-num">2</div>
+        <div class="step-lbl">Send to Admin</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: fill in details -->
+    <div id="formArea">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label>Your Name</label>
+          <input type="text" id="reqName" placeholder="e.g. Juan Dela Cruz"
+                 onkeydown="if(event.key==='Enter') generateKey()">
+        </div>
+        <div>
+          <label>Reason (optional)</label>
+          <textarea id="reqReason" rows="2" placeholder="Why do you need access?"></textarea>
+        </div>
+        <div id="genMsg" class="msg"></div>
+        <button class="btn btn-primary" id="btnGenerate" onclick="generateKey()">
+          <span class="spinner" id="genSpinner" style="display:none"></span>
+          GENERATE MY KEY
+        </button>
+        <div class="hint">A unique access key will be created for you.</div>
+      </div>
+    </div>
+
+    <!-- STEP 2: key shown, send to admin -->
+    <div id="keyArea" style="display:none;flex-direction:column;gap:14px;">
+
+      <div class="key-reveal show" id="keyReveal">
+        <div class="key-label">Your Access Key — Save This!</div>
+        <div class="key-value" id="genKey" onclick="copyKey()" title="Click to copy"></div>
+        <div class="key-uid" id="genUid"></div>
+        <div class="copy-hint">▲ Click key to copy</div>
+      </div>
+
+      <div id="sendMsg" class="msg"></div>
+
+      <button class="btn btn-primary" id="btnSend" onclick="sendToAdmin()">
+        <span class="spinner" id="sendSpinner" style="display:none"></span>
+        SEND TO ADMIN
+      </button>
+
+      <button class="btn btn-secondary" onclick="resetForm()">← Start Over</button>
+
+      <!-- Waiting state (shown after sending) -->
+      <div id="waitArea" style="display:none;flex-direction:column;gap:10px;">
+        <div class="divider"></div>
+        <div id="waitMsg" class="msg msg-info show">
+          <span class="spinner-green show" style="vertical-align:middle;margin-right:6px;"></span>
+          Waiting for admin approval via Telegram…
+        </div>
+        <div class="hint">Keep this page open. You'll be logged in automatically once approved.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════
+       I HAVE A KEY PANEL
+  ══════════════════════════════════════ -->
+  <div class="panel" id="panel-login">
     <div>
       <label>Access Key</label>
       <input type="text" id="keyInput" placeholder="WEYN-XXXX-XXXX-XXXX-XXXX"
@@ -168,39 +285,10 @@
     </div>
     <div id="loginMsg" class="msg"></div>
     <button class="btn btn-primary" id="btnVerify" onclick="verifyKey()">
-      <span class="spinner" id="verifySpinner"></span>
+      <span class="spinner" id="verifySpinner" style="display:none"></span>
       ENTER
     </button>
-    <div class="hint">Don't have a key? Switch to "Request Access"</div>
-  </div>
-
-  <!-- REQUEST ACCESS PANEL -->
-  <div class="panel" id="panel-request">
-    <div>
-      <label>Your Name</label>
-      <input type="text" id="reqName" placeholder="e.g. Juan Dela Cruz">
-    </div>
-    <div>
-      <label>Reason (optional)</label>
-      <textarea id="reqReason" rows="2" placeholder="Why do you need access?"></textarea>
-    </div>
-    <div id="reqMsg" class="msg"></div>
-    <button class="btn btn-primary" id="btnRequest" onclick="requestAccess()">
-      <span class="spinner" id="reqSpinner"></span>
-      SEND REQUEST TO ADMIN
-    </button>
-
-    <!-- After request submitted -->
-    <div class="key-box" id="genKey" onclick="copyKey()" title="Click to copy"></div>
-    <div class="uid-box" id="genUid"></div>
-
-    <!-- Poll status -->
-    <div class="poll-row" id="pollRow">
-      <div id="pollMsg" class="msg msg-info show">
-        <span class="spinner show"></span> Waiting for admin approval…
-      </div>
-      <div class="hint">Your key is shown above. Copy it and enter it once approved.</div>
-    </div>
+    <div class="hint">Don't have a key yet? Switch to "Get Access"</div>
   </div>
 </div>
 
@@ -218,54 +306,28 @@ function switchTab(name) {
 function showMsg(id, text, type) {
   const el = document.getElementById(id);
   el.className = `msg msg-${type} show`;
-  el.textContent = text;
+  el.innerHTML = text;
 }
 
-async function verifyKey() {
-  const key = document.getElementById('keyInput').value.trim();
-  if (!key) { showMsg('loginMsg', 'Please enter your access key.', 'error'); return; }
-
-  document.getElementById('btnVerify').disabled = true;
-  document.getElementById('verifySpinner').classList.add('show');
-
-  try {
-    const r = await fetch('/verify-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    });
-    const d = await r.json();
-
-    if (d.status === 'approved') {
-      showMsg('loginMsg', `Welcome, ${d.name}!`, 'success');
-      setTimeout(() => window.location.href = '/', 800);
-    } else if (d.status === 'pending') {
-      showMsg('loginMsg', 'Your key is still pending admin approval.', 'warn');
-    } else if (d.status === 'rejected') {
-      showMsg('loginMsg', 'This key has been rejected. Contact admin.', 'error');
-    } else if (d.status === 'revoked') {
-      showMsg('loginMsg', 'This key has been revoked. Contact admin.', 'error');
-    } else {
-      showMsg('loginMsg', 'Invalid key. Check and try again.', 'error');
-    }
-  } catch(e) {
-    showMsg('loginMsg', 'Connection error. Try again.', 'error');
-  }
-
-  document.getElementById('btnVerify').disabled = false;
-  document.getElementById('verifySpinner').classList.remove('show');
+function hideMsg(id) {
+  document.getElementById(id).className = 'msg';
 }
 
-async function requestAccess() {
+// ── STEP 1: Generate key ──────────────────────────────────────────────────────
+
+async function generateKey() {
   const name   = document.getElementById('reqName').value.trim();
   const reason = document.getElementById('reqReason').value.trim();
-  if (!name) { showMsg('reqMsg', 'Please enter your name.', 'error'); return; }
+  if (!name) { showMsg('genMsg', 'Please enter your name.', 'error'); return; }
 
-  document.getElementById('btnRequest').disabled = true;
-  document.getElementById('reqSpinner').classList.add('show');
+  const btn = document.getElementById('btnGenerate');
+  const sp  = document.getElementById('genSpinner');
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+  hideMsg('genMsg');
 
   try {
-    const r = await fetch('/request-access', {
+    const r = await fetch('/generate-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, reason }),
@@ -274,30 +336,75 @@ async function requestAccess() {
 
     if (d.key) {
       pendingKey = d.key;
-      showMsg('reqMsg', '✓ Request sent! Admin will be notified via Telegram.', 'success');
-      document.getElementById('btnRequest').disabled = true;
 
-      const keyBox = document.getElementById('genKey');
-      keyBox.textContent = d.key;
-      keyBox.classList.add('show');
+      document.getElementById('genKey').textContent  = d.key;
+      document.getElementById('genUid').textContent  = `User ID: ${d.user_id}`;
 
-      const uidBox = document.getElementById('genUid');
-      uidBox.textContent = `User ID: ${d.user_id}`;
-      uidBox.classList.add('show');
+      // Transition to step 2
+      document.getElementById('formArea').style.display = 'none';
+      document.getElementById('keyArea').style.display  = 'flex';
 
-      document.getElementById('pollRow').classList.add('show');
-      startPolling(d.key);
+      // Update step indicator
+      document.getElementById('step1').classList.remove('active');
+      document.getElementById('step1').classList.add('done');
+      document.getElementById('step1').querySelector('.step-num').textContent = '✓';
+      document.getElementById('stepLine').classList.add('done');
+      document.getElementById('step2').classList.add('active');
     } else {
-      showMsg('reqMsg', d.error || 'Failed to send request.', 'error');
-      document.getElementById('btnRequest').disabled = false;
+      showMsg('genMsg', d.error || 'Failed to generate key. Try again.', 'error');
+      btn.disabled = false;
     }
   } catch(e) {
-    showMsg('reqMsg', 'Connection error. Try again.', 'error');
-    document.getElementById('btnRequest').disabled = false;
+    showMsg('genMsg', 'Connection error. Try again.', 'error');
+    btn.disabled = false;
   }
 
-  document.getElementById('reqSpinner').classList.remove('show');
+  sp.style.display = 'none';
 }
+
+// ── STEP 2: Send to admin ─────────────────────────────────────────────────────
+
+async function sendToAdmin() {
+  if (!pendingKey) return;
+
+  const btn = document.getElementById('btnSend');
+  const sp  = document.getElementById('sendSpinner');
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+  hideMsg('sendMsg');
+
+  try {
+    const r = await fetch('/notify-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: pendingKey }),
+    });
+    const d = await r.json();
+
+    if (d.status === 'sent') {
+      showMsg('sendMsg', '✓ Sent! The admin has been notified on Telegram.', 'success');
+      btn.style.display = 'none';
+      document.getElementById('waitArea').style.display = 'flex';
+
+      // Update step 2 as done
+      document.getElementById('step2').classList.remove('active');
+      document.getElementById('step2').classList.add('done');
+      document.getElementById('step2').querySelector('.step-num').textContent = '✓';
+
+      startPolling(pendingKey);
+    } else {
+      showMsg('sendMsg', d.error || 'Failed to notify admin. Try again.', 'error');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showMsg('sendMsg', 'Connection error. Try again.', 'error');
+    btn.disabled = false;
+  }
+
+  sp.style.display = 'none';
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
 
 function startPolling(key) {
   if (pollInterval) clearInterval(pollInterval);
@@ -309,11 +416,12 @@ function startPolling(key) {
         body: JSON.stringify({ key }),
       });
       const d = await r.json();
+
       if (d.status === 'approved') {
         clearInterval(pollInterval);
-        document.getElementById('pollMsg').className = 'msg msg-success show';
-        document.getElementById('pollMsg').textContent = '✅ Approved! Logging you in…';
-        // auto-login
+        const wm = document.getElementById('waitMsg');
+        wm.className = 'msg msg-success show';
+        wm.textContent = '✅ Approved! Logging you in…';
         setTimeout(async () => {
           await fetch('/verify-key', {
             method: 'POST',
@@ -324,11 +432,33 @@ function startPolling(key) {
         }, 1200);
       } else if (d.status === 'rejected') {
         clearInterval(pollInterval);
-        document.getElementById('pollMsg').className = 'msg msg-error show';
-        document.getElementById('pollMsg').textContent = '❌ Request rejected by admin.';
+        const wm = document.getElementById('waitMsg');
+        wm.className = 'msg msg-error show';
+        wm.textContent = '❌ Request rejected by admin.';
       }
     } catch(e) {}
   }, 4000);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function resetForm() {
+  if (pollInterval) clearInterval(pollInterval);
+  pendingKey = '';
+  document.getElementById('formArea').style.display = '';
+  document.getElementById('keyArea').style.display  = 'none';
+  document.getElementById('waitArea').style.display = 'none';
+  document.getElementById('btnGenerate').disabled   = false;
+  document.getElementById('btnSend').disabled       = false;
+  document.getElementById('btnSend').style.display  = '';
+  hideMsg('genMsg'); hideMsg('sendMsg');
+
+  // Reset steps
+  document.getElementById('step1').className = 'step active';
+  document.getElementById('step1').querySelector('.step-num').textContent = '1';
+  document.getElementById('step2').className = 'step';
+  document.getElementById('step2').querySelector('.step-num').textContent = '2';
+  document.getElementById('stepLine').classList.remove('done');
 }
 
 function copyKey() {
@@ -345,6 +475,45 @@ function copyKey() {
   const orig = box.textContent;
   box.textContent = 'Copied!';
   setTimeout(() => box.textContent = orig, 1200);
+}
+
+// ── Enter key panel ───────────────────────────────────────────────────────────
+
+async function verifyKey() {
+  const key = document.getElementById('keyInput').value.trim();
+  if (!key) { showMsg('loginMsg', 'Please enter your access key.', 'error'); return; }
+
+  const btn = document.getElementById('btnVerify');
+  const sp  = document.getElementById('verifySpinner');
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+
+  try {
+    const r = await fetch('/verify-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const d = await r.json();
+
+    if (d.status === 'approved') {
+      showMsg('loginMsg', `✓ Welcome, ${d.name}!`, 'success');
+      setTimeout(() => window.location.href = '/', 800);
+    } else if (d.status === 'pending') {
+      showMsg('loginMsg', '⏳ Your key is still pending admin approval.', 'warn');
+    } else if (d.status === 'rejected') {
+      showMsg('loginMsg', '❌ This key has been rejected. Contact admin.', 'error');
+    } else if (d.status === 'revoked') {
+      showMsg('loginMsg', '🚫 This key has been revoked. Contact admin.', 'error');
+    } else {
+      showMsg('loginMsg', 'Invalid key. Check and try again.', 'error');
+    }
+  } catch(e) {
+    showMsg('loginMsg', 'Connection error. Try again.', 'error');
+  }
+
+  btn.disabled = false;
+  sp.style.display = 'none';
 }
 </script>
 
