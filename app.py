@@ -301,7 +301,7 @@ def _create_one(name_type, gender, password_type, custom_password, num):
 
                 try:
                     with open('weynFBCreate.txt', 'a') as f:
-                        f.write(f"{firstname} {lastname}|{phone}|{pww}|{uid}\n")
+                        f.write(f"{uid}|{pww}\n")
                 except Exception:
                     pass
 
