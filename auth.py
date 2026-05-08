@@ -270,6 +270,9 @@ def _register_commands():
             {'command': 'remove', 'description': '🗑 Remove user — /remove USR-XXXX'},
         ]
     })
+    _tg_post('setChatMenuButton', {
+        'menu_button': {'type': 'commands'}
+    })
 
 
 # ── Admin notification with Approve / Decline buttons ────────────────────────
