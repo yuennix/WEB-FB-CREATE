@@ -454,7 +454,7 @@ def status():
 
 # ── Admin auth ────────────────────────────────────────────────────────────────
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'weyn-admin-2025')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'yuennix')
 
 def _require_admin():
     return session.get('is_admin') is True
