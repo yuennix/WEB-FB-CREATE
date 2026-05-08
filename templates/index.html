@@ -350,7 +350,7 @@
 
   /* ── Accounts toolbar ── */
   .accounts-toolbar {
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: flex-end;
     padding: 8px 20px;
@@ -358,7 +358,6 @@
     flex-shrink: 0;
     background: rgba(10,15,26,0.5);
   }
-  .accounts-toolbar.visible { display: flex; }
 
   .btn-copy-all {
     padding: 6px 14px;
@@ -727,7 +726,6 @@ function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
   const uidPass = `${data.uid}|${data.password}`;
   allAccounts.push(uidPass);
-  document.getElementById('accountsToolbar').classList.add('visible');
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
   card.className = 'acct-card';
@@ -817,7 +815,6 @@ async function startJob() {
 
   createdCount = 0; targetCount = count; startTime = Date.now();
   allAccounts = [];
-  document.getElementById('accountsToolbar').classList.remove('visible');
   document.getElementById('statCreated').textContent = '0';
   document.getElementById('statTotal').textContent   = count;
   document.getElementById('statTime').textContent    = '0s';
