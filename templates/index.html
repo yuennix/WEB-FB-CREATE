@@ -348,22 +348,30 @@
   .log-warn    .log-msg { color: #fbbf24; }
   .log-error   .log-msg { color: #f87171; }
 
-  .btn-copy-all {
-    margin-left: auto;
-    padding: 0 4px;
-    background: none;
-    border: none;
+  .copy-all-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    background: rgba(0,230,118,0.07);
+    border-bottom: 1px solid rgba(0,230,118,0.12);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background .2s;
+    gap: 8px;
+  }
+  .copy-all-bar:hover { background: rgba(0,230,118,0.13); }
+  .copy-all-bar:active { background: rgba(0,230,118,0.18); }
+  .copy-all-bar-icon { font-size: 15px; color: #00e676; }
+  .copy-all-bar-text {
     font-family: 'Inter', sans-serif;
     font-size: 13px;
     font-weight: 700;
     color: #e2e8f0;
-    cursor: pointer;
-    letter-spacing: -0.2px;
-    transition: color .15s;
-    white-space: nowrap;
+    letter-spacing: -0.1px;
   }
-  .btn-copy-all:hover { color: #00e676; }
-  .btn-copy-all.copied { color: #00e676; }
+  .copy-all-bar-text span { color: #00e676; }
+  .copy-all-bar.copied .copy-all-bar-text { color: #00e676; }
 
   /* ── Accounts panel ── */
   #accounts-panel {
@@ -598,7 +606,11 @@
     <div class="tabs-bar">
       <div class="tab active" onclick="switchTab('log')">Console Log</div>
       <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#1e293b;">(0)</span></div>
-      <button class="btn-copy-all" id="btnCopyAll" onclick="copyAllAccounts(this)">Copy All Accounts</button>
+    </div>
+
+    <div class="copy-all-bar" id="copyAllBar" onclick="copyAllAccounts(this)">
+      <span class="copy-all-bar-icon">⎘</span>
+      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
     </div>
 
     <div class="tab-content active" id="tab-log">
@@ -745,7 +757,7 @@ function addAccount(data) {
   updateProgress();
 }
 
-function copyAllAccounts(btn) {
+function copyAllAccounts(el) {
   if (!allAccounts.length) return;
   const text = allAccounts.join('\n');
   navigator.clipboard.writeText(text).catch(() => {
@@ -753,10 +765,12 @@ function copyAllAccounts(btn) {
     ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
   });
-  const orig = btn.textContent;
-  btn.classList.add('copied');
-  btn.textContent = `✓ Copied ${allAccounts.length} account${allAccounts.length > 1 ? 's' : ''}!`;
-  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 2000);
+  const bar  = document.getElementById('copyAllBar');
+  const label = document.getElementById('copyAllText');
+  const orig  = label.innerHTML;
+  bar.classList.add('copied');
+  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length > 1 ? 's' : ''} (uid|password)!`;
+  setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2000);
 }
 
 function copyField(btn, text) {
