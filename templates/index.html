@@ -5,19 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WEYN — FB Account Creator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #060a12;
+    background: #050810;
     color: #e2e8f0;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     height: 100vh;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,230,118,0.05) 0%, transparent 60%);
   }
 
   /* ── Header ── */
@@ -100,7 +101,7 @@
   .btn-header {
     padding: 6px 14px;
     border-radius: 8px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -149,11 +150,23 @@
 
   .section-label {
     font-size: 10px;
-    font-weight: 600;
-    color: #334155;
+    font-weight: 700;
+    color: #475569;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .section-label::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 10px;
+    background: #00e676;
+    border-radius: 2px;
+    flex-shrink: 0;
   }
 
   .form-group { display: flex; flex-direction: column; gap: 5px; }
@@ -170,7 +183,7 @@
     border-radius: 9px;
     color: #e2e8f0;
     padding: 10px 12px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 13px;
     outline: none;
     transition: border-color .2s, box-shadow .2s;
@@ -227,25 +240,28 @@
   }
 
   .stat-box {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 10px 8px;
+    background: linear-gradient(160deg, rgba(20,30,54,0.9) 0%, rgba(10,15,26,0.9) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-top: 1px solid rgba(0,230,118,0.15);
+    border-radius: 12px;
+    padding: 12px 8px;
     text-align: center;
+    transition: border-color .2s;
   }
+  .stat-box:hover { border-color: rgba(255,255,255,0.12); }
   .stat-num {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 800;
     color: #00e676;
-    letter-spacing: -0.5px;
+    letter-spacing: -1px;
   }
   .stat-label {
     font-size: 9px;
-    color: #334155;
+    color: #475569;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    font-weight: 600;
-    margin-top: 2px;
+    font-weight: 700;
+    margin-top: 3px;
   }
 
   /* ── Buttons ── */
@@ -255,7 +271,7 @@
     padding: 11px 16px;
     border-radius: 10px;
     border: none;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -265,13 +281,14 @@
   }
 
   .btn-start {
-    background: linear-gradient(135deg, #00e676, #00c853);
+    background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
     color: #000;
-    box-shadow: 0 4px 16px rgba(0,230,118,0.2);
+    font-weight: 700;
+    box-shadow: 0 4px 20px rgba(0,230,118,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
   }
   .btn-start:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0,230,118,0.3);
+    box-shadow: 0 8px 28px rgba(0,230,118,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
   }
   .btn-start:disabled {
     background: rgba(0,230,118,0.1);
@@ -335,7 +352,7 @@
     padding: 16px 20px;
     font-size: 12px;
     line-height: 1.8;
-    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
   #log-panel::-webkit-scrollbar { width: 3px; }
   #log-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
@@ -364,7 +381,7 @@
   .copy-all-bar:active { background: rgba(0,230,118,0.18); }
   .copy-all-bar-icon { font-size: 15px; color: #00e676; }
   .copy-all-bar-text {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 13px;
     font-weight: 700;
     color: #e2e8f0;
@@ -386,17 +403,21 @@
   #accounts-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
 
   .acct-card {
-    background: rgba(14,20,36,0.8);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(18,26,48,0.95) 0%, rgba(10,15,26,0.95) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
     padding: 14px 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     position: relative;
-    transition: border-color .2s;
+    transition: border-color .2s, box-shadow .2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   }
-  .acct-card:hover { border-color: rgba(0,230,118,0.15); }
+  .acct-card:hover {
+    border-color: rgba(0,230,118,0.2);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
 
   .acct-num {
     position: absolute;
@@ -445,7 +466,7 @@
     cursor: pointer;
     padding: 3px 9px;
     font-size: 11px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-weight: 500;
     transition: all .15s;
     flex-shrink: 0;
