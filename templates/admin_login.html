@@ -58,32 +58,33 @@
   .logo { text-align: center; }
 
   .logo-icon {
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     background: linear-gradient(135deg, #f59e0b, #d97706);
-    border-radius: 14px;
+    border-radius: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 800;
     color: #000;
     letter-spacing: -1px;
-    margin-bottom: 14px;
-    box-shadow: 0 8px 24px rgba(245,158,11,0.3);
+    margin-bottom: 16px;
+    box-shadow: 0 0 0 8px rgba(245,158,11,0.08), 0 12px 32px rgba(245,158,11,0.35);
   }
 
   .logo-name {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 800;
     color: #f1f5f9;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.8px;
   }
 
   .logo-sub {
     font-size: 12px;
-    color: #475569;
-    margin-top: 4px;
+    color: #64748b;
+    margin-top: 5px;
+    font-weight: 500;
   }
 
   .field-label {
@@ -97,38 +98,41 @@
   input[type="password"] {
     width: 100%;
     background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
     color: #e2e8f0;
-    padding: 12px 14px;
+    padding: 13px 16px;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 14px;
+    font-weight: 500;
     outline: none;
-    transition: border-color .2s, box-shadow .2s;
+    transition: border-color .2s, box-shadow .2s, background .2s;
   }
   input[type="password"]:focus {
-    border-color: rgba(245,158,11,0.5);
-    box-shadow: 0 0 0 3px rgba(245,158,11,0.08);
+    border-color: rgba(245,158,11,0.45);
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.08);
+    background: rgba(245,158,11,0.02);
   }
-  input::placeholder { color: #334155; }
+  input::placeholder { color: #2d3f55; font-weight: 400; }
 
   .btn {
     width: 100%;
-    padding: 13px;
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+    padding: 14px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     color: #000;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: all .2s;
-    box-shadow: 0 4px 16px rgba(245,158,11,0.25);
+    box-shadow: 0 4px 20px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+    letter-spacing: 0.1px;
   }
   .btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(245,158,11,0.35);
+    box-shadow: 0 8px 28px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
   }
   .btn:active { transform: translateY(0); }
 

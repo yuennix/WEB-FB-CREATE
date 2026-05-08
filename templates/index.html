@@ -23,11 +23,11 @@
 
   /* ── Header ── */
   header {
-    background: rgba(10,15,26,0.95);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(8,12,22,0.97);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
     padding: 0 24px;
-    height: 56px;
+    height: 60px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -37,25 +37,25 @@
   }
 
   .logo-mark {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     background: linear-gradient(135deg, #00e676, #00b84c);
-    border-radius: 8px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 800;
     color: #000;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(0,230,118,0.3);
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.1), 0 4px 16px rgba(0,230,118,0.3);
   }
 
   .logo-text {
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 800;
     color: #f1f5f9;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.5px;
   }
 
   .logo-sep {
@@ -67,8 +67,8 @@
 
   .logo-sub {
     font-size: 12px;
-    color: #334155;
-    font-weight: 400;
+    color: #475569;
+    font-weight: 500;
   }
 
   .running-badge {
@@ -135,13 +135,13 @@
 
   /* ── Sidebar ── */
   .sidebar {
-    background: rgba(10,15,26,0.6);
-    border-right: 1px solid rgba(255,255,255,0.05);
-    padding: 20px 18px;
+    background: rgba(8,12,22,0.8);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 22px 20px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 22px;
   }
 
   .sidebar::-webkit-scrollbar { width: 3px; }
@@ -179,14 +179,15 @@
 
   select, input[type="text"], input[type="number"], input[type="password"] {
     background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
     color: #e2e8f0;
-    padding: 10px 12px;
+    padding: 10px 14px;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 13px;
+    font-weight: 500;
     outline: none;
-    transition: border-color .2s, box-shadow .2s;
+    transition: border-color .2s, box-shadow .2s, background .2s;
     width: 100%;
     -webkit-appearance: none;
   }
@@ -197,8 +198,9 @@
     padding-right: 32px;
   }
   select:focus, input:focus {
-    border-color: rgba(0,230,118,0.35);
-    box-shadow: 0 0 0 3px rgba(0,230,118,0.07);
+    border-color: rgba(0,230,118,0.45);
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.08);
+    background: rgba(0,230,118,0.02);
   }
   select option { background: #0e1420; }
   input::placeholder { color: #1e293b; }
@@ -281,18 +283,21 @@
   }
 
   .btn-start {
-    background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+    background: linear-gradient(135deg, #00e676 0%, #00b84c 100%);
     color: #000;
     font-weight: 700;
-    box-shadow: 0 4px 20px rgba(0,230,118,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+    font-size: 13px;
+    letter-spacing: 0.2px;
+    box-shadow: 0 4px 24px rgba(0,230,118,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
   }
   .btn-start:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 28px rgba(0,230,118,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(0,230,118,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
   }
+  .btn-start:active:not(:disabled) { transform: translateY(0); }
   .btn-start:disabled {
-    background: rgba(0,230,118,0.1);
-    color: rgba(0,230,118,0.25);
+    background: rgba(0,230,118,0.08);
+    color: rgba(0,230,118,0.2);
     cursor: not-allowed;
     box-shadow: none;
   }
@@ -322,8 +327,8 @@
 
   .tabs-bar {
     display: flex;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    background: rgba(10,15,26,0.8);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(8,12,22,0.9);
     flex-shrink: 0;
     padding: 0 20px;
     gap: 0;
@@ -332,15 +337,16 @@
   .tab {
     padding: 14px 18px;
     font-size: 12px;
-    font-weight: 500;
-    color: #334155;
+    font-weight: 600;
+    color: #475569;
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: all .2s;
     user-select: none;
+    letter-spacing: 0.1px;
   }
   .tab.active { color: #00e676; border-bottom-color: #00e676; }
-  .tab:hover:not(.active) { color: #64748b; }
+  .tab:hover:not(.active) { color: #94a3b8; }
 
   .tab-content { flex: 1; overflow: hidden; display: none; }
   .tab-content.active { display: flex; flex-direction: column; }

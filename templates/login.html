@@ -26,8 +26,9 @@
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,230,118,0.08) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0,180,255,0.04) 0%, transparent 60%);
+      radial-gradient(ellipse 90% 70% at 50% -5%, rgba(0,230,118,0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 40% at 85% 85%, rgba(0,180,255,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 15% 70%, rgba(0,230,118,0.04) 0%, transparent 60%);
     pointer-events: none;
   }
 
@@ -35,15 +36,16 @@
     position: fixed;
     inset: 0;
     background-image:
-      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 48px 48px;
     pointer-events: none;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
   }
 
   .card {
-    background: linear-gradient(160deg, rgba(18,26,48,0.92) 0%, rgba(10,15,26,0.92) 100%);
-    backdrop-filter: blur(24px);
+    background: linear-gradient(160deg, rgba(13,19,36,0.96) 0%, rgba(8,12,22,0.96) 100%);
+    backdrop-filter: blur(32px);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 24px;
     padding: 44px 40px;
@@ -59,42 +61,42 @@
   }
 
   .logo-icon {
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     background: linear-gradient(135deg, #00e676, #00b84c);
-    border-radius: 14px;
+    border-radius: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 800;
     color: #000;
     letter-spacing: -1px;
-    margin-bottom: 14px;
-    box-shadow: 0 8px 24px rgba(0,230,118,0.3);
+    margin-bottom: 16px;
+    box-shadow: 0 0 0 8px rgba(0,230,118,0.08), 0 12px 32px rgba(0,230,118,0.35);
   }
 
   .logo-name {
-    font-size: 24px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 800;
     color: #f1f5f9;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.8px;
   }
 
   .logo-sub {
     font-size: 12px;
-    color: #475569;
-    margin-top: 4px;
-    font-weight: 400;
-    letter-spacing: 0;
+    color: #64748b;
+    margin-top: 5px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
   }
 
   .tabs {
     display: flex;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 3px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 4px;
     margin-bottom: 28px;
     gap: 2px;
   }
@@ -102,26 +104,26 @@
   .tab {
     flex: 1;
     text-align: center;
-    padding: 8px 10px;
+    padding: 9px 10px;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     color: #475569;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 9px;
     transition: all .2s;
     user-select: none;
-    letter-spacing: 0;
+    letter-spacing: 0.1px;
   }
 
   .tab.active {
-    background: rgba(0,230,118,0.12);
+    background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,200,100,0.08));
     color: #00e676;
-    box-shadow: inset 0 0 0 1px rgba(0,230,118,0.2);
+    box-shadow: inset 0 0 0 1px rgba(0,230,118,0.25), 0 2px 8px rgba(0,230,118,0.1);
   }
 
-  .tab:hover:not(.active) { color: #94a3b8; }
+  .tab:hover:not(.active) { color: #94a3b8; background: rgba(255,255,255,0.03); }
 
-  .tab.admin-tab { color: #f59e0b88; }
+  .tab.admin-tab { color: rgba(245,158,11,0.5); }
   .tab.admin-tab:hover { color: #f59e0b; }
 
   .panel { display: none; flex-direction: column; gap: 16px; }
@@ -139,23 +141,25 @@
   input[type="text"], textarea {
     width: 100%;
     background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
     color: #e2e8f0;
-    padding: 11px 14px;
+    padding: 13px 16px;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 14px;
+    font-weight: 500;
     outline: none;
-    transition: border-color .2s, box-shadow .2s;
+    transition: border-color .2s, box-shadow .2s, background .2s;
     resize: none;
   }
 
   input:focus, textarea:focus {
-    border-color: rgba(0,230,118,0.4);
-    box-shadow: 0 0 0 3px rgba(0,230,118,0.08);
+    border-color: rgba(0,230,118,0.45);
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.08);
+    background: rgba(0,230,118,0.02);
   }
 
-  input::placeholder, textarea::placeholder { color: #334155; }
+  input::placeholder, textarea::placeholder { color: #2d3f55; font-weight: 400; }
 
   .btn {
     width: 100%;
@@ -175,17 +179,20 @@
   }
 
   .btn-primary {
-    background: linear-gradient(135deg, #00e676, #00c853);
+    background: linear-gradient(135deg, #00e676 0%, #00c050 100%);
     color: #000;
-    box-shadow: 0 4px 16px rgba(0,230,118,0.25);
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 4px 20px rgba(0,230,118,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+    letter-spacing: 0.1px;
   }
   .btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0,230,118,0.35);
+    box-shadow: 0 8px 28px rgba(0,230,118,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
   }
   .btn-primary:active:not(:disabled) { transform: translateY(0); }
   .btn-primary:disabled {
-    background: rgba(0,230,118,0.12);
+    background: rgba(0,230,118,0.1);
     color: rgba(0,230,118,0.3);
     cursor: not-allowed;
     box-shadow: none;
