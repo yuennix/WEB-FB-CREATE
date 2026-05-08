@@ -401,7 +401,7 @@
       <div class="section-title">Custom Domains (IMAP)</div>
       <div class="custom-domain-form">
         <input type="text" id="newCustomDomain" placeholder="Domain  e.g. weyn.store">
-        <input type="password" id="newCustomPass" placeholder="IMAP password">
+        <input type="password" id="newCustomPass" placeholder="IMAP password (optional)">
         <button onclick="addCustomDomain()">+ ADD CUSTOM DOMAIN</button>
       </div>
       <div id="customDomainList" class="domain-section" style="margin-top:12px;"></div>
@@ -849,7 +849,7 @@ async function addTempDomain() {
 async function addCustomDomain() {
   const domain    = document.getElementById('newCustomDomain').value.trim().toLowerCase();
   const imap_pass = document.getElementById('newCustomPass').value.trim();
-  if (!domain || !imap_pass) { toast('Domain and IMAP password required', true); return; }
+  if (!domain) { toast('Enter a domain', true); return; }
   const d = await api('/admin/api/domains/add-custom', 'POST', { domain, imap_pass });
   if (d.status === 'added') {
     toast(`✓ Added: ${domain}`);
