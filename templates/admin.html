@@ -857,31 +857,51 @@ function cAddAccount(data) {
   const empty = document.getElementById('c-acctEmpty');
   if (empty) empty.remove();
   const panel = document.getElementById('c-accts-panel');
-  const copyAll = `${data.name}\n${data.email}\n${data.password}\n${data.uid}`;
+  const copyAll = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
+
   const card = document.createElement('div');
-  card.style.cssText = 'background:#0d1117;border:1px solid #00ff8818;border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:5px;position:relative;';
+  card.style.cssText = `
+    background:#0d1117;
+    border:1px solid #00ff8822;
+    border-radius:10px;
+    padding:14px 14px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:0;
+    position:relative;
+  `;
   card.innerHTML = `
-    <span style="position:absolute;top:9px;right:11px;font-size:10px;color:#333;">#${data.num}</span>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">Name</span>
-      <span style="font-size:12px;color:#e0e0e0;font-weight:bold;flex:1;">${esc(data.name)}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:11px;color:#444;letter-spacing:1px;">#${data.num}</span>
+      <button onclick="cCopyField(this,\`${escAttr(copyAll)}\`)"
+        style="background:#161b22;border:1px solid #30363d;border-radius:5px;color:#555;cursor:pointer;padding:3px 10px;font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;transition:all .15s;"
+        title="Copy all">COPY ALL</button>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">Email</span>
-      <span style="font-size:12px;color:#00b4ff;flex:1;word-break:break-all;">${esc(data.email)}</span>
-      <button onclick="cCopyField(this,'${escAttr(data.email)}')" style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#444;cursor:pointer;padding:2px 7px;font-size:11px;transition:all .15s;flex-shrink:0;">copy</button>
+
+    <div style="display:grid;grid-template-columns:64px 1fr;row-gap:8px;align-items:center;">
+
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">Name</span>
+      <span style="font-size:13px;color:#e0e0e0;font-weight:bold;">${esc(data.name)}</span>
+
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">Email</span>
+      <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+        <span style="font-size:12px;color:#00b4ff;word-break:break-all;flex:1;">${esc(data.email)}</span>
+        <button onclick="cCopyField(this,'${escAttr(data.email)}')"
+          style="background:linear-gradient(135deg,#00b4ff22,#0088cc22);border:1px solid #00b4ff44;border-radius:5px;color:#00b4ff;cursor:pointer;padding:3px 10px;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;letter-spacing:1px;flex-shrink:0;transition:all .15s;">
+          COPY
+        </button>
+      </div>
+
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">Password</span>
+      <span style="font-size:12px;color:#888;letter-spacing:.5px;">${esc(data.password)}</span>
+
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">UID</span>
+      <span style="font-size:12px;color:#00ff88;letter-spacing:.5px;">${esc(data.uid)}</span>
+
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">Password</span>
-      <span style="font-size:12px;color:#888;flex:1;">${esc(data.password)}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">UID</span>
-      <span style="font-size:12px;color:#00ff88;flex:1;">${esc(data.uid)}</span>
-    </div>
-    <button onclick="cCopyField(this,'${escAttr(copyAll)}')" style="position:absolute;bottom:9px;right:11px;background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:14px;padding:0;transition:color .15s;" title="Copy all">⎘</button>
   `;
   panel.appendChild(card);
+
   cCreatedCount++;
   document.getElementById('c-statCreated').textContent = cCreatedCount;
   document.getElementById('c-acctCount').textContent = `(${cCreatedCount})`;
