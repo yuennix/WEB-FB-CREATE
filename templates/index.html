@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KYBX | FB Account Creator</title>
+<title>WEYN | FB Account Creator</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -342,11 +342,14 @@
 
 <header>
   <div>
-    <div class="logo-text">KYBX</div>
+    <div class="logo-text">WEYN</div>
     <div class="logo-sub">Facebook Account Creator</div>
   </div>
   <span class="running-badge" id="runningBadge">● RUNNING</span>
-  <div class="status-dot idle" id="statusDot"></div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+    <span id="userNameBadge" style="font-size:11px;color:#00ff8899;letter-spacing:1px;"></span>
+    <div class="status-dot idle" id="statusDot"></div>
+  </div>
 </header>
 
 <div class="container">
@@ -380,9 +383,6 @@
           <label>Email Domain</label>
           <select id="emailDomain" onchange="onDomainChange()">
             <option value="1secmail.com">1secmail (Auto API)</option>
-            <option value="weyn.store">weyn.store (Custom)</option>
-            <option value="jhames.shop">jhames.shop (Custom)</option>
-            <option value="jakulan.site">jakulan.site (Custom)</option>
           </select>
         </div>
 
@@ -499,15 +499,47 @@ let createdCount = 0;
 let targetCount = 0;
 let startTime = null;
 
+let _customDomains = [];
+
+async function loadDomains() {
+  try {
+    const r = await fetch('/api/domains');
+    if (!r.ok) return;
+    const d = await r.json();
+    _customDomains = d.custom || [];
+    const sel = document.getElementById('emailDomain');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    (d.temp || []).forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom;
+      o.textContent = dom + ' (Auto API)';
+      sel.appendChild(o);
+    });
+    _customDomains.forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom;
+      o.textContent = dom + ' (Custom)';
+      sel.appendChild(o);
+    });
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    onDomainChange();
+  } catch(e) {}
+}
+
 function onDomainChange() {
   const v = document.getElementById('emailDomain').value;
   const row = document.getElementById('domainPassRow');
-  if (['weyn.store','jhames.shop','jakulan.site'].includes(v)) {
-    row.classList.add('visible');
-  } else {
-    row.classList.remove('visible');
-  }
+  row.classList.toggle('visible', _customDomains.includes(v));
 }
+
+const _userName = {{ user_name | tojson }};
+document.addEventListener('DOMContentLoaded', () => {
+  if (_userName) {
+    document.getElementById('userNameBadge').textContent = '👤 ' + _userName;
+  }
+  loadDomains();
+});
 
 function onPassTypeChange() {
   const v = document.getElementById('passwordType').value;
