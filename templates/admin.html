@@ -346,6 +346,7 @@
   <div class="nav-tab active" onclick="showPage('overview')">Overview</div>
   <div class="nav-tab" onclick="showPage('users')">Users <span id="pendingBadge" style="display:none;color:#ffaa00;"> ●</span></div>
   <div class="nav-tab" onclick="showPage('domains')">Domains</div>
+  <div class="nav-tab" onclick="showPage('create')" style="color:#00b4ff99;">Create Accounts</div>
 </nav>
 
 <!-- OVERVIEW -->
@@ -408,6 +409,112 @@
   </div>
 </div>
 
+<!-- CREATE ACCOUNTS -->
+<div class="page" id="page-create">
+  <div style="display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - 100px);">
+
+    <!-- sidebar -->
+    <div style="background:#0d1117;border-right:1px solid #00ff8815;padding:20px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;">
+
+      <div class="section-title">Configuration</div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Name Type</label>
+          <select id="c-nameType" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+            <option value="1">Filipino Names</option>
+            <option value="2">RPW (Fantasy) Names</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Gender</label>
+          <select id="c-gender" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+            <option value="3">Mixed</option>
+            <option value="1">Male</option>
+            <option value="2">Female</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Email Domain</label>
+          <select id="c-emailDomain" onchange="cOnDomainChange()" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+            <option value="1secmail.com">1secmail.com (Auto API)</option>
+          </select>
+        </div>
+        <div id="c-domainPassRow" style="display:none;flex-direction:column;gap:5px;">
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;">Domain Password</label>
+          <input type="password" id="c-domainPassword" placeholder="Enter domain password" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Password Type</label>
+          <select id="c-passwordType" onchange="cOnPassTypeChange()" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+            <option value="auto">Auto-Generated</option>
+            <option value="custom">Custom Password</option>
+          </select>
+        </div>
+        <div id="c-customPassRow" style="display:none;flex-direction:column;gap:5px;">
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;">Custom Password</label>
+          <input type="text" id="c-customPassword" placeholder="Enter password" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Number of Accounts</label>
+          <input type="number" id="c-count" value="5" min="1" max="200" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        </div>
+      </div>
+
+      <!-- progress -->
+      <div>
+        <div class="section-title">Progress</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:6px;">
+          <span id="c-progressLabel">Ready</span>
+          <span id="c-progressPct">0%</span>
+        </div>
+        <div style="background:#161b22;border-radius:4px;height:5px;overflow:hidden;margin-bottom:10px;">
+          <div id="c-progressBar" style="height:100%;background:linear-gradient(90deg,#00ff88,#00cc6a);border-radius:4px;transition:width .4s ease;width:0%;"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;background:#161b22;border:1px solid #00ff8818;border-radius:6px;padding:8px;text-align:center;">
+            <div id="c-statCreated" style="font-size:20px;font-weight:bold;color:#00ff88;">0</div>
+            <div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;">Created</div>
+          </div>
+          <div style="flex:1;background:#161b22;border:1px solid #00ff8818;border-radius:6px;padding:8px;text-align:center;">
+            <div id="c-statTotal" style="font-size:20px;font-weight:bold;color:#00ff88;">—</div>
+            <div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;">Target</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- buttons -->
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <button id="c-btnStart" onclick="cStartJob()" style="padding:10px;background:linear-gradient(135deg,#00ff88,#00cc6a);border:none;border-radius:6px;color:#000;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;transition:all .2s;">▶ START CREATION</button>
+        <button id="c-btnStop" onclick="cStopJob()" disabled style="padding:10px;background:transparent;border:1px solid #ff444440;border-radius:6px;color:#ff4444;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;opacity:.4;">■ STOP</button>
+        <button onclick="window.location.href='/download'" style="padding:10px;background:transparent;border:1px solid #00ff8840;border-radius:6px;color:#00ff88;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;transition:all .2s;">⬇ DOWNLOAD RESULTS</button>
+      </div>
+    </div>
+
+    <!-- log + accounts -->
+    <div style="display:flex;flex-direction:column;overflow:hidden;">
+      <div style="display:flex;border-bottom:1px solid #00ff8815;background:#0d1117;">
+        <div id="c-tab-log" class="nav-tab active" style="border-bottom:2px solid #00ff88;color:#00ff88;" onclick="cSwitchTab('log')">Console Log</div>
+        <div id="c-tab-accts" class="nav-tab" onclick="cSwitchTab('accts')">Accounts <span id="c-acctCount" style="color:#555;">(0)</span></div>
+      </div>
+
+      <div id="c-log-panel" style="flex:1;overflow-y:auto;padding:12px 16px;background:#070b10;font-size:12px;line-height:1.7;">
+        <div id="c-logEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333;gap:8px;text-align:center;">
+          <div style="font-size:32px;">⬡</div>
+          <div style="font-size:12px;letter-spacing:1px;">Waiting to start...</div>
+        </div>
+      </div>
+
+      <div id="c-accts-panel" style="flex:1;overflow-y:auto;background:#070b10;padding:12px 14px;display:none;flex-direction:column;gap:8px;">
+        <div id="c-acctEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333;gap:8px;text-align:center;">
+          <div style="font-size:32px;">⬡</div>
+          <div style="font-size:12px;letter-spacing:1px;">No accounts yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -416,15 +523,16 @@ let currentFilter = 'all';
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav .nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  const tabs = document.querySelectorAll('.nav-tab');
-  const map = { overview: 0, users: 1, domains: 2 };
-  tabs[map[name]].classList.add('active');
+  const tabs = document.querySelectorAll('nav .nav-tab');
+  const map = { overview: 0, users: 1, domains: 2, create: 3 };
+  if (tabs[map[name]]) tabs[map[name]].classList.add('active');
 
   if (name === 'overview') loadOverview();
   if (name === 'users')    loadUsers();
   if (name === 'domains')  loadDomains();
+  if (name === 'create')   cLoadDomains();
 }
 
 function toast(msg, isErr) {
@@ -670,6 +778,208 @@ function copyText(text) {
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Create Accounts tab ───────────────────────────────────────────────────────
+
+let cEventSource   = null;
+let cCreatedCount  = 0;
+let cTargetCount   = 0;
+let _cCustomDomains = [];
+
+async function cLoadDomains() {
+  try {
+    const r = await fetch('/api/domains');
+    if (!r.ok) return;
+    const d = await r.json();
+    _cCustomDomains = d.custom || [];
+    const sel = document.getElementById('c-emailDomain');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    (d.temp || []).forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom; o.textContent = dom + ' (Auto API)';
+      sel.appendChild(o);
+    });
+    _cCustomDomains.forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom; o.textContent = dom + ' (Custom)';
+      sel.appendChild(o);
+    });
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    cOnDomainChange();
+  } catch(e) {}
+}
+
+function cOnDomainChange() {
+  const v = document.getElementById('c-emailDomain').value;
+  const row = document.getElementById('c-domainPassRow');
+  row.style.display = _cCustomDomains.includes(v) ? 'flex' : 'none';
+}
+
+function cOnPassTypeChange() {
+  const v = document.getElementById('c-passwordType').value;
+  document.getElementById('c-customPassRow').style.display = v === 'custom' ? 'flex' : 'none';
+}
+
+function cSwitchTab(name) {
+  const logPanel  = document.getElementById('c-log-panel');
+  const acctPanel = document.getElementById('c-accts-panel');
+  const logTab    = document.getElementById('c-tab-log');
+  const acctTab   = document.getElementById('c-tab-accts');
+  if (name === 'log') {
+    logPanel.style.display  = 'block';
+    acctPanel.style.display = 'none';
+    logTab.classList.add('active'); logTab.style.borderBottom = '2px solid #00ff88'; logTab.style.color = '#00ff88';
+    acctTab.classList.remove('active'); acctTab.style.borderBottom = ''; acctTab.style.color = '';
+  } else {
+    logPanel.style.display  = 'none';
+    acctPanel.style.display = 'flex';
+    acctTab.classList.add('active'); acctTab.style.borderBottom = '2px solid #00ff88'; acctTab.style.color = '#00ff88';
+    logTab.classList.remove('active'); logTab.style.borderBottom = ''; logTab.style.color = '';
+  }
+}
+
+function cAddLog(msg, level) {
+  const panel = document.getElementById('c-log-panel');
+  const empty = document.getElementById('c-logEmpty');
+  if (empty) empty.remove();
+  const colors = { success: '#00ff88', warn: '#ffaa00', error: '#ff4444', info: '#aaa' };
+  const now = new Date().toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.style.cssText = 'display:flex;gap:8px;align-items:baseline;';
+  line.innerHTML = `<span style="color:#333;font-size:10px;flex-shrink:0;">${now}</span><span style="color:${colors[level]||'#aaa'};flex:1;word-break:break-all;">${esc(msg)}</span>`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function cAddAccount(data) {
+  const empty = document.getElementById('c-acctEmpty');
+  if (empty) empty.remove();
+  const panel = document.getElementById('c-accts-panel');
+  const copyAll = `${data.name}\n${data.email}\n${data.password}\n${data.uid}`;
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#0d1117;border:1px solid #00ff8818;border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:5px;position:relative;';
+  card.innerHTML = `
+    <span style="position:absolute;top:9px;right:11px;font-size:10px;color:#333;">#${data.num}</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">Name</span>
+      <span style="font-size:12px;color:#e0e0e0;font-weight:bold;flex:1;">${esc(data.name)}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">Email</span>
+      <span style="font-size:12px;color:#00b4ff;flex:1;word-break:break-all;">${esc(data.email)}</span>
+      <button onclick="cCopyField(this,'${escAttr(data.email)}')" style="background:#161b22;border:1px solid #30363d;border-radius:4px;color:#444;cursor:pointer;padding:2px 7px;font-size:11px;transition:all .15s;flex-shrink:0;">copy</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">Password</span>
+      <span style="font-size:12px;color:#888;flex:1;">${esc(data.password)}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;width:56px;flex-shrink:0;">UID</span>
+      <span style="font-size:12px;color:#00ff88;flex:1;">${esc(data.uid)}</span>
+    </div>
+    <button onclick="cCopyField(this,'${escAttr(copyAll)}')" style="position:absolute;bottom:9px;right:11px;background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:14px;padding:0;transition:color .15s;" title="Copy all">⎘</button>
+  `;
+  panel.appendChild(card);
+  cCreatedCount++;
+  document.getElementById('c-statCreated').textContent = cCreatedCount;
+  document.getElementById('c-acctCount').textContent = `(${cCreatedCount})`;
+  const pct = cTargetCount ? Math.round((cCreatedCount / cTargetCount) * 100) : 0;
+  document.getElementById('c-progressBar').style.width = pct + '%';
+  document.getElementById('c-progressPct').textContent = pct + '%';
+  document.getElementById('c-progressLabel').textContent = `${cCreatedCount} of ${cTargetCount}`;
+}
+
+function cCopyField(btn, text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.style.color = '#00ff88';
+  btn.textContent = '✓';
+  setTimeout(() => { btn.style.color = ''; btn.textContent = orig; }, 1200);
+}
+
+function cSetRunning(running) {
+  document.getElementById('c-btnStart').disabled = running;
+  const stop = document.getElementById('c-btnStop');
+  stop.disabled = !running;
+  stop.style.opacity = running ? '1' : '.4';
+}
+
+async function cStartJob() {
+  const nameType       = document.getElementById('c-nameType').value;
+  const emailDomain    = document.getElementById('c-emailDomain').value;
+  const domainPassword = document.getElementById('c-domainPassword').value;
+  const count          = parseInt(document.getElementById('c-count').value) || 1;
+  const passwordType   = document.getElementById('c-passwordType').value;
+  const customPassword = document.getElementById('c-customPassword').value;
+  const gender         = document.getElementById('c-gender').value;
+
+  if (passwordType === 'custom' && !customPassword.trim()) {
+    toast('Enter a custom password', true); return;
+  }
+
+  cCreatedCount = 0; cTargetCount = count;
+  document.getElementById('c-statCreated').textContent = '0';
+  document.getElementById('c-statTotal').textContent   = count;
+  document.getElementById('c-progressBar').style.width = '0%';
+  document.getElementById('c-progressPct').textContent = '0%';
+  document.getElementById('c-progressLabel').textContent = 'Starting...';
+  document.getElementById('c-log-panel').innerHTML = '<div id="c-logEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333;gap:8px;text-align:center;"><div style="font-size:32px;">⬡</div></div>';
+  document.getElementById('c-accts-panel').innerHTML = '<div id="c-acctEmpty" style="color:#333;text-align:center;padding:40px;font-size:12px;letter-spacing:1px;">No accounts yet</div>';
+  document.getElementById('c-acctCount').textContent = '(0)';
+  cSwitchTab('log');
+
+  const resp = await fetch('/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name_type: nameType, email_domain: emailDomain,
+      domain_password: domainPassword, count, password_type: passwordType,
+      custom_password: customPassword, gender }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json();
+    toast('Error: ' + (err.error || 'Unknown'), true); return;
+  }
+
+  cSetRunning(true);
+  cAddLog(`Started — ${count} account(s) on ${emailDomain}`, 'info');
+
+  if (cEventSource) cEventSource.close();
+  cEventSource = new EventSource('/stream');
+  cEventSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping') return;
+    if (msg.type === 'log')     cAddLog(msg.msg, msg.level);
+    if (msg.type === 'account') cAddAccount(msg.data);
+    if (msg.type === 'done') {
+      cAddLog(msg.msg, 'success');
+      cSetRunning(false);
+      cEventSource.close();
+      document.getElementById('c-progressLabel').textContent = 'Completed';
+    }
+  };
+  cEventSource.onerror = () => {
+    cSetRunning(false);
+    cAddLog('Connection lost.', 'warn');
+    cEventSource.close();
+  };
+}
+
+async function cStopJob() {
+  await fetch('/stop', { method: 'POST' });
+  cSetRunning(false);
+  cAddLog('Stop requested.', 'warn');
+  if (cEventSource) { cEventSource.close(); cEventSource = null; }
+}
+
+function escAttr(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
 }
 
 // Initial load

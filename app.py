@@ -113,6 +113,8 @@ def key_status():
 # ── Auth guard ────────────────────────────────────────────────────────────────
 
 def _require_auth():
+    if session.get('is_admin'):
+        return True
     key = request.cookies.get('access_key', '')
     if not key:
         return False
