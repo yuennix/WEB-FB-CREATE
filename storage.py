@@ -10,7 +10,6 @@ _DB_URL = os.environ.get('DATABASE_URL', '')
 def _get_conn():
     import psycopg2
     url = _DB_URL
-    # Railway sometimes gives postgres:// but psycopg2 needs postgresql://
     if url.startswith('postgres://'):
         url = 'postgresql://' + url[len('postgres://'):]
     return psycopg2.connect(url)
@@ -39,11 +38,30 @@ def _init_db():
     global _db_ready
     if not _db_ready and _DB_URL:
         _ensure_table()
+        _migrate_json_to_db()
         _db_ready = True
 
 
-def _db_load(name):
-    _init_db()
+def _migrate_json_to_db():
+    """On first startup with DB, copy any existing JSON files into the database."""
+    for name in ('keys', 'domains'):
+        existing = _db_load_raw(name)
+        if existing is not None:
+            continue  # already has data, skip
+        # Try to load from JSON file
+        try:
+            with open(f'{name}.json') as f:
+                data = json.load(f)
+            if data:
+                _db_save_raw(name, data)
+                print(f'[storage] Migrated {name}.json → database ✓')
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f'[storage] Migration error ({name}): {e}')
+
+
+def _db_load_raw(name):
     try:
         conn = _get_conn()
         cur  = conn.cursor()
@@ -58,8 +76,7 @@ def _db_load(name):
     return None
 
 
-def _db_save(name, data):
-    _init_db()
+def _db_save_raw(name, data):
     try:
         conn = _get_conn()
         cur  = conn.cursor()
@@ -76,15 +93,21 @@ def _db_save(name, data):
     return False
 
 
+def _db_load(name):
+    _init_db()
+    return _db_load_raw(name)
+
+
+def _db_save(name, data):
+    _init_db()
+    return _db_save_raw(name, data)
+
+
 # ── File backend ──────────────────────────────────────────────────────────────
-
-def _file_path(name):
-    return f'{name}.json'
-
 
 def _file_load(name):
     try:
-        with open(_file_path(name)) as f:
+        with open(f'{name}.json') as f:
             return json.load(f)
     except Exception:
         return None
@@ -92,7 +115,7 @@ def _file_load(name):
 
 def _file_save(name, data):
     try:
-        with open(_file_path(name), 'w') as f:
+        with open(f'{name}.json', 'w') as f:
             json.dump(data, f, indent=2)
         return True
     except Exception as e:
