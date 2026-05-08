@@ -418,6 +418,13 @@ def stop():
     return jsonify({'status': 'stopped'})
 
 
+@app.route('/api/accounts/all')
+def api_accounts_all():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify({'accounts': _sto.get_accounts_list()})
+
+
 @app.route('/api/domains')
 def api_domains():
     if not _require_auth():

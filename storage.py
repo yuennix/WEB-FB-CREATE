@@ -254,6 +254,32 @@ def get_accounts_text():
             return None
 
 
+def get_accounts_list():
+    """Return all accounts as a list of 'uid|password' strings (no session headers)."""
+    if _DB_URL:
+        _init_db()
+        try:
+            conn = _get_conn()
+            cur  = conn.cursor()
+            cur.execute("SELECT uid, password FROM accounts ORDER BY id ASC")
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            return [f"{uid}|{password}" for uid, password in rows]
+        except Exception as e:
+            print(f'[storage] get_accounts_list error: {e}')
+            return []
+    else:
+        try:
+            with open('weynFBCreate.txt') as f:
+                return [
+                    l.strip() for l in f
+                    if l.strip() and not l.startswith('=') and not l.startswith(' SESSION')
+                ]
+        except Exception:
+            return []
+
+
 def count_accounts():
     """Return total number of created accounts."""
     if _DB_URL:

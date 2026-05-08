@@ -758,19 +758,33 @@ function addAccount(data) {
 }
 
 function copyAllAccounts(el) {
-  if (!allAccounts.length) return;
-  const text = allAccounts.join('\n');
-  navigator.clipboard.writeText(text).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta);
-  });
-  const bar  = document.getElementById('copyAllBar');
+  const bar   = document.getElementById('copyAllBar');
   const label = document.getElementById('copyAllText');
   const orig  = label.innerHTML;
-  bar.classList.add('copied');
-  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length > 1 ? 's' : ''} (uid|password)!`;
-  setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2000);
+  label.innerHTML = 'Loading…';
+  fetch('/api/accounts/all')
+    .then(r => r.json())
+    .then(data => {
+      const list = data.accounts || [];
+      if (!list.length) {
+        label.innerHTML = 'No accounts yet';
+        setTimeout(() => { label.innerHTML = orig; }, 2000);
+        return;
+      }
+      const text = list.join('\n');
+      navigator.clipboard.writeText(text).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+      });
+      bar.classList.add('copied');
+      label.innerHTML = `✓ Copied ${list.length} account${list.length !== 1 ? 's' : ''} (uid|password)!`;
+      setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
+    })
+    .catch(() => {
+      label.innerHTML = 'Error — try again';
+      setTimeout(() => { label.innerHTML = orig; }, 2000);
+    });
 }
 
 function copyField(btn, text) {
