@@ -5,10 +5,10 @@ import uuid
 import threading
 import requests
 import domains as dm
+import storage
 
 TG_TOKEN  = os.environ.get('TG_BOT_TOKEN', '')
 TG_CHAT   = os.environ.get('TG_CHAT_ID', '')
-KEYS_FILE = 'keys.json'
 ACCS_FILE = 'weynFBCreate.txt'
 _lock     = threading.Lock()
 
@@ -16,16 +16,11 @@ _lock     = threading.Lock()
 # ── Storage helpers ───────────────────────────────────────────────────────────
 
 def _load():
-    try:
-        with open(KEYS_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return storage.load('keys', default={})
 
 
 def _save(data):
-    with open(KEYS_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    storage.save('keys', data)
 
 
 def _count_accounts():
