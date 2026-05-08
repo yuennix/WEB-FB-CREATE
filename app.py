@@ -13,6 +13,7 @@ from flask import Flask, render_template, request, jsonify, Response, send_file,
 sys.path.insert(0, '.')
 import main as m
 import auth
+import domains as dm
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
@@ -36,10 +37,10 @@ WORKERS = 50   # 50 parallel workers
 def index():
     key = request.cookies.get('access_key', '')
     if key:
-        status, _ = auth.check_key(key)
+        status, entry = auth.check_key(key)
         if status == 'approved':
             auth.touch_key(key)
-            return render_template('index.html')
+            return render_template('index.html', user_name=entry.get('name', ''))
     return render_template('login.html')
 
 
@@ -140,8 +141,8 @@ def start():
         custom_password = data.get('custom_password', '')
         gender          = data.get('gender', '3')
 
-        if email_domain in m.CUSTOM_DOMAINS:
-            if domain_password != m.DOMAIN_PASSWORD:
+        if email_domain in dm.get_custom_domains():
+            if domain_password != dm.get_domain_password():
                 return jsonify({'error': 'Wrong domain password'}), 403
 
         result_store  = []
@@ -396,6 +397,17 @@ def stop():
     global job_running
     job_running = False
     return jsonify({'status': 'stopped'})
+
+
+@app.route('/api/domains')
+def api_domains():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    info = dm.get_all_info()
+    return jsonify({
+        'temp':   info.get('temp', []),
+        'custom': [e['domain'] for e in info.get('custom', [])],
+    })
 
 
 @app.route('/download')
