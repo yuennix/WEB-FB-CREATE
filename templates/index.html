@@ -348,31 +348,22 @@
   .log-warn    .log-msg { color: #fbbf24; }
   .log-error   .log-msg { color: #f87171; }
 
-  /* ── Accounts toolbar ── */
-  .accounts-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 8px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    flex-shrink: 0;
-    background: rgba(10,15,26,0.5);
-  }
-
   .btn-copy-all {
-    padding: 6px 14px;
-    border-radius: 8px;
+    margin-left: auto;
+    padding: 0 4px;
+    background: none;
+    border: none;
     font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
     cursor: pointer;
-    transition: all .2s;
-    border: 1px solid rgba(0,230,118,0.25);
-    background: rgba(0,230,118,0.06);
-    color: #00e676;
+    letter-spacing: -0.2px;
+    transition: color .15s;
+    white-space: nowrap;
   }
-  .btn-copy-all:hover { background: rgba(0,230,118,0.12); border-color: rgba(0,230,118,0.4); }
-  .btn-copy-all.copied { background: rgba(0,230,118,0.15); }
+  .btn-copy-all:hover { color: #00e676; }
+  .btn-copy-all.copied { color: #00e676; }
 
   /* ── Accounts panel ── */
   #accounts-panel {
@@ -607,6 +598,7 @@
     <div class="tabs-bar">
       <div class="tab active" onclick="switchTab('log')">Console Log</div>
       <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#1e293b;">(0)</span></div>
+      <button class="btn-copy-all" id="btnCopyAll" onclick="copyAllAccounts(this)">Copy All Accounts</button>
     </div>
 
     <div class="tab-content active" id="tab-log">
@@ -619,9 +611,6 @@
     </div>
 
     <div class="tab-content" id="tab-accounts">
-      <div class="accounts-toolbar" id="accountsToolbar">
-        <button class="btn-copy-all" id="btnCopyAll" onclick="copyAllAccounts(this)">⎘ Copy All (uid|pass)</button>
-      </div>
       <div id="accounts-panel">
         <div class="empty-state" id="acctEmpty">
           <div class="empty-icon">⬡</div>
