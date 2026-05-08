@@ -8,37 +8,102 @@ import concurrent.futures as _cfi
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote as _uq
 
-from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import Flask, render_template, request, jsonify, Response, send_file, session
 
 sys.path.insert(0, '.')
 import main as m
+import auth
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
 
-# ── Global job state ────────────────────────────────────────────────────────
+# ── Global job state ─────────────────────────────────────────────────────────
 task_queue   = queue.Queue()
 result_store = []
 job_running  = False
 job_lock     = threading.Lock()
 
-lock         = threading.Lock()   # mirrors main.py's lock
-done_count   = [0]                # mirrors main.py's done[0]
-cp_count     = [0]                # checkpoint count
+lock       = threading.Lock()
+done_count = [0]
+cp_count   = [0]
 
-WORKERS = 10   # always 10, same as original
+WORKERS = 20   # 20 parallel workers
 
 
-# ── Routes ──────────────────────────────────────────────────────────────────
+# ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    key = request.cookies.get('access_key', '')
+    if key:
+        status, _ = auth.check_key(key)
+        if status == 'approved':
+            auth.touch_key(key)
+            return render_template('index.html')
+    return render_template('login.html')
 
+
+@app.route('/request-access', methods=['POST'])
+def request_access():
+    data   = request.json or {}
+    name   = (data.get('name') or '').strip()
+    reason = (data.get('reason') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    key, user_id = auth.request_access(name, reason)
+    return jsonify({'key': key, 'user_id': user_id})
+
+
+@app.route('/verify-key', methods=['POST'])
+def verify_key():
+    data   = request.json or {}
+    key    = (data.get('key') or '').strip().upper()
+    status, entry = auth.check_key(key)
+    if status == 'approved':
+        auth.touch_key(key)
+        resp = jsonify({
+            'status': 'approved',
+            'name':    entry['name'],
+            'user_id': entry['user_id'],
+        })
+        resp.set_cookie('access_key', key, max_age=60*60*24*30, httponly=True, samesite='Lax')
+        return resp
+    return jsonify({'status': status})
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    resp = jsonify({'status': 'ok'})
+    resp.delete_cookie('access_key')
+    return resp
+
+
+@app.route('/key-status', methods=['POST'])
+def key_status():
+    data = request.json or {}
+    key  = (data.get('key') or '').strip().upper()
+    status, entry = auth.check_key(key)
+    return jsonify({'status': status})
+
+
+# ── Auth guard ────────────────────────────────────────────────────────────────
+
+def _require_auth():
+    key = request.cookies.get('access_key', '')
+    if not key:
+        return False
+    status, _ = auth.check_key(key)
+    return status == 'approved'
+
+
+# ── Main routes ───────────────────────────────────────────────────────────────
 
 @app.route('/start', methods=['POST'])
 def start():
-    global job_running, result_store, done_count, cp_count
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
 
+    global job_running, result_store, done_count, cp_count
     with job_lock:
         if job_running:
             return jsonify({'error': 'A job is already running'}), 400
@@ -56,7 +121,6 @@ def start():
             if domain_password != m.DOMAIN_PASSWORD:
                 return jsonify({'error': 'Wrong domain password'}), 403
 
-        # Reset state
         result_store  = []
         done_count[0] = 0
         cp_count[0]   = 0
@@ -70,21 +134,16 @@ def start():
 
         threading.Thread(
             target=run_creation,
-            args=(name_type, email_domain, count, password_type,
-                  custom_password, gender),
+            args=(name_type, email_domain, count, password_type, custom_password, gender),
             daemon=True,
         ).start()
 
     return jsonify({'status': 'started'})
 
 
-# ── Exact copy of _create_one from main.py, adapted for SSE ─────────────────
+# ── Exact _create_one from main.py ────────────────────────────────────────────
 
 def _create_one(name_type, gender, password_type, custom_password, num):
-    """
-    Direct copy of main.py's _create_one() worker loop.
-    Runs until done_count[0] >= num or job_running is False.
-    """
     global job_running
 
     while True:
@@ -102,7 +161,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                                 'msg': 'Could not load reg page, retrying…'})
                 continue
 
-            # ── Name generation (exact copy) ──────────────────────────────
             if name_type == '2':
                 firstname, lastname = m.get_rpw_name()
             else:
@@ -115,7 +173,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                     firstname = m.random.choice(m.first_names_male + m.first_names_female)
                 lastname = base_last
 
-            # ── Sex mapping (exact copy) ──────────────────────────────────
             if gender == '1':
                 fb_sex = "2"
             elif gender == '2':
@@ -126,7 +183,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
             phone = m.get_email_for_registration(firstname, lastname)
             pww   = m.get_pass() if password_type == 'auto' else custom_password
 
-            # ── Reg URL (exact copy) ──────────────────────────────────────
             _pt = form.get('privacy_mutation_token', '')
             if _pt:
                 _reg_url = (f"https://m.facebook.com/reg/submit/"
@@ -134,7 +190,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
             else:
                 _reg_url = "https://m.facebook.com/reg/submit/?multi_step_form=1&skip_suma=0"
 
-            # ── Payload (exact copy) ──────────────────────────────────────
             payload = {
                 'ccp': "2",
                 'reg_instance':       form.get("reg_instance", ""),
@@ -159,7 +214,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                 '__dyn': '', '__csr': '', '__req': 'q', '__a': '', '__user': '0',
             }
 
-            # ── Headers (exact copy) ──────────────────────────────────────
             merged_headers = {
                 'User-Agent':    m.FB_LITE_UA,
                 'Accept':        ('text/html,application/xhtml+xml,application/xml;q=0.9,'
@@ -183,11 +237,9 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                 'viewport-width':    '980',
             }
 
-            reg_submit  = ses.post(_reg_url, data=payload,
-                                   headers=merged_headers, timeout=20)
-            login_coki  = ses.cookies.get_dict()
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=20)
+            login_coki = ses.cookies.get_dict()
 
-            # ── Success branch (exact copy logic) ────────────────────────
             if "c_user" in login_coki:
                 uid = login_coki["c_user"]
 
@@ -197,7 +249,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                     done_count[0] += 1
                     current = done_count[0]
 
-                # Save result and stream to UI
                 result = {
                     'num':      current,
                     'name':     f'{firstname} {lastname}',
@@ -220,7 +271,6 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                                 'msg': (f'[{current}/{num}] ✓ '
                                         f'{firstname} {lastname} | {phone} | UID:{uid}')})
 
-                # ── INSTANT trigger: fire all resend URLs in parallel (exact copy) ──
                 _instant_urls = [
                     'https://m.facebook.com/confirmemail.php?send=1',
                     'https://m.facebook.com/confirmemail.php?soft=hjk&send=1',
@@ -229,12 +279,12 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                     'https://www.facebook.com/confirmemail.php?send=1',
                 ]
                 _ih = {
-                    'User-Agent':      m.FB_LITE_UA,
-                    'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Referer':         'https://m.facebook.com/confirmemail.php',
-                    'x-requested-with':'com.facebook.lite',
+                    'User-Agent':       m.FB_LITE_UA,
+                    'Accept':           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language':  'en-US,en;q=0.9',
+                    'Accept-Encoding':  'gzip, deflate, br',
+                    'Referer':          'https://m.facebook.com/confirmemail.php',
+                    'x-requested-with': 'com.facebook.lite',
                 }
                 def _ifire(u):
                     try:
@@ -244,44 +294,35 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                 with _cfi.ThreadPoolExecutor(max_workers=len(_instant_urls)) as _ipool:
                     _ipool.map(_ifire, _instant_urls)
 
-                # Background thread handles 1secmail polling + repeat trigger waves (exact copy)
-                _t = threading.Thread(
+                threading.Thread(
                     target=m._full_email_confirm,
                     args=(ses, phone, uid, pww),
                     daemon=False,
-                )
-                _t.start()
+                ).start()
 
-            # ── Checkpoint branch (exact copy) ────────────────────────────
             elif "checkpoint" in login_coki:
                 with lock:
                     cp_count[0] += 1
                 task_queue.put({'type': 'log', 'level': 'warn',
-                                'msg': (f'⚠ Checkpoint — {firstname} {lastname} | {phone}')})
-
-            # If neither c_user nor checkpoint: loop continues automatically
+                                'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
 
         except Exception as e:
             task_queue.put({'type': 'log', 'level': 'error', 'msg': str(e)})
 
 
-# ── Orchestrator ─────────────────────────────────────────────────────────────
+# ── Orchestrator ──────────────────────────────────────────────────────────────
 
-def run_creation(name_type, email_domain, count, password_type,
-                 custom_password, gender):
+def run_creation(name_type, email_domain, count, password_type, custom_password, gender):
     global job_running
 
     m.EMAIL_DOMAIN = email_domain
-
     task_queue.put({'type': 'log', 'level': 'info',
-                    'msg': (f'Starting {count} account(s) with {WORKERS} workers '
-                            f'on {email_domain}…')})
+                    'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
 
     try:
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             futures = [
-                pool.submit(_create_one, name_type, gender,
-                            password_type, custom_password, count)
+                pool.submit(_create_one, name_type, gender, password_type, custom_password, count)
                 for _ in range(WORKERS)
             ]
             for f in as_completed(futures):
@@ -301,10 +342,13 @@ def run_creation(name_type, email_domain, count, password_type,
         })
 
 
-# ── SSE stream ───────────────────────────────────────────────────────────────
+# ── SSE stream ────────────────────────────────────────────────────────────────
 
 @app.route('/stream')
 def stream():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
     def generate():
         while True:
             try:
@@ -324,6 +368,8 @@ def stream():
 
 @app.route('/stop', methods=['POST'])
 def stop():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
     global job_running
     job_running = False
     return jsonify({'status': 'stopped'})
@@ -331,6 +377,8 @@ def stop():
 
 @app.route('/download')
 def download():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
     path = os.path.abspath('weynFBCreate.txt')
     if os.path.exists(path):
         return send_file(path, as_attachment=True, download_name='weynFBCreate.txt')
@@ -343,5 +391,6 @@ def status():
 
 
 if __name__ == '__main__':
+    auth.start_bot()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
