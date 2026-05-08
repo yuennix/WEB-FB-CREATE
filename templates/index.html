@@ -379,6 +379,7 @@
   <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
     <span id="userNameBadge" style="font-size:11px;color:#00ff8899;letter-spacing:1px;"></span>
     <div class="status-dot idle" id="statusDot"></div>
+    <button onclick="doLogout()" style="background:transparent;border:1px solid #ff444430;border-radius:5px;color:#ff4444;cursor:pointer;padding:4px 10px;font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;transition:all .2s;" onmouseover="this.style.background='#ff444415'" onmouseout="this.style.background='transparent'">LOGOUT</button>
   </div>
 </header>
 
@@ -748,6 +749,12 @@ function copyText(text) {
     document.execCommand('copy');
     document.body.removeChild(ta);
   });
+}
+
+async function doLogout() {
+  try { localStorage.removeItem('weyn_access_key'); } catch(e) {}
+  await fetch('/logout', { method: 'POST' });
+  window.location.href = '/';
 }
 
 function escHtml(s) {
