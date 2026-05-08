@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KYBX | FB Account Creator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+    border-bottom: 1px solid #00ff8820;
+    padding: 18px 30px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-text {
+    font-size: 22px;
+    font-weight: bold;
+    color: #00ff88;
+    letter-spacing: 3px;
+    text-shadow: 0 0 12px #00ff8860;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: #666;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+    animation: pulse 2s infinite;
+    margin-left: auto;
+  }
+  .status-dot.idle { background: #555; box-shadow: none; animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 0;
+    height: calc(100vh - 61px);
+  }
+
+  .sidebar {
+    background: #0d1117;
+    border-right: 1px solid #00ff8815;
+    padding: 24px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    color: #00ff88;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #00ff8820;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+  label {
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  select, input[type="text"], input[type="number"], input[type="password"] {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 9px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+
+  select:focus, input:focus {
+    border-color: #00ff88;
+    box-shadow: 0 0 0 2px #00ff8815;
+  }
+
+  select option { background: #161b22; }
+
+  .domain-pass-row {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .domain-pass-row.visible { display: flex; }
+
+  .custom-pass-row {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .custom-pass-row.visible { display: flex; }
+
+  .btn {
+    padding: 11px 20px;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .2s;
+    width: 100%;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, #00ff88, #00cc6a);
+    color: #000;
+  }
+  .btn-start:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
+  .btn-start:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-stop {
+    background: transparent;
+    border: 1px solid #ff4444;
+    color: #ff4444;
+  }
+  .btn-stop:hover { background: #ff444415; }
+  .btn-stop:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-download {
+    background: transparent;
+    border: 1px solid #00ff88;
+    color: #00ff88;
+  }
+  .btn-download:hover { background: #00ff8815; }
+
+  .progress-bar-wrap {
+    background: #161b22;
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff88, #00cc6a);
+    border-radius: 4px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .stat-box {
+    flex: 1;
+    background: #161b22;
+    border: 1px solid #00ff8820;
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 22px;
+    font-weight: bold;
+    color: #00ff88;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #00ff8815;
+    background: #0d1117;
+  }
+
+  .tab {
+    padding: 12px 22px;
+    font-size: 11px;
+    color: #555;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    user-select: none;
+  }
+  .tab.active { color: #00ff88; border-bottom-color: #00ff88; }
+  .tab:hover:not(.active) { color: #888; }
+
+  .tab-content { flex: 1; overflow: hidden; display: none; }
+  .tab-content.active { display: flex; flex-direction: column; }
+
+  #log-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 18px;
+    background: #070b10;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .log-line { display: flex; gap: 8px; align-items: baseline; }
+  .log-ts { color: #333; font-size: 10px; flex-shrink: 0; }
+  .log-msg { flex: 1; word-break: break-all; }
+  .log-info  .log-msg { color: #aaa; }
+  .log-success .log-msg { color: #00ff88; }
+  .log-warn  .log-msg { color: #ffaa00; }
+  .log-error .log-msg { color: #ff4444; }
+
+  #accounts-panel {
+    flex: 1;
+    overflow-y: auto;
+    background: #070b10;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  thead th {
+    background: #0d1117;
+    color: #00ff88;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 10px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid #00ff8820;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #ffffff08;
+    transition: background .15s;
+  }
+  tbody tr:hover { background: #ffffff05; }
+
+  tbody td {
+    padding: 9px 14px;
+    color: #ccc;
+    word-break: break-all;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+  .badge-success { background: #00ff8820; color: #00ff88; border: 1px solid #00ff8840; }
+
+  .copy-btn {
+    background: none;
+    border: none;
+    color: #444;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 11px;
+    transition: color .2s;
+  }
+  .copy-btn:hover { color: #00ff88; }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: #333;
+    gap: 10px;
+    padding: 40px;
+    text-align: center;
+  }
+
+  .empty-icon { font-size: 36px; }
+  .empty-text { font-size: 13px; letter-spacing: 1px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #00ff8830; border-radius: 2px; }
+
+  .running-badge {
+    display: none;
+    font-size: 10px;
+    color: #00ff88;
+    letter-spacing: 1px;
+    animation: pulse 1.2s infinite;
+  }
+  .running-badge.visible { display: inline; }
+
+  @media (max-width: 768px) {
+    .container { grid-template-columns: 1fr; height: auto; }
+    .sidebar { border-right: none; border-bottom: 1px solid #00ff8815; }
+    .main-panel { min-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo-text">KYBX</div>
+    <div class="logo-sub">Facebook Account Creator</div>
+  </div>
+  <span class="running-badge" id="runningBadge">● RUNNING</span>
+  <div class="status-dot idle" id="statusDot"></div>
+</header>
+
+<div class="container">
+
+  <!-- SIDEBAR / FORM -->
+  <div class="sidebar">
+
+    <div>
+      <div class="section-title">Configuration</div>
+
+      <div style="display:flex; flex-direction:column; gap:14px;">
+
+        <div class="form-group">
+          <label>Name Type</label>
+          <select id="nameType">
+            <option value="1">Filipino Names</option>
+            <option value="2">RPW (Fantasy) Names</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="gender">
+            <option value="3">Mixed</option>
+            <option value="1">Male</option>
+            <option value="2">Female</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Email Domain</label>
+          <select id="emailDomain" onchange="onDomainChange()">
+            <option value="1secmail.com">1secmail (Auto API)</option>
+            <option value="weyn.store">weyn.store (Custom)</option>
+            <option value="jhames.shop">jhames.shop (Custom)</option>
+            <option value="jakulan.site">jakulan.site (Custom)</option>
+          </select>
+        </div>
+
+        <div class="domain-pass-row form-group" id="domainPassRow">
+          <label>Domain Password</label>
+          <input type="password" id="domainPassword" placeholder="Enter domain password">
+        </div>
+
+        <div class="form-group">
+          <label>Password Type</label>
+          <select id="passwordType" onchange="onPassTypeChange()">
+            <option value="auto">Auto-Generated</option>
+            <option value="custom">Custom Password</option>
+          </select>
+        </div>
+
+        <div class="custom-pass-row form-group" id="customPassRow">
+          <label>Custom Password</label>
+          <input type="text" id="customPassword" placeholder="Enter password">
+        </div>
+
+        <div class="form-group">
+          <label>Number of Accounts</label>
+          <input type="number" id="count" value="5" min="1" max="200">
+        </div>
+
+
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Progress</div>
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:6px;">
+          <span id="progressLabel">Ready</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-num" id="statCreated">0</div>
+          <div class="stat-label">Created</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statTotal">—</div>
+          <div class="stat-label">Target</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statRate">—</div>
+          <div class="stat-label">Rate</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-start" id="btnStart" onclick="startJob()">▶ START CREATION</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopJob()" disabled>■ STOP</button>
+      <button class="btn btn-download" onclick="downloadResults()">⬇ DOWNLOAD RESULTS</button>
+    </div>
+
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main-panel">
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('log')">Console Log</div>
+      <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#555">(0)</span></div>
+    </div>
+
+    <!-- LOG TAB -->
+    <div class="tab-content active" id="tab-log">
+      <div id="log-panel">
+        <div class="empty-state" id="logEmpty">
+          <div class="empty-icon">⬡</div>
+          <div class="empty-text">Waiting to start...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNTS TAB -->
+    <div class="tab-content" id="tab-accounts">
+      <div id="accounts-panel">
+        <div class="empty-state" id="acctEmpty">
+          <div class="empty-icon">⬡</div>
+          <div class="empty-text">No accounts created yet</div>
+        </div>
+        <table id="acctTable" style="display:none;">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Password</th>
+              <th>UID</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="acctBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let eventSource = null;
+let createdCount = 0;
+let targetCount = 0;
+let startTime = null;
+
+function onDomainChange() {
+  const v = document.getElementById('emailDomain').value;
+  const row = document.getElementById('domainPassRow');
+  if (['weyn.store','jhames.shop','jakulan.site'].includes(v)) {
+    row.classList.add('visible');
+  } else {
+    row.classList.remove('visible');
+  }
+}
+
+function onPassTypeChange() {
+  const v = document.getElementById('passwordType').value;
+  const row = document.getElementById('customPassRow');
+  row.classList.toggle('visible', v === 'custom');
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['log','accounts'][i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+function addLog(msg, level) {
+  const panel = document.getElementById('log-panel');
+  const empty = document.getElementById('logEmpty');
+  if (empty) empty.remove();
+
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = `log-line log-${level || 'info'}`;
+  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg">${escHtml(msg)}</span>`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function addAccount(data) {
+  document.getElementById('acctEmpty').style.display = 'none';
+  const table = document.getElementById('acctTable');
+  table.style.display = '';
+
+  const row = document.getElementById('acctBody').insertRow();
+  const copyData = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
+  row.innerHTML = `
+    <td style="color:#555">${data.num}</td>
+    <td style="color:#e0e0e0">${escHtml(data.name)}</td>
+    <td style="color:#00b4ff">${escHtml(data.email)}</td>
+    <td style="color:#888;font-size:11px">${escHtml(data.password)}</td>
+    <td style="color:#00ff88">${escHtml(data.uid)}</td>
+    <td><span class="badge badge-success">OK</span></td>
+    <td><button class="copy-btn" title="Copy all info" onclick="copyText('${escAttr(copyData)}')">⎘</button></td>
+  `;
+
+  createdCount++;
+  document.getElementById('statCreated').textContent = createdCount;
+  document.getElementById('accountCount').textContent = `(${createdCount})`;
+  updateProgress();
+}
+
+function updateProgress() {
+  if (!targetCount) return;
+  const pct = Math.round((createdCount / targetCount) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressLabel').textContent = `${createdCount} of ${targetCount}`;
+
+  if (startTime && createdCount > 0) {
+    const elapsed = (Date.now() - startTime) / 1000 / 60;
+    const rate = (createdCount / elapsed).toFixed(1);
+    document.getElementById('statRate').textContent = rate + '/m';
+  }
+}
+
+function setRunning(running) {
+  document.getElementById('btnStart').disabled = running;
+  document.getElementById('btnStop').disabled = !running;
+  const dot = document.getElementById('statusDot');
+  const badge = document.getElementById('runningBadge');
+  dot.classList.toggle('idle', !running);
+  badge.classList.toggle('visible', running);
+}
+
+async function startJob() {
+  const nameType    = document.getElementById('nameType').value;
+  const emailDomain = document.getElementById('emailDomain').value;
+  const domainPassword = document.getElementById('domainPassword').value;
+  const count       = parseInt(document.getElementById('count').value) || 1;
+  const passwordType = document.getElementById('passwordType').value;
+  const customPassword = document.getElementById('customPassword').value;
+  const gender      = document.getElementById('gender').value;
+  if (passwordType === 'custom' && !customPassword.trim()) {
+    alert('Please enter a custom password.');
+    return;
+  }
+
+  createdCount = 0;
+  targetCount  = count;
+  startTime    = Date.now();
+
+  document.getElementById('statCreated').textContent = '0';
+  document.getElementById('statTotal').textContent   = count;
+  document.getElementById('statRate').textContent    = '—';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('progressPct').textContent = '0%';
+  document.getElementById('progressLabel').textContent = 'Starting...';
+
+  document.getElementById('log-panel').innerHTML = '';
+  document.getElementById('acctBody').innerHTML  = '';
+  document.getElementById('acctEmpty').style.display = '';
+  document.getElementById('acctTable').style.display = 'none';
+  document.getElementById('accountCount').textContent = '(0)';
+
+  const resp = await fetch('/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name_type: nameType, email_domain: emailDomain,
+      domain_password: domainPassword, count, password_type: passwordType,
+      custom_password: customPassword, gender }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json();
+    alert('Error: ' + (err.error || 'Unknown'));
+    return;
+  }
+
+  setRunning(true);
+  addLog(`Job started — creating ${count} account(s) on ${emailDomain}`, 'info');
+
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource('/stream');
+
+  eventSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping') return;
+    if (msg.type === 'log')     addLog(msg.msg, msg.level);
+    if (msg.type === 'account') addAccount(msg.data);
+    if (msg.type === 'done') {
+      addLog(msg.msg, 'success');
+      setRunning(false);
+      eventSource.close();
+      document.getElementById('progressLabel').textContent = 'Completed';
+    }
+  };
+
+  eventSource.onerror = () => {
+    setRunning(false);
+    addLog('Connection lost.', 'warn');
+    eventSource.close();
+  };
+}
+
+async function stopJob() {
+  await fetch('/stop', { method: 'POST' });
+  setRunning(false);
+  addLog('Stop requested.', 'warn');
+  if (eventSource) { eventSource.close(); eventSource = null; }
+}
+
+function downloadResults() {
+  window.location.href = '/download';
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+  return String(s).replace(/'/g, "\\'");
+}
+</script>
+
+</body>
+</html>
