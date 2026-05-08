@@ -1,6 +1,7 @@
 import os
 import json
 import threading
+import datetime
 
 _lock = threading.Lock()
 _DB_URL = os.environ.get('DATABASE_URL', '')
@@ -25,6 +26,23 @@ def _ensure_table():
                 data TEXT NOT NULL
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id TEXT PRIMARY KEY,
+                started_at TIMESTAMP DEFAULT NOW(),
+                count      INTEGER,
+                domain     TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                id         SERIAL PRIMARY KEY,
+                session_id TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
+                uid        TEXT NOT NULL,
+                password   TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         conn.commit()
         cur.close()
         conn.close()
@@ -47,8 +65,7 @@ def _migrate_json_to_db():
     for name in ('keys', 'domains'):
         existing = _db_load_raw(name)
         if existing is not None:
-            continue  # already has data, skip
-        # Try to load from JSON file
+            continue
         try:
             with open(f'{name}.json') as f:
                 data = json.load(f)
@@ -123,7 +140,7 @@ def _file_save(name, data):
     return False
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+# ── Public KV API ─────────────────────────────────────────────────────────────
 
 def load(name, default=None):
     with _lock:
@@ -140,3 +157,124 @@ def save(name, data):
             return _db_save(name, data)
         else:
             return _file_save(name, data)
+
+
+# ── Accounts / Sessions API ───────────────────────────────────────────────────
+
+def save_session(session_id, count, domain):
+    """Record the start of a creation session."""
+    if _DB_URL:
+        _init_db()
+        try:
+            conn = _get_conn()
+            cur  = conn.cursor()
+            cur.execute(
+                "INSERT INTO sessions (session_id, count, domain) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                (session_id, count, domain)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f'[storage] save_session error: {e}')
+    else:
+        try:
+            with open('weynFBCreate.txt', 'a') as f:
+                ts  = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                sep = f"\n{'='*60}\n SESSION {ts} | {count} account(s) | {domain}\n{'='*60}\n"
+                f.write(sep)
+        except Exception as e:
+            print(f'[storage] save_session file error: {e}')
+
+
+def save_account(session_id, uid, password):
+    """Persist a created account to DB or file."""
+    if _DB_URL:
+        _init_db()
+        try:
+            conn = _get_conn()
+            cur  = conn.cursor()
+            cur.execute(
+                "INSERT INTO accounts (session_id, uid, password) VALUES (%s, %s, %s)",
+                (session_id, uid, password)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f'[storage] save_account error: {e}')
+    else:
+        try:
+            with open('weynFBCreate.txt', 'a') as f:
+                f.write(f"{uid}|{password}\n")
+        except Exception as e:
+            print(f'[storage] save_account file error: {e}')
+
+
+def get_accounts_text():
+    """Return all accounts formatted for download, grouped by session."""
+    if _DB_URL:
+        _init_db()
+        try:
+            conn = _get_conn()
+            cur  = conn.cursor()
+            cur.execute("""
+                SELECT s.session_id, s.started_at, s.count, s.domain,
+                       a.uid, a.password
+                FROM   sessions s
+                JOIN   accounts a ON a.session_id = s.session_id
+                ORDER  BY s.started_at ASC, a.id ASC
+            """)
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            if not rows:
+                return None
+
+            lines         = []
+            current_sid   = None
+            for sid, started_at, count, domain, uid, password in rows:
+                if sid != current_sid:
+                    current_sid = sid
+                    ts = started_at.strftime('%Y-%m-%d %H:%M:%S') if started_at else '—'
+                    lines.append(f"\n{'='*60}")
+                    lines.append(f" SESSION {ts} | {count} account(s) | {domain}")
+                    lines.append('='*60)
+                lines.append(f"{uid}|{password}")
+            return '\n'.join(lines)
+        except Exception as e:
+            print(f'[storage] get_accounts_text error: {e}')
+            return None
+    else:
+        try:
+            with open('weynFBCreate.txt') as f:
+                return f.read()
+        except Exception:
+            return None
+
+
+def count_accounts():
+    """Return total number of created accounts."""
+    if _DB_URL:
+        _init_db()
+        try:
+            conn = _get_conn()
+            cur  = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM accounts")
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f'[storage] count_accounts error: {e}')
+            return 0
+    else:
+        try:
+            with open('weynFBCreate.txt') as f:
+                return sum(
+                    1 for l in f
+                    if l.strip() and not l.startswith('=') and not l.startswith(' SESSION')
+                )
+        except Exception:
+            return 0

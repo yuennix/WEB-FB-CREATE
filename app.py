@@ -183,7 +183,7 @@ def start():
 
 # ── Exact _create_one from main.py ────────────────────────────────────────────
 
-def _create_one(name_type, gender, password_type, custom_password, num):
+def _create_one(name_type, gender, password_type, custom_password, num, session_id):
     global job_running
 
     while True:
@@ -299,11 +299,7 @@ def _create_one(name_type, gender, password_type, custom_password, num):
                 }
                 result_store.append(result)
 
-                try:
-                    with open('weynFBCreate.txt', 'a') as f:
-                        f.write(f"{uid}|{pww}\n")
-                except Exception:
-                    pass
+                _sto.save_account(session_id, uid, pww)
 
 
                 task_queue.put({'type': 'account', 'data': result,
@@ -356,16 +352,12 @@ def _create_one(name_type, gender, password_type, custom_password, num):
 def run_creation(name_type, email_domain, count, password_type, custom_password, gender):
     global job_running
 
+    import uuid
+    session_id = str(uuid.uuid4())
+
     m.EMAIL_DOMAIN = email_domain
 
-    # Write a session separator to the results file
-    try:
-        import datetime
-        with open('weynFBCreate.txt', 'a') as f:
-            sep = f"\n{'='*60}\n SESSION {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {count} account(s) | {email_domain}\n{'='*60}\n"
-            f.write(sep)
-    except Exception:
-        pass
+    _sto.save_session(session_id, count, email_domain)
 
     task_queue.put({'type': 'log', 'level': 'info',
                     'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
@@ -373,7 +365,7 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
     try:
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             futures = [
-                pool.submit(_create_one, name_type, gender, password_type, custom_password, count)
+                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id)
                 for _ in range(WORKERS)
             ]
             for f in as_completed(futures):
@@ -441,10 +433,14 @@ def api_domains():
 def download():
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
-    path = os.path.abspath('weynFBCreate.txt')
-    if os.path.exists(path):
-        return send_file(path, as_attachment=True, download_name='weynFBCreate.txt')
-    return jsonify({'error': 'No results file yet'}), 404
+    text = _sto.get_accounts_text()
+    if text:
+        import io
+        buf = io.BytesIO(text.encode('utf-8'))
+        buf.seek(0)
+        return send_file(buf, as_attachment=True, download_name='weynFBCreate.txt',
+                         mimetype='text/plain')
+    return jsonify({'error': 'No results yet'}), 404
 
 
 @app.route('/status')
@@ -485,12 +481,7 @@ def admin_stats():
     if not _require_admin():
         return jsonify({'error': 'Unauthorized'}), 401
     counts, users = auth.get_stats()
-    total_accounts = 0
-    try:
-        with open('weynFBCreate.txt') as f:
-            total_accounts = sum(1 for l in f if l.strip() and not l.startswith('=') and not l.startswith(' SESSION'))
-    except Exception:
-        pass
+    total_accounts = _sto.count_accounts()
     return jsonify({'counts': counts, 'total_accounts': total_accounts})
 
 @app.route('/admin/api/users')
