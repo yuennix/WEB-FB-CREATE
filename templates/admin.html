@@ -1007,7 +1007,8 @@ async function cStartJob() {
   cCreatedCount = 0; cTargetCount = count; cStartTime = Date.now();
   document.getElementById('c-statCreated').textContent = '0';
   document.getElementById('c-statTotal').textContent   = count;
-  document.getElementById('c-statRate').textContent    = '—';
+  document.getElementById('c-statTime').textContent    = '0s';
+  document.getElementById('c-statTime').style.color    = '';
   document.getElementById('c-progressBar').style.width = '0%';
   document.getElementById('c-progressPct').textContent = '0%';
   document.getElementById('c-progressLabel').textContent = 'Starting…';

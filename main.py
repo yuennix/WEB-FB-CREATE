@@ -1227,10 +1227,13 @@ def get_custom_email(firstname='', lastname=''):
 
 
 def get_email_for_registration(firstname='', lastname=''):
-    """Return a natural email based on currently selected domain and account name."""
-    if EMAIL_DOMAIN in _dm.get_custom_domains():
-        return get_custom_email(firstname, lastname)
-    return get_1secmail(firstname, lastname)
+    """Return a natural email based on currently selected domain and account name.
+    Always generates locally — never calls any external email API."""
+    if not firstname:
+        firstname = fake.first_name()
+    if not lastname:
+        lastname = fake.last_name()
+    return generate_natural_email(firstname, lastname, EMAIL_DOMAIN)
 
 def choose_email_domain():
     """Email Domain Selection Menu"""
