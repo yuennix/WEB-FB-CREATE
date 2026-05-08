@@ -436,6 +436,160 @@ def status():
     return jsonify({'running': job_running, 'count': len(result_store)})
 
 
+# ── Admin auth ────────────────────────────────────────────────────────────────
+
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'weyn-admin-2025')
+
+def _require_admin():
+    return session.get('is_admin') is True
+
+@app.route('/admin')
+def admin_panel():
+    if not _require_admin():
+        return render_template('admin_login.html')
+    counts, users = auth.get_stats()
+    return render_template('admin.html', counts=counts)
+
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    pw = (request.json or {}).get('password', '')
+    if pw == ADMIN_PASSWORD:
+        session['is_admin'] = True
+        return jsonify({'status': 'ok'})
+    return jsonify({'error': 'Wrong password'}), 401
+
+@app.route('/admin/logout', methods=['POST'])
+def admin_logout():
+    session.pop('is_admin', None)
+    return jsonify({'status': 'ok'})
+
+@app.route('/admin/api/stats')
+def admin_stats():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    counts, users = auth.get_stats()
+    total_accounts = 0
+    try:
+        with open('weynFBCreate.txt') as f:
+            total_accounts = sum(1 for l in f if l.strip() and not l.startswith('=') and not l.startswith(' SESSION'))
+    except Exception:
+        pass
+    return jsonify({'counts': counts, 'total_accounts': total_accounts})
+
+@app.route('/admin/api/users')
+def admin_users():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    users = auth.list_users()
+    result = []
+    for key, v in users.items():
+        result.append({
+            'key':         key,
+            'user_id':     v.get('user_id', ''),
+            'name':        v.get('name', ''),
+            'reason':      v.get('reason', ''),
+            'status':      v.get('status', ''),
+            'created_at':  v.get('created_at'),
+            'approved_at': v.get('approved_at'),
+            'last_seen':   v.get('last_seen'),
+        })
+    result.sort(key=lambda x: x.get('created_at') or 0, reverse=True)
+    return jsonify(result)
+
+@app.route('/admin/api/approve/<key>', methods=['POST'])
+def admin_approve(key):
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    ok, entry = auth.approve_key(key.upper())
+    if ok:
+        return jsonify({'status': 'approved', 'name': entry['name']})
+    return jsonify({'error': 'Key not found'}), 404
+
+@app.route('/admin/api/reject/<key>', methods=['POST'])
+def admin_reject(key):
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    ok, entry = auth.reject_key(key.upper())
+    if ok:
+        return jsonify({'status': 'rejected'})
+    return jsonify({'error': 'Key not found'}), 404
+
+@app.route('/admin/api/revoke/<uid>', methods=['POST'])
+def admin_revoke(uid):
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    ok, entry = auth.revoke_by_id(uid.upper())
+    if ok:
+        return jsonify({'status': 'revoked'})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/admin/api/remove/<uid>', methods=['POST'])
+def admin_remove(uid):
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    ok, entry = auth.remove_by_id(uid.upper())
+    if ok:
+        return jsonify({'status': 'removed'})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/admin/api/add-user', methods=['POST'])
+def admin_add_user():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    key, uid = auth.add_user(name)
+    return jsonify({'key': key, 'user_id': uid, 'name': name})
+
+@app.route('/admin/api/domains')
+def admin_domains():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify(dm.get_all_info())
+
+@app.route('/admin/api/domains/add-temp', methods=['POST'])
+def admin_add_temp():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    domain = ((request.json or {}).get('domain') or '').strip().lower()
+    if not domain:
+        return jsonify({'error': 'Domain is required'}), 400
+    ok = dm.add_temp_domain(domain)
+    return jsonify({'status': 'added' if ok else 'exists'})
+
+@app.route('/admin/api/domains/add-custom', methods=['POST'])
+def admin_add_custom():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json or {}
+    domain = (data.get('domain') or '').strip().lower()
+    imap_pass = (data.get('imap_pass') or '').strip()
+    if not domain or not imap_pass:
+        return jsonify({'error': 'Domain and IMAP password are required'}), 400
+    ok = dm.add_custom_domain(domain, imap_pass)
+    return jsonify({'status': 'added' if ok else 'exists'})
+
+@app.route('/admin/api/domains/remove', methods=['POST'])
+def admin_remove_domain():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    domain = ((request.json or {}).get('domain') or '').strip().lower()
+    ok = dm.remove_domain(domain)
+    return jsonify({'status': 'removed' if ok else 'not_found'})
+
+@app.route('/admin/api/domains/set-password', methods=['POST'])
+def admin_set_dm_password():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    pw = ((request.json or {}).get('password') or '').strip()
+    if not pw:
+        return jsonify({'error': 'Password is required'}), 400
+    dm.set_domain_password(pw)
+    return jsonify({'status': 'updated'})
+
+
 if __name__ == '__main__':
     auth.start_bot()
     port = int(os.environ.get('PORT', 5000))

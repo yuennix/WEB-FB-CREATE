@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEYN | Admin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card {
+    background: #0d1117;
+    border: 1px solid #00ff8820;
+    border-radius: 12px;
+    padding: 40px 36px;
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .logo { text-align: center; }
+  .logo-text { font-size: 26px; font-weight: bold; color: #00ff88; letter-spacing: 4px; text-shadow: 0 0 14px #00ff8860; }
+  .logo-sub  { font-size: 10px; color: #444; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
+  label { font-size: 10px; color: #555; letter-spacing: 1.5px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  input[type="password"] {
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 10px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type="password"]:focus { border-color: #00ff88; box-shadow: 0 0 0 2px #00ff8815; }
+  .btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #00ff88, #00cc6a);
+    border: none;
+    border-radius: 6px;
+    color: #000;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
+  .err { font-size: 12px; color: #ff4444; text-align: center; display: none; }
+  .err.visible { display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-text">WEYN</div>
+    <div class="logo-sub">Admin Panel</div>
+  </div>
+  <div>
+    <label>Admin Password</label>
+    <input type="password" id="pw" placeholder="Enter password" onkeydown="if(event.key==='Enter') login()">
+  </div>
+  <button class="btn" onclick="login()">ENTER ADMIN</button>
+  <div class="err" id="err">Wrong password. Try again.</div>
+</div>
+<script>
+async function login() {
+  const pw = document.getElementById('pw').value;
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  const r = await fetch('/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw }),
+  });
+  if (r.ok) {
+    window.location.reload();
+  } else {
+    err.classList.add('visible');
+    document.getElementById('pw').value = '';
+    document.getElementById('pw').focus();
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEYN | Admin Panel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; min-height: 100vh; }
+
+  header {
+    background: #0d1117;
+    border-bottom: 1px solid #00ff8820;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo-text { font-size: 20px; font-weight: bold; color: #00ff88; letter-spacing: 3px; text-shadow: 0 0 10px #00ff8860; }
+  .logo-sub  { font-size: 9px; color: #444; letter-spacing: 2px; text-transform: uppercase; }
+  .admin-badge { font-size: 10px; color: #ffaa00; letter-spacing: 1px; border: 1px solid #ffaa0040; padding: 2px 8px; border-radius: 4px; }
+  .logout-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid #ff444440;
+    color: #ff4444;
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .2s;
+  }
+  .logout-btn:hover { background: #ff444415; }
+
+  nav {
+    background: #0d1117;
+    border-bottom: 1px solid #ffffff08;
+    padding: 0 28px;
+    display: flex;
+    gap: 0;
+  }
+  .nav-tab {
+    padding: 11px 20px;
+    font-size: 11px;
+    color: #555;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    user-select: none;
+  }
+  .nav-tab.active { color: #00ff88; border-bottom-color: #00ff88; }
+  .nav-tab:hover:not(.active) { color: #888; }
+
+  .page { display: none; padding: 26px 28px; max-width: 1100px; }
+  .page.active { display: block; }
+
+  /* ── Stats ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .stat-card {
+    background: #0d1117;
+    border: 1px solid #00ff8818;
+    border-radius: 8px;
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .stat-card .num { font-size: 30px; font-weight: bold; color: #00ff88; }
+  .stat-card .lbl { font-size: 9px; color: #444; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 4px; }
+  .stat-card.warn .num { color: #ffaa00; }
+  .stat-card.danger .num { color: #ff4444; }
+
+  /* ── Section title ── */
+  .section-title {
+    font-size: 10px;
+    color: #00ff88;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #00ff8818;
+    margin-bottom: 16px;
+  }
+
+  /* ── Users table ── */
+  .user-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .filter-btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+    background: #161b22;
+    color: #888;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .filter-btn.active { border-color: #00ff88; color: #00ff88; background: #00ff8808; }
+
+  .users-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .user-card {
+    background: #0d1117;
+    border: 1px solid #ffffff08;
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    transition: border-color .15s;
+  }
+  .user-card:hover { border-color: #00ff8825; }
+  .user-card.pending { border-left: 3px solid #ffaa00; }
+  .user-card.approved { border-left: 3px solid #00ff88; }
+  .user-card.rejected, .user-card.revoked { border-left: 3px solid #ff4444; opacity: .7; }
+
+  .user-info { flex: 1; min-width: 180px; }
+  .user-name { font-size: 13px; color: #e0e0e0; font-weight: bold; }
+  .user-meta { font-size: 10px; color: #444; margin-top: 3px; letter-spacing: .5px; }
+  .user-reason { font-size: 11px; color: #666; margin-top: 4px; font-style: italic; }
+
+  .user-key {
+    font-size: 10px;
+    color: #333;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 4px 8px;
+    letter-spacing: .5px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .user-key:hover { color: #00ff88; border-color: #00ff8840; }
+
+  .status-badge {
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .badge-approved { background: #00ff8820; color: #00ff88; border: 1px solid #00ff8840; }
+  .badge-pending  { background: #ffaa0020; color: #ffaa00; border: 1px solid #ffaa0040; }
+  .badge-rejected { background: #ff444420; color: #ff4444; border: 1px solid #ff444440; }
+  .badge-revoked  { background: #ff444420; color: #ff4444; border: 1px solid #ff444440; }
+
+  .user-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .act-btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: none;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: .5px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .act-approve { background: #00ff8820; color: #00ff88; border: 1px solid #00ff8840; }
+  .act-approve:hover { background: #00ff8835; }
+  .act-reject  { background: #ff444420; color: #ff4444; border: 1px solid #ff444440; }
+  .act-reject:hover  { background: #ff444430; }
+  .act-revoke  { background: #ffaa0020; color: #ffaa00; border: 1px solid #ffaa0040; }
+  .act-revoke:hover  { background: #ffaa0035; }
+  .act-remove  { background: transparent; color: #444; border: 1px solid #333; }
+  .act-remove:hover  { color: #ff4444; border-color: #ff4444; }
+
+  .empty-users { text-align: center; color: #333; padding: 40px; font-size: 12px; letter-spacing: 1px; }
+
+  /* ── Add user row ── */
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .add-row input {
+    flex: 1;
+    min-width: 160px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .add-row input:focus { border-color: #00ff88; }
+  .add-row button {
+    padding: 8px 18px;
+    background: linear-gradient(135deg, #00ff88, #00cc6a);
+    border: none;
+    border-radius: 6px;
+    color: #000;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+  .add-row button:hover { transform: translateY(-1px); box-shadow: 0 3px 10px #00ff8840; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 26px;
+    right: 26px;
+    background: #0d1117;
+    border: 1px solid #00ff8840;
+    color: #00ff88;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 12px;
+    letter-spacing: .5px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 999;
+  }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: #ff444460; color: #ff4444; }
+
+  /* ── Domains ── */
+  .domains-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .domains-grid { grid-template-columns: 1fr; } }
+
+  .domain-section { display: flex; flex-direction: column; gap: 10px; }
+
+  .domain-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #aaa;
+    gap: 10px;
+  }
+  .domain-pill .rm {
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    transition: color .15s;
+    line-height: 1;
+  }
+  .domain-pill .rm:hover { color: #ff4444; }
+
+  .dm-pass-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .dm-pass-row input {
+    flex: 1;
+    min-width: 120px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 7px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .dm-pass-row input:focus { border-color: #00ff88; }
+  .dm-pass-row .save-btn {
+    padding: 7px 14px;
+    background: #00ff8820;
+    border: 1px solid #00ff8840;
+    border-radius: 5px;
+    color: #00ff88;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .dm-pass-row .save-btn:hover { background: #00ff8830; }
+
+  .custom-domain-form { display: flex; flex-direction: column; gap: 8px; }
+  .custom-domain-form input {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 7px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  .custom-domain-form input:focus { border-color: #00ff88; }
+  .custom-domain-form button {
+    padding: 8px;
+    background: #00ff8820;
+    border: 1px solid #00ff8840;
+    border-radius: 5px;
+    color: #00ff88;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .custom-domain-form button:hover { background: #00ff8830; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #00ff8830; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo-text">WEYN</div>
+    <div class="logo-sub">Admin Panel</div>
+  </div>
+  <span class="admin-badge">⚡ ADMIN</span>
+  <button class="logout-btn" onclick="logout()">LOGOUT</button>
+</header>
+
+<nav>
+  <div class="nav-tab active" onclick="showPage('overview')">Overview</div>
+  <div class="nav-tab" onclick="showPage('users')">Users <span id="pendingBadge" style="display:none;color:#ffaa00;"> ●</span></div>
+  <div class="nav-tab" onclick="showPage('domains')">Domains</div>
+</nav>
+
+<!-- OVERVIEW -->
+<div class="page active" id="page-overview">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="num" id="ov-total">—</div><div class="lbl">Total Users</div></div>
+    <div class="stat-card"><div class="num" id="ov-approved">—</div><div class="lbl">Approved</div></div>
+    <div class="stat-card warn"><div class="num" id="ov-pending">—</div><div class="lbl">Pending</div></div>
+    <div class="stat-card danger"><div class="num" id="ov-rejected">—</div><div class="lbl">Rejected / Revoked</div></div>
+    <div class="stat-card"><div class="num" id="ov-accounts">—</div><div class="lbl">FB Accounts Created</div></div>
+  </div>
+  <div class="section-title">Pending Requests</div>
+  <div id="pendingList" class="users-list"></div>
+</div>
+
+<!-- USERS -->
+<div class="page" id="page-users">
+  <div class="section-title">Add User Directly</div>
+  <div class="add-row">
+    <input type="text" id="newUserName" placeholder="Full name">
+    <button onclick="addUser()">+ ADD &amp; APPROVE</button>
+  </div>
+  <div class="section-title">All Users</div>
+  <div class="user-filters">
+    <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-btn" onclick="setFilter('approved', this)">Approved</button>
+    <button class="filter-btn" onclick="setFilter('pending', this)">Pending</button>
+    <button class="filter-btn" onclick="setFilter('rejected', this)">Rejected</button>
+    <button class="filter-btn" onclick="setFilter('revoked', this)">Revoked</button>
+  </div>
+  <div id="userList" class="users-list"></div>
+</div>
+
+<!-- DOMAINS -->
+<div class="page" id="page-domains">
+  <div class="section-title">Domain Password</div>
+  <div class="dm-pass-row" style="margin-bottom:24px;">
+    <input type="text" id="dmPass" placeholder="Current domain password">
+    <button class="save-btn" onclick="saveDmPass()">SAVE PASSWORD</button>
+  </div>
+
+  <div class="domains-grid">
+    <div>
+      <div class="section-title">Temp Domains (Auto API)</div>
+      <div class="add-row">
+        <input type="text" id="newTempDomain" placeholder="e.g. tempmail.net">
+        <button onclick="addTempDomain()">+ ADD</button>
+      </div>
+      <div id="tempDomainList" class="domain-section"></div>
+    </div>
+    <div>
+      <div class="section-title">Custom Domains (IMAP)</div>
+      <div class="custom-domain-form">
+        <input type="text" id="newCustomDomain" placeholder="Domain  e.g. weyn.store">
+        <input type="password" id="newCustomPass" placeholder="IMAP password">
+        <button onclick="addCustomDomain()">+ ADD CUSTOM DOMAIN</button>
+      </div>
+      <div id="customDomainList" class="domain-section" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let allUsers = [];
+let currentFilter = 'all';
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const tabs = document.querySelectorAll('.nav-tab');
+  const map = { overview: 0, users: 1, domains: 2 };
+  tabs[map[name]].classList.add('active');
+
+  if (name === 'overview') loadOverview();
+  if (name === 'users')    loadUsers();
+  if (name === 'domains')  loadDomains();
+}
+
+function toast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => el.className = '', 2500);
+}
+
+async function api(url, method, body) {
+  const opts = { method: method || 'GET', headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// ── Logout ──
+async function logout() {
+  await api('/admin/logout', 'POST');
+  window.location.reload();
+}
+
+// ── Overview ──
+async function loadOverview() {
+  const d = await api('/admin/api/stats');
+  document.getElementById('ov-total').textContent    = d.counts.total;
+  document.getElementById('ov-approved').textContent = d.counts.approved;
+  document.getElementById('ov-pending').textContent  = d.counts.pending;
+  document.getElementById('ov-rejected').textContent = d.counts.rejected + d.counts.revoked;
+  document.getElementById('ov-accounts').textContent = d.total_accounts;
+
+  if (d.counts.pending > 0) {
+    document.getElementById('pendingBadge').style.display = '';
+  }
+
+  const users = await api('/admin/api/users');
+  const pending = users.filter(u => u.status === 'pending');
+  const list = document.getElementById('pendingList');
+  if (!pending.length) {
+    list.innerHTML = '<div class="empty-users">No pending requests</div>';
+    return;
+  }
+  list.innerHTML = '';
+  pending.forEach(u => list.appendChild(buildCard(u)));
+}
+
+// ── Users ──
+async function loadUsers() {
+  allUsers = await api('/admin/api/users');
+  renderUsers();
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderUsers();
+}
+
+function renderUsers() {
+  const list = document.getElementById('userList');
+  const filtered = currentFilter === 'all' ? allUsers : allUsers.filter(u => u.status === currentFilter);
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-users">No users found</div>';
+    return;
+  }
+  list.innerHTML = '';
+  filtered.forEach(u => list.appendChild(buildCard(u)));
+}
+
+function buildCard(u) {
+  const card = document.createElement('div');
+  card.className = `user-card ${u.status}`;
+  card.id = `card-${u.user_id}`;
+
+  const ago = u.last_seen
+    ? `Last seen ${Math.round((Date.now()/1000 - u.last_seen)/60)}m ago`
+    : 'Never logged in';
+
+  const badgeClass = { approved:'badge-approved', pending:'badge-pending', rejected:'badge-rejected', revoked:'badge-revoked' }[u.status] || 'badge-pending';
+
+  let actions = '';
+  if (u.status === 'pending') {
+    actions = `<button class="act-btn act-approve" onclick="approveUser('${u.key}','${u.user_id}')">✓ Approve</button>
+               <button class="act-btn act-reject"  onclick="rejectUser('${u.key}','${u.user_id}')">✗ Reject</button>`;
+  } else if (u.status === 'approved') {
+    actions = `<button class="act-btn act-revoke" onclick="revokeUser('${u.user_id}')">⊘ Revoke</button>`;
+  }
+  actions += `<button class="act-btn act-remove" onclick="removeUser('${u.user_id}')">🗑</button>`;
+
+  card.innerHTML = `
+    <div class="user-info">
+      <div class="user-name">${esc(u.name)}</div>
+      <div class="user-meta">${esc(u.user_id)} &nbsp;·&nbsp; ${ago}</div>
+      ${u.reason ? `<div class="user-reason">"${esc(u.reason)}"</div>` : ''}
+    </div>
+    <span class="user-key" title="Click to copy key" onclick="copyText('${u.key}')">${u.key}</span>
+    <span class="status-badge ${badgeClass}">${u.status}</span>
+    <div class="user-actions">${actions}</div>
+  `;
+  return card;
+}
+
+async function approveUser(key, uid) {
+  const d = await api(`/admin/api/approve/${key}`, 'POST');
+  if (d.status === 'approved') {
+    toast(`✓ Approved: ${d.name}`);
+    refreshCard(uid, 'approved');
+    loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+async function rejectUser(key, uid) {
+  const d = await api(`/admin/api/reject/${key}`, 'POST');
+  if (d.status === 'rejected') {
+    toast('Rejected.');
+    refreshCard(uid, 'rejected');
+    loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+async function revokeUser(uid) {
+  const d = await api(`/admin/api/revoke/${uid}`, 'POST');
+  if (d.status === 'revoked') {
+    toast('Access revoked.');
+    refreshCard(uid, 'revoked');
+  } else toast(d.error || 'Error', true);
+}
+
+async function removeUser(uid) {
+  if (!confirm('Permanently remove this user?')) return;
+  const d = await api(`/admin/api/remove/${uid}`, 'POST');
+  if (d.status === 'removed') {
+    toast('User removed.');
+    document.getElementById(`card-${uid}`)?.remove();
+    allUsers = allUsers.filter(u => u.user_id !== uid);
+    loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+function refreshCard(uid, newStatus) {
+  const u = allUsers.find(x => x.user_id === uid);
+  if (u) {
+    u.status = newStatus;
+    const old = document.getElementById(`card-${uid}`);
+    if (old) old.replaceWith(buildCard(u));
+  }
+}
+
+async function addUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  if (!name) { toast('Enter a name', true); return; }
+  const d = await api('/admin/api/add-user', 'POST', { name });
+  if (d.key) {
+    toast(`✓ Added: ${d.name} — Key: ${d.key}`);
+    document.getElementById('newUserName').value = '';
+    loadUsers();
+    loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+// ── Domains ──
+async function loadDomains() {
+  const d = await api('/admin/api/domains');
+  document.getElementById('dmPass').value = d.domain_password || '';
+
+  const tempList = document.getElementById('tempDomainList');
+  tempList.innerHTML = '';
+  (d.temp || []).forEach(dom => tempList.appendChild(domainPill(dom)));
+
+  const customList = document.getElementById('customDomainList');
+  customList.innerHTML = '';
+  (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain, true)));
+}
+
+function domainPill(domain, isCustom) {
+  const pill = document.createElement('div');
+  pill.className = 'domain-pill';
+  pill.innerHTML = `
+    <span>${esc(domain)}${isCustom ? ' <span style="color:#444;font-size:10px;">(IMAP)</span>' : ''}</span>
+    <button class="rm" title="Remove domain" onclick="removeDomain('${domain}')">×</button>
+  `;
+  return pill;
+}
+
+async function addTempDomain() {
+  const domain = document.getElementById('newTempDomain').value.trim().toLowerCase();
+  if (!domain) { toast('Enter a domain', true); return; }
+  const d = await api('/admin/api/domains/add-temp', 'POST', { domain });
+  if (d.status === 'added') {
+    toast(`✓ Added: ${domain}`);
+    document.getElementById('newTempDomain').value = '';
+    loadDomains();
+  } else if (d.status === 'exists') {
+    toast('Domain already exists', true);
+  } else toast(d.error || 'Error', true);
+}
+
+async function addCustomDomain() {
+  const domain    = document.getElementById('newCustomDomain').value.trim().toLowerCase();
+  const imap_pass = document.getElementById('newCustomPass').value.trim();
+  if (!domain || !imap_pass) { toast('Domain and IMAP password required', true); return; }
+  const d = await api('/admin/api/domains/add-custom', 'POST', { domain, imap_pass });
+  if (d.status === 'added') {
+    toast(`✓ Added: ${domain}`);
+    document.getElementById('newCustomDomain').value = '';
+    document.getElementById('newCustomPass').value = '';
+    loadDomains();
+  } else if (d.status === 'exists') {
+    toast('Domain already exists', true);
+  } else toast(d.error || 'Error', true);
+}
+
+async function removeDomain(domain) {
+  if (!confirm(`Remove domain "${domain}"?`)) return;
+  const d = await api('/admin/api/domains/remove', 'POST', { domain });
+  if (d.status === 'removed') {
+    toast(`Removed: ${domain}`);
+    loadDomains();
+  } else toast('Not found', true);
+}
+
+async function saveDmPass() {
+  const pw = document.getElementById('dmPass').value.trim();
+  if (!pw) { toast('Enter a password', true); return; }
+  const d = await api('/admin/api/domains/set-password', 'POST', { password: pw });
+  if (d.status === 'updated') toast('✓ Domain password updated');
+  else toast(d.error || 'Error', true);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  toast('Copied!');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Initial load
+loadOverview();
+</script>
+</body>
+</html>
