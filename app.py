@@ -16,7 +16,21 @@ import auth
 import domains as dm
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
+
+# ── Stable secret key (persisted in DB so sessions survive restarts) ──────────
+import datetime as _dt
+import storage as _sto
+
+def _get_stable_secret():
+    rec = _sto.load('flask_secret', None)
+    if rec and isinstance(rec, dict) and rec.get('key'):
+        return rec['key']
+    key = os.urandom(32).hex()
+    _sto.save('flask_secret', {'key': key})
+    return key
+
+app.secret_key = os.environ.get('SECRET_KEY') or _get_stable_secret()
+app.permanent_session_lifetime = _dt.timedelta(days=30)
 
 # ── Global job state ─────────────────────────────────────────────────────────
 task_queue   = queue.Queue()
@@ -90,7 +104,7 @@ def verify_key():
             'name':    entry['name'],
             'user_id': entry['user_id'],
         })
-        resp.set_cookie('access_key', key, max_age=60*60*24*30, httponly=True, samesite='Lax')
+        resp.set_cookie('access_key', key, max_age=60*60*24*30, httponly=True, samesite='Lax', path='/')
         return resp
     return jsonify({'status': status})
 
@@ -456,6 +470,7 @@ def admin_panel():
 def admin_login():
     pw = (request.json or {}).get('password', '')
     if pw == ADMIN_PASSWORD:
+        session.permanent = True
         session['is_admin'] = True
         return jsonify({'status': 'ok'})
     return jsonify({'error': 'Wrong password'}), 401

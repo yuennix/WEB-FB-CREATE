@@ -410,109 +410,223 @@
 </div>
 
 <!-- CREATE ACCOUNTS -->
-<div class="page" id="page-create">
-  <div style="display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - 100px);">
+<div class="page" id="page-create" style="height:calc(100vh - 57px);overflow:hidden;">
+<style>
+  .cr-container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: 100%;
+  }
+  .cr-sidebar {
+    background: #0d1117;
+    border-right: 1px solid #00ff8815;
+    padding: 20px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cr-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #070b10;
+  }
+  .cr-tabs {
+    display: flex;
+    border-bottom: 1px solid #00ff8815;
+    background: #0d1117;
+    flex-shrink: 0;
+  }
+  .cr-tab {
+    padding: 12px 20px;
+    font-size: 11px;
+    color: #555;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+  }
+  .cr-tab.active { color: #00ff88; border-bottom-color: #00ff88; }
+  .cr-tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+  .cr-tab-content.active { display: flex; }
+  #c-log-panel {
+    flex: 1; overflow-y: auto;
+    padding: 14px 18px;
+    font-size: 12px; line-height: 1.7;
+  }
+  .c-log-line { display: flex; gap: 8px; align-items: baseline; }
+  .c-log-ts { color: #333; font-size: 10px; flex-shrink: 0; }
+  .c-log-msg { flex: 1; word-break: break-all; }
+  .c-log-info    .c-log-msg { color: #aaa; }
+  .c-log-success .c-log-msg { color: #00ff88; }
+  .c-log-warn    .c-log-msg { color: #ffaa00; }
+  .c-log-error   .c-log-msg { color: #ff4444; }
+  #c-accts-panel {
+    flex: 1; overflow-y: auto;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .c-acct-card {
+    background: #0d1117;
+    border: 1px solid #00ff8818;
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    position: relative;
+    transition: border-color .2s;
+  }
+  .c-acct-card:hover { border-color: #00ff8840; }
+  .c-acct-num { position: absolute; top: 10px; right: 12px; font-size: 10px; color: #333; }
+  .c-acct-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .c-acct-lbl { font-size: 9px; color: #444; letter-spacing: 1.5px; text-transform: uppercase; width: 58px; flex-shrink: 0; }
+  .c-acct-val { font-size: 12px; word-break: break-all; flex: 1; min-width: 0; }
+  .c-val-name  { color: #e0e0e0; font-weight: bold; }
+  .c-val-email { color: #00b4ff; }
+  .c-val-pass  { color: #888; }
+  .c-val-uid   { color: #00ff88; }
+  .c-copy-btn {
+    background: #161b22; border: 1px solid #30363d; border-radius: 4px;
+    color: #444; cursor: pointer; padding: 2px 8px; font-size: 11px;
+    transition: all .15s; flex-shrink: 0; font-family: 'Courier New', monospace;
+  }
+  .c-copy-btn:hover { color: #00ff88; border-color: #00ff8860; background: #00ff8808; }
+  .c-copy-btn.copied { color: #00ff88; border-color: #00ff88; }
+  .c-empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex: 1; color: #333; gap: 10px; text-align: center; padding: 40px; }
+  .cr-fg { display: flex; flex-direction: column; gap: 6px; }
+  .cr-fg label { font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+  .cr-fg select, .cr-fg input {
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    color: #e0e0e0; padding: 9px 12px; font-family: 'Courier New', monospace;
+    font-size: 13px; outline: none; transition: border-color .2s; width: 100%;
+  }
+  .cr-fg select:focus, .cr-fg input:focus { border-color: #00ff88; box-shadow: 0 0 0 2px #00ff8815; }
+  .cr-stats { display: flex; gap: 8px; }
+  .cr-stat { flex: 1; background: #161b22; border: 1px solid #00ff8820; border-radius: 6px; padding: 10px; text-align: center; }
+  .cr-stat-num { font-size: 22px; font-weight: bold; color: #00ff88; }
+  .cr-stat-lbl { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+  .cr-btn { padding: 11px; border-radius: 6px; border: none; font-family: 'Courier New', monospace;
+    font-size: 13px; font-weight: bold; cursor: pointer; letter-spacing: 1px; width: 100%; }
+  .cr-btn-start { background: linear-gradient(135deg,#00ff88,#00cc6a); color: #000; }
+  .cr-btn-start:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
+  .cr-btn-start:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
+  .cr-btn-stop { background: transparent; border: 1px solid #ff4444; color: #ff4444; }
+  .cr-btn-stop:hover { background: #ff444415; }
+  .cr-btn-stop:disabled { opacity: 0.3; cursor: not-allowed; }
+  .cr-btn-dl { background: transparent; border: 1px solid #00ff88; color: #00ff88; }
+  .cr-btn-dl:hover { background: #00ff8815; }
+  .cr-prog-bar-wrap { background: #161b22; border-radius: 4px; height: 6px; overflow: hidden; }
+  .cr-prog-bar { height: 100%; background: linear-gradient(90deg,#00ff88,#00cc6a); border-radius: 4px; transition: width .4s ease; width: 0%; }
+  @media (max-width: 768px) {
+    .cr-container { grid-template-columns: 1fr; height: auto; overflow-y: auto; }
+    .cr-main { min-height: 70vh; }
+  }
+</style>
 
-    <!-- sidebar -->
-    <div style="background:#0d1117;border-right:1px solid #00ff8815;padding:20px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;">
+<div class="cr-container">
 
+  <!-- SIDEBAR -->
+  <div class="cr-sidebar">
+
+    <div>
       <div class="section-title">Configuration</div>
-
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div>
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Name Type</label>
-          <select id="c-nameType" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="cr-fg">
+          <label>Name Type</label>
+          <select id="c-nameType">
             <option value="1">Filipino Names</option>
             <option value="2">RPW (Fantasy) Names</option>
           </select>
         </div>
-        <div>
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Gender</label>
-          <select id="c-gender" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        <div class="cr-fg">
+          <label>Gender</label>
+          <select id="c-gender">
             <option value="3">Mixed</option>
             <option value="1">Male</option>
             <option value="2">Female</option>
           </select>
         </div>
-        <div>
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Email Domain</label>
-          <select id="c-emailDomain" onchange="cOnDomainChange()" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        <div class="cr-fg">
+          <label>Email Domain</label>
+          <select id="c-emailDomain" onchange="cOnDomainChange()">
             <option value="1secmail.com">1secmail.com (Auto API)</option>
           </select>
         </div>
-        <div id="c-domainPassRow" style="display:none;flex-direction:column;gap:5px;">
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;">Domain Password</label>
-          <input type="password" id="c-domainPassword" placeholder="Enter domain password" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        <div class="cr-fg" id="c-domainPassRow" style="display:none;">
+          <label>Domain Password</label>
+          <input type="password" id="c-domainPassword" placeholder="Enter domain password">
         </div>
-        <div>
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Password Type</label>
-          <select id="c-passwordType" onchange="cOnPassTypeChange()" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        <div class="cr-fg">
+          <label>Password Type</label>
+          <select id="c-passwordType" onchange="cOnPassTypeChange()">
             <option value="auto">Auto-Generated</option>
             <option value="custom">Custom Password</option>
           </select>
         </div>
-        <div id="c-customPassRow" style="display:none;flex-direction:column;gap:5px;">
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;">Custom Password</label>
-          <input type="text" id="c-customPassword" placeholder="Enter password" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        <div class="cr-fg" id="c-customPassRow" style="display:none;">
+          <label>Custom Password</label>
+          <input type="text" id="c-customPassword" placeholder="Enter password">
         </div>
-        <div>
-          <label style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px;">Number of Accounts</label>
-          <input type="number" id="c-count" value="5" min="1" max="200" style="width:100%;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#e0e0e0;padding:8px 10px;font-family:'Courier New',monospace;font-size:12px;outline:none;">
+        <div class="cr-fg">
+          <label>Number of Accounts</label>
+          <input type="number" id="c-count" value="5" min="1" max="200">
         </div>
-      </div>
-
-      <!-- progress -->
-      <div>
-        <div class="section-title">Progress</div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:6px;">
-          <span id="c-progressLabel">Ready</span>
-          <span id="c-progressPct">0%</span>
-        </div>
-        <div style="background:#161b22;border-radius:4px;height:5px;overflow:hidden;margin-bottom:10px;">
-          <div id="c-progressBar" style="height:100%;background:linear-gradient(90deg,#00ff88,#00cc6a);border-radius:4px;transition:width .4s ease;width:0%;"></div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <div style="flex:1;background:#161b22;border:1px solid #00ff8818;border-radius:6px;padding:8px;text-align:center;">
-            <div id="c-statCreated" style="font-size:20px;font-weight:bold;color:#00ff88;">0</div>
-            <div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;">Created</div>
-          </div>
-          <div style="flex:1;background:#161b22;border:1px solid #00ff8818;border-radius:6px;padding:8px;text-align:center;">
-            <div id="c-statTotal" style="font-size:20px;font-weight:bold;color:#00ff88;">—</div>
-            <div style="font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;">Target</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- buttons -->
-      <div style="display:flex;flex-direction:column;gap:7px;">
-        <button id="c-btnStart" onclick="cStartJob()" style="padding:10px;background:linear-gradient(135deg,#00ff88,#00cc6a);border:none;border-radius:6px;color:#000;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;transition:all .2s;">▶ START CREATION</button>
-        <button id="c-btnStop" onclick="cStopJob()" disabled style="padding:10px;background:transparent;border:1px solid #ff444440;border-radius:6px;color:#ff4444;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;opacity:.4;">■ STOP</button>
-        <button onclick="window.location.href='/download'" style="padding:10px;background:transparent;border:1px solid #00ff8840;border-radius:6px;color:#00ff88;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;letter-spacing:1px;cursor:pointer;transition:all .2s;">⬇ DOWNLOAD RESULTS</button>
       </div>
     </div>
 
-    <!-- log + accounts -->
-    <div style="display:flex;flex-direction:column;overflow:hidden;">
-      <div style="display:flex;border-bottom:1px solid #00ff8815;background:#0d1117;">
-        <div id="c-tab-log" class="nav-tab active" style="border-bottom:2px solid #00ff88;color:#00ff88;" onclick="cSwitchTab('log')">Console Log</div>
-        <div id="c-tab-accts" class="nav-tab" onclick="cSwitchTab('accts')">Accounts <span id="c-acctCount" style="color:#555;">(0)</span></div>
+    <div>
+      <div class="section-title">Progress</div>
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:6px;">
+          <span id="c-progressLabel">Ready</span>
+          <span id="c-progressPct">0%</span>
+        </div>
+        <div class="cr-prog-bar-wrap"><div class="cr-prog-bar" id="c-progressBar"></div></div>
       </div>
+      <div class="cr-stats">
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statCreated">0</div><div class="cr-stat-lbl">Created</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statTotal">—</div><div class="cr-stat-lbl">Target</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statRate">—</div><div class="cr-stat-lbl">Rate</div></div>
+      </div>
+    </div>
 
-      <div id="c-log-panel" style="flex:1;overflow-y:auto;padding:12px 16px;background:#070b10;font-size:12px;line-height:1.7;">
-        <div id="c-logEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333;gap:8px;text-align:center;">
-          <div style="font-size:32px;">⬡</div>
-          <div style="font-size:12px;letter-spacing:1px;">Waiting to start...</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="cr-btn cr-btn-start" id="c-btnStart" onclick="cStartJob()">▶ START CREATION</button>
+      <button class="cr-btn cr-btn-stop"  id="c-btnStop"  onclick="cStopJob()" disabled>■ STOP</button>
+      <button class="cr-btn cr-btn-dl" onclick="window.location.href='/download'">⬇ DOWNLOAD RESULTS</button>
+    </div>
+
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="cr-main">
+    <div class="cr-tabs">
+      <div class="cr-tab active" id="c-tab-log"   onclick="cSwitchTab('log')">Console Log</div>
+      <div class="cr-tab"        id="c-tab-accts" onclick="cSwitchTab('accts')">Accounts <span id="c-acctCount" style="color:#555;">(0)</span></div>
+    </div>
+
+    <div class="cr-tab-content active" id="c-tc-log">
+      <div id="c-log-panel">
+        <div class="c-empty" id="c-logEmpty">
+          <div style="font-size:36px;">⬡</div>
+          <div style="font-size:13px;letter-spacing:1px;">Waiting to start...</div>
         </div>
       </div>
+    </div>
 
-      <div id="c-accts-panel" style="flex:1;overflow-y:auto;background:#070b10;padding:12px 14px;display:none;flex-direction:column;gap:8px;">
-        <div id="c-acctEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333;gap:8px;text-align:center;">
-          <div style="font-size:32px;">⬡</div>
-          <div style="font-size:12px;letter-spacing:1px;">No accounts yet</div>
+    <div class="cr-tab-content" id="c-tc-accts">
+      <div id="c-accts-panel">
+        <div class="c-empty" id="c-acctEmpty">
+          <div style="font-size:36px;">⬡</div>
+          <div style="font-size:13px;letter-spacing:1px;">No accounts created yet</div>
         </div>
       </div>
     </div>
   </div>
+
+</div>
 </div>
 
 <div id="toast"></div>
