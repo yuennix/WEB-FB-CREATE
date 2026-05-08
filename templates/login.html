@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KYBX | Access</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card {
+    background: #0d1117;
+    border: 1px solid #00ff8825;
+    border-radius: 12px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 0 40px #00ff8808;
+  }
+
+  .logo { text-align: center; margin-bottom: 32px; }
+  .logo-text { font-size: 28px; font-weight: bold; color: #00ff88; letter-spacing: 4px; text-shadow: 0 0 16px #00ff8860; }
+  .logo-sub  { font-size: 10px; color: #444; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 28px;
+    border-bottom: 1px solid #00ff8820;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #444;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+  }
+  .tab.active { color: #00ff88; border-bottom-color: #00ff88; }
+
+  .panel { display: none; flex-direction: column; gap: 14px; }
+  .panel.active { display: flex; }
+
+  label { font-size: 10px; color: #666; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 5px; }
+
+  input[type="text"], input[type="password"], textarea {
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 10px 13px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .2s;
+    resize: none;
+  }
+  input:focus, textarea:focus { border-color: #00ff88; box-shadow: 0 0 0 2px #00ff8812; }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .2s;
+  }
+  .btn-primary { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #000; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
+  .btn-primary:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .msg {
+    font-size: 12px;
+    padding: 10px 13px;
+    border-radius: 6px;
+    display: none;
+    line-height: 1.5;
+  }
+  .msg.show { display: block; }
+  .msg-success { background: #00ff8812; border: 1px solid #00ff8830; color: #00ff88; }
+  .msg-error   { background: #ff444412; border: 1px solid #ff444430; color: #ff6666; }
+  .msg-warn    { background: #ffaa0012; border: 1px solid #ffaa0030; color: #ffaa00; }
+  .msg-info    { background: #0088ff12; border: 1px solid #0088ff30; color: #66aaff; }
+
+  .key-box {
+    background: #070b10;
+    border: 1px solid #00ff8830;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 13px;
+    color: #00ff88;
+    text-align: center;
+    letter-spacing: 1px;
+    word-break: break-all;
+    cursor: pointer;
+    transition: background .2s;
+    display: none;
+  }
+  .key-box:hover { background: #00ff8810; }
+  .key-box.show { display: block; }
+
+  .uid-box {
+    font-size: 10px;
+    color: #555;
+    text-align: center;
+    display: none;
+    letter-spacing: 1px;
+  }
+  .uid-box.show { display: block; }
+
+  .hint { font-size: 10px; color: #444; text-align: center; letter-spacing: 0.5px; }
+
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid #00ff8830;
+    border-top-color: #00ff88;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+    display: none;
+  }
+  .spinner.show { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .poll-row { display: none; flex-direction: column; gap: 10px; }
+  .poll-row.show { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-text">KYBX</div>
+    <div class="logo-sub">Facebook Account Creator</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-login" onclick="switchTab('login')">Enter Key</div>
+    <div class="tab" id="tab-request" onclick="switchTab('request')">Request Access</div>
+  </div>
+
+  <!-- ENTER KEY PANEL -->
+  <div class="panel active" id="panel-login">
+    <div>
+      <label>Access Key</label>
+      <input type="text" id="keyInput" placeholder="WEYN-XXXX-XXXX-XXXX-XXXX"
+             oninput="this.value=this.value.toUpperCase()"
+             onkeydown="if(event.key==='Enter') verifyKey()">
+    </div>
+    <div id="loginMsg" class="msg"></div>
+    <button class="btn btn-primary" id="btnVerify" onclick="verifyKey()">
+      <span class="spinner" id="verifySpinner"></span>
+      ENTER
+    </button>
+    <div class="hint">Don't have a key? Switch to "Request Access"</div>
+  </div>
+
+  <!-- REQUEST ACCESS PANEL -->
+  <div class="panel" id="panel-request">
+    <div>
+      <label>Your Name</label>
+      <input type="text" id="reqName" placeholder="e.g. Juan Dela Cruz">
+    </div>
+    <div>
+      <label>Reason (optional)</label>
+      <textarea id="reqReason" rows="2" placeholder="Why do you need access?"></textarea>
+    </div>
+    <div id="reqMsg" class="msg"></div>
+    <button class="btn btn-primary" id="btnRequest" onclick="requestAccess()">
+      <span class="spinner" id="reqSpinner"></span>
+      SEND REQUEST TO ADMIN
+    </button>
+
+    <!-- After request submitted -->
+    <div class="key-box" id="genKey" onclick="copyKey()" title="Click to copy"></div>
+    <div class="uid-box" id="genUid"></div>
+
+    <!-- Poll status -->
+    <div class="poll-row" id="pollRow">
+      <div id="pollMsg" class="msg msg-info show">
+        <span class="spinner show"></span> Waiting for admin approval…
+      </div>
+      <div class="hint">Your key is shown above. Copy it and enter it once approved.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let pollInterval = null;
+let pendingKey   = '';
+
+function switchTab(name) {
+  document.getElementById('tab-login').classList.toggle('active', name === 'login');
+  document.getElementById('tab-request').classList.toggle('active', name === 'request');
+  document.getElementById('panel-login').classList.toggle('active', name === 'login');
+  document.getElementById('panel-request').classList.toggle('active', name === 'request');
+}
+
+function showMsg(id, text, type) {
+  const el = document.getElementById(id);
+  el.className = `msg msg-${type} show`;
+  el.textContent = text;
+}
+
+async function verifyKey() {
+  const key = document.getElementById('keyInput').value.trim();
+  if (!key) { showMsg('loginMsg', 'Please enter your access key.', 'error'); return; }
+
+  document.getElementById('btnVerify').disabled = true;
+  document.getElementById('verifySpinner').classList.add('show');
+
+  try {
+    const r = await fetch('/verify-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const d = await r.json();
+
+    if (d.status === 'approved') {
+      showMsg('loginMsg', `Welcome, ${d.name}!`, 'success');
+      setTimeout(() => window.location.href = '/', 800);
+    } else if (d.status === 'pending') {
+      showMsg('loginMsg', 'Your key is still pending admin approval.', 'warn');
+    } else if (d.status === 'rejected') {
+      showMsg('loginMsg', 'This key has been rejected. Contact admin.', 'error');
+    } else if (d.status === 'revoked') {
+      showMsg('loginMsg', 'This key has been revoked. Contact admin.', 'error');
+    } else {
+      showMsg('loginMsg', 'Invalid key. Check and try again.', 'error');
+    }
+  } catch(e) {
+    showMsg('loginMsg', 'Connection error. Try again.', 'error');
+  }
+
+  document.getElementById('btnVerify').disabled = false;
+  document.getElementById('verifySpinner').classList.remove('show');
+}
+
+async function requestAccess() {
+  const name   = document.getElementById('reqName').value.trim();
+  const reason = document.getElementById('reqReason').value.trim();
+  if (!name) { showMsg('reqMsg', 'Please enter your name.', 'error'); return; }
+
+  document.getElementById('btnRequest').disabled = true;
+  document.getElementById('reqSpinner').classList.add('show');
+
+  try {
+    const r = await fetch('/request-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, reason }),
+    });
+    const d = await r.json();
+
+    if (d.key) {
+      pendingKey = d.key;
+      showMsg('reqMsg', '✓ Request sent! Admin will be notified via Telegram.', 'success');
+      document.getElementById('btnRequest').disabled = true;
+
+      const keyBox = document.getElementById('genKey');
+      keyBox.textContent = d.key;
+      keyBox.classList.add('show');
+
+      const uidBox = document.getElementById('genUid');
+      uidBox.textContent = `User ID: ${d.user_id}`;
+      uidBox.classList.add('show');
+
+      document.getElementById('pollRow').classList.add('show');
+      startPolling(d.key);
+    } else {
+      showMsg('reqMsg', d.error || 'Failed to send request.', 'error');
+      document.getElementById('btnRequest').disabled = false;
+    }
+  } catch(e) {
+    showMsg('reqMsg', 'Connection error. Try again.', 'error');
+    document.getElementById('btnRequest').disabled = false;
+  }
+
+  document.getElementById('reqSpinner').classList.remove('show');
+}
+
+function startPolling(key) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/key-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const d = await r.json();
+      if (d.status === 'approved') {
+        clearInterval(pollInterval);
+        document.getElementById('pollMsg').className = 'msg msg-success show';
+        document.getElementById('pollMsg').textContent = '✅ Approved! Logging you in…';
+        // auto-login
+        setTimeout(async () => {
+          await fetch('/verify-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key }),
+          });
+          window.location.href = '/';
+        }, 1200);
+      } else if (d.status === 'rejected') {
+        clearInterval(pollInterval);
+        document.getElementById('pollMsg').className = 'msg msg-error show';
+        document.getElementById('pollMsg').textContent = '❌ Request rejected by admin.';
+      }
+    } catch(e) {}
+  }, 4000);
+}
+
+function copyKey() {
+  const key = document.getElementById('genKey').textContent;
+  navigator.clipboard.writeText(key).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = key;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  const box = document.getElementById('genKey');
+  const orig = box.textContent;
+  box.textContent = 'Copied!';
+  setTimeout(() => box.textContent = orig, 1200);
+}
+</script>
+
+</body>
+</html>
