@@ -348,6 +348,33 @@
   .log-warn    .log-msg { color: #fbbf24; }
   .log-error   .log-msg { color: #f87171; }
 
+  /* ── Accounts toolbar ── */
+  .accounts-toolbar {
+    display: none;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    flex-shrink: 0;
+    background: rgba(10,15,26,0.5);
+  }
+  .accounts-toolbar.visible { display: flex; }
+
+  .btn-copy-all {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    border: 1px solid rgba(0,230,118,0.25);
+    background: rgba(0,230,118,0.06);
+    color: #00e676;
+  }
+  .btn-copy-all:hover { background: rgba(0,230,118,0.12); border-color: rgba(0,230,118,0.4); }
+  .btn-copy-all.copied { background: rgba(0,230,118,0.15); }
+
   /* ── Accounts panel ── */
   #accounts-panel {
     flex: 1;
@@ -593,6 +620,9 @@
     </div>
 
     <div class="tab-content" id="tab-accounts">
+      <div class="accounts-toolbar" id="accountsToolbar">
+        <button class="btn-copy-all" id="btnCopyAll" onclick="copyAllAccounts(this)">⎘ Copy All (uid|pass)</button>
+      </div>
       <div id="accounts-panel">
         <div class="empty-state" id="acctEmpty">
           <div class="empty-icon">⬡</div>
@@ -611,6 +641,7 @@ let targetCount = 0;
 let startTime = null;
 let _customDomains = [];
 let _timerTick = null;
+let allAccounts = [];
 
 function _startTicker() {
   if (_timerTick) clearInterval(_timerTick);
@@ -694,10 +725,12 @@ function addLog(msg, level) {
 
 function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
+  const uidPass = `${data.uid}|${data.password}`;
+  allAccounts.push(uidPass);
+  document.getElementById('accountsToolbar').classList.add('visible');
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
   card.className = 'acct-card';
-  const copyAll = `${data.name}\n${data.email}\n${data.password}\n${data.uid}`;
   card.innerHTML = `
     <span class="acct-num">#${data.num}</span>
     <div class="acct-row">
@@ -707,7 +740,6 @@ function addAccount(data) {
     <div class="acct-row">
       <span class="acct-field-label">Email</span>
       <span class="acct-field-value acct-email">${escHtml(data.email)}</span>
-      <button class="copy-btn" onclick="copyField(this, '${escAttr(data.email)}')">copy</button>
     </div>
     <div class="acct-row">
       <span class="acct-field-label">Password</span>
@@ -717,13 +749,27 @@ function addAccount(data) {
       <span class="acct-field-label">UID</span>
       <span class="acct-field-value acct-uid">${escHtml(data.uid)}</span>
     </div>
-    <button class="acct-copy-all" title="Copy all" onclick="copyField(this, '${escAttr(copyAll)}')">⎘</button>
+    <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
   panel.appendChild(card);
   createdCount++;
   document.getElementById('statCreated').textContent = createdCount;
   document.getElementById('accountCount').textContent = `(${createdCount})`;
   updateProgress();
+}
+
+function copyAllAccounts(btn) {
+  if (!allAccounts.length) return;
+  const text = allAccounts.join('\n');
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.classList.add('copied');
+  btn.textContent = `✓ Copied ${allAccounts.length} account${allAccounts.length > 1 ? 's' : ''}!`;
+  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 2000);
 }
 
 function copyField(btn, text) {
@@ -770,6 +816,8 @@ async function startJob() {
   if (passwordType === 'custom' && !customPassword.trim()) { alert('Please enter a custom password.'); return; }
 
   createdCount = 0; targetCount = count; startTime = Date.now();
+  allAccounts = [];
+  document.getElementById('accountsToolbar').classList.remove('visible');
   document.getElementById('statCreated').textContent = '0';
   document.getElementById('statTotal').textContent   = count;
   document.getElementById('statTime').textContent    = '0s';
