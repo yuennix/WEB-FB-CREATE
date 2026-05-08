@@ -4,6 +4,7 @@ import time
 import uuid
 import threading
 import requests
+import domains as dm
 
 TG_TOKEN  = os.environ.get('TG_BOT_TOKEN', '')
 TG_CHAT   = os.environ.get('TG_CHAT_ID', '')
@@ -264,13 +265,16 @@ def _tg_edit_remove_buttons(chat_id, message_id, text):
 def _register_commands():
     _tg_post('setMyCommands', {
         'commands': [
-            {'command': 'start',  'description': '👋 Welcome message'},
-            {'command': 'stats',  'description': '📊 Total users & accounts created'},
-            {'command': 'users',  'description': '👥 View all users with revoke buttons'},
-            {'command': 'remove', 'description': '🗑 Remove user — /remove USR-XXXX'},
+            {'command': 'start',       'description': '👋 Welcome message'},
+            {'command': 'stats',       'description': '📊 Total users & accounts created'},
+            {'command': 'users',       'description': '👥 View all users with revoke buttons'},
+            {'command': 'remove',      'description': '🗑 Remove user — /remove USR-XXXX'},
+            {'command': 'domains',     'description': '🌐 List & manage email domains'},
+            {'command': 'adddomain',   'description': '➕ Add temp domain — /adddomain domain.com'},
+            {'command': 'addcustom',   'description': '➕ Add custom domain — /addcustom domain.com pass'},
+            {'command': 'setdmpass',   'description': '🔑 Set domain password — /setdmpass newpass'},
         ]
     })
-    # Set for admin chat specifically + global default
     for payload in [
         {'chat_id': TG_CHAT, 'menu_button': {'type': 'commands'}},
         {'menu_button': {'type': 'commands'}},
@@ -353,6 +357,17 @@ def _handle_callback(callback_id, chat_id, message_id, data_str):
         else:
             _tg_answer_callback(callback_id, '⚠️ User not found')
 
+    elif action == 'domain_remove':
+        domain = value.lower()
+        ok = dm.remove_domain(domain)
+        if ok:
+            _tg_answer_callback(callback_id, f'🗑 Removed {domain}')
+            _tg_edit_remove_buttons(chat_id, message_id,
+                f"🗑 *Domain Removed*\n\n`{domain}` has been deleted.\nUsers will no longer see it in the web UI."
+            )
+        else:
+            _tg_answer_callback(callback_id, f'⚠️ Domain not found')
+
 
 # ── Command handler ───────────────────────────────────────────────────────────
 
@@ -363,13 +378,17 @@ def _handle_command(chat_id, text):
     # /start
     if cmd == '/start':
         _tg_send(chat_id, (
-            "👋 *Welcome to KYBX Admin Bot*\n\n"
+            "👋 *Welcome to WEYN Admin Bot*\n\n"
             "Use the *Menu* button to see all commands.\n\n"
             "📌 *Quick guide:*\n"
             "• New requests arrive with ✅ Approve / ❌ Decline buttons\n"
             "• `/stats` — see totals\n"
             "• `/users` — manage users with revoke buttons\n"
-            "• `/remove USR\\-XXXX` — permanently delete a user"
+            "• `/remove USR\\-XXXX` — permanently delete a user\n"
+            "• `/domains` — list & manage email domains\n"
+            "• `/adddomain domain.com` — add a temp domain\n"
+            "• `/addcustom domain.com pass` — add a custom domain\n"
+            "• `/setdmpass newpass` — change domain password"
         ))
 
     # /stats
@@ -380,7 +399,7 @@ def _handle_command(chat_id, text):
         recent.sort(key=lambda x: x[1]['last_seen'], reverse=True)
 
         lines = [
-            "📊 *KYBX Statistics*\n",
+            "📊 *WEYN Statistics*\n",
             f"👥 Total Users:          *{counts['total']}*",
             f"✅ Approved:             *{counts['approved']}*",
             f"⏳ Pending:              *{counts['pending']}*",
@@ -462,6 +481,79 @@ def _handle_command(chat_id, text):
             _tg_send(chat_id, f"🗑 Permanently removed *{entry['name']}* (`{uid}`).")
         else:
             _tg_send(chat_id, f"⚠️ User ID not found: `{uid}`")
+
+    # /domains
+    elif cmd == '/domains':
+        info = dm.get_all_info()
+        temp_list   = info.get('temp', [])
+        custom_list = info.get('custom', [])
+        pw          = info.get('domain_password', '—')
+
+        lines = ["🌐 *Email Domains*\n", f"🔑 Password: `{pw}`\n"]
+
+        if temp_list:
+            lines.append("📦 *Temp (API)*")
+            for d in temp_list:
+                lines.append(f"  • `{d}`")
+        else:
+            lines.append("📦 *Temp:* _(none)_")
+
+        lines.append("")
+        if custom_list:
+            lines.append("🔧 *Custom (IMAP)*")
+            for e in custom_list:
+                lines.append(f"  • `{e['domain']}`")
+        else:
+            lines.append("🔧 *Custom:* _(none)_")
+
+        lines.append("\n_Tap ❌ below to remove a domain_")
+        msg_text = "\n".join(lines)
+
+        all_domains = [(d, 'temp') for d in temp_list] + [(e['domain'], 'custom') for e in custom_list]
+        if all_domains:
+            buttons = [[{'text': f'❌ {d}', 'callback_data': f'domain_remove:{d}'}] for d, _ in all_domains]
+            _tg_send_buttons(chat_id, msg_text, buttons)
+        else:
+            _tg_send(chat_id, msg_text + "\n\n_(No domains configured yet)_")
+
+    # /adddomain <domain>
+    elif cmd == '/adddomain':
+        if len(parts) < 2:
+            _tg_send(chat_id, "Usage: `/adddomain domain.com`")
+            return
+        domain = parts[1].lower()
+        ok = dm.add_temp_domain(domain)
+        if ok:
+            _tg_send(chat_id, f"✅ Temp domain added: `{domain}`\nUsers will see it in the web UI immediately.")
+        else:
+            _tg_send(chat_id, f"⚠️ `{domain}` is already in the list.")
+
+    # /addcustom <domain> <password>
+    elif cmd == '/addcustom':
+        if len(parts) < 3:
+            _tg_send(chat_id, "Usage: `/addcustom domain.com mailpassword`\n\nThis uses standard IMAP: `mail.domain.com` / `admin@domain.com`.\nContact me if you need custom IMAP settings.")
+            return
+        domain   = parts[1].lower()
+        imap_pass = parts[2]
+        ok = dm.add_custom_domain(domain, imap_pass)
+        if ok:
+            _tg_send(chat_id,
+                f"✅ Custom domain added: `{domain}`\n"
+                f"📬 IMAP: `mail.{domain}` → `admin@{domain}`\n"
+                f"🔑 Pass: `{imap_pass}`\n\n"
+                f"Users will see it immediately in the web UI."
+            )
+        else:
+            _tg_send(chat_id, f"⚠️ `{domain}` is already in the custom domain list.")
+
+    # /setdmpass <newpass>
+    elif cmd == '/setdmpass':
+        if len(parts) < 2:
+            _tg_send(chat_id, "Usage: `/setdmpass newpassword`")
+            return
+        new_pw = parts[1]
+        dm.set_domain_password(new_pw)
+        _tg_send(chat_id, f"🔑 Domain password updated to: `{new_pw}`\n\nUsers must enter this password when selecting a custom domain.")
 
     else:
         _tg_send(chat_id, "Use the *Menu* button or send /start for help.")
