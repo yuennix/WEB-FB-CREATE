@@ -1,7 +1,7 @@
 import json
 import threading
+import storage
 
-DOMAINS_FILE = 'domains.json'
 _lock = threading.Lock()
 
 _DEFAULT = {
@@ -16,16 +16,14 @@ _DEFAULT = {
 
 
 def _load():
-    try:
-        with open(DOMAINS_FILE) as f:
-            return json.load(f)
-    except Exception:
+    data = storage.load('domains', default=None)
+    if data is None:
         return json.loads(json.dumps(_DEFAULT))
+    return data
 
 
 def _save(data):
-    with open(DOMAINS_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    storage.save('domains', data)
 
 
 def get_domain_password():
