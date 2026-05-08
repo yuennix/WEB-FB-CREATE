@@ -3,350 +3,452 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WEYN | Admin Panel</title>
+<title>WEYN — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; min-height: 100vh; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+  body {
+    background: #060a12;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
   header {
-    background: #0d1117;
-    border-bottom: 1px solid #00ff8820;
-    padding: 14px 28px;
+    background: rgba(10,15,26,0.97);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 0 24px;
+    height: 56px;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
-  .logo-text { font-size: 20px; font-weight: bold; color: #00ff88; letter-spacing: 3px; text-shadow: 0 0 10px #00ff8860; }
-  .logo-sub  { font-size: 9px; color: #444; letter-spacing: 2px; text-transform: uppercase; }
-  .admin-badge { font-size: 10px; color: #ffaa00; letter-spacing: 1px; border: 1px solid #ffaa0040; padding: 2px 8px; border-radius: 4px; }
-  .logout-btn {
-    margin-left: auto;
-    background: transparent;
-    border: 1px solid #ff444440;
-    color: #ff4444;
-    padding: 6px 14px;
-    border-radius: 5px;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    cursor: pointer;
-    letter-spacing: 1px;
-    transition: all .2s;
-  }
-  .logout-btn:hover { background: #ff444415; }
 
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #000;
+    box-shadow: 0 4px 12px rgba(245,158,11,0.3);
+    flex-shrink: 0;
+  }
+
+  .logo-text { font-size: 16px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.3px; }
+  .logo-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.07); margin: 0 4px; }
+  .admin-badge {
+    font-size: 10px; font-weight: 700; color: #f59e0b;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2);
+    border-radius: 6px; padding: 3px 8px; letter-spacing: 0.5px;
+  }
+
+  .header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .btn-hdr {
+    padding: 6px 14px; border-radius: 8px; font-family: 'Inter', sans-serif;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;
+  }
+  .btn-hdr-user {
+    background: rgba(0,230,118,0.06); border: 1px solid rgba(0,230,118,0.2); color: #00e676;
+  }
+  .btn-hdr-user:hover { background: rgba(0,230,118,0.12); border-color: rgba(0,230,118,0.4); }
+  .btn-hdr-logout {
+    background: transparent; border: 1px solid rgba(239,68,68,0.2); color: #f87171;
+  }
+  .btn-hdr-logout:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.4); }
+
+  /* ── Nav ── */
   nav {
-    background: #0d1117;
-    border-bottom: 1px solid #ffffff08;
-    padding: 0 28px;
+    background: rgba(10,15,26,0.8);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 0 24px;
     display: flex;
     gap: 0;
+    position: sticky;
+    top: 56px;
+    z-index: 90;
   }
+
   .nav-tab {
-    padding: 11px 20px;
-    font-size: 11px;
-    color: #555;
+    padding: 13px 18px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #334155;
     cursor: pointer;
-    letter-spacing: 1px;
-    text-transform: uppercase;
     border-bottom: 2px solid transparent;
     transition: all .2s;
     user-select: none;
   }
-  .nav-tab.active { color: #00ff88; border-bottom-color: #00ff88; }
-  .nav-tab:hover:not(.active) { color: #888; }
+  .nav-tab.active { color: #f59e0b; border-bottom-color: #f59e0b; }
+  .nav-tab:hover:not(.active) { color: #64748b; }
+  .nav-tab.create-tab { color: rgba(96,165,250,0.5); }
+  .nav-tab.create-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+  .nav-tab.create-tab:hover:not(.active) { color: rgba(96,165,250,0.8); }
 
-  .page { display: none; padding: 26px 28px; max-width: 1100px; }
+  /* ── Pages ── */
+  .page { display: none; padding: 28px 24px; max-width: 1100px; }
   .page.active { display: block; }
 
-  /* ── Stats ── */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
-  .stat-card {
-    background: #0d1117;
-    border: 1px solid #00ff8818;
-    border-radius: 8px;
-    padding: 16px 18px;
-    text-align: center;
-  }
-  .stat-card .num { font-size: 30px; font-weight: bold; color: #00ff88; }
-  .stat-card .lbl { font-size: 9px; color: #444; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 4px; }
-  .stat-card.warn .num { color: #ffaa00; }
-  .stat-card.danger .num { color: #ff4444; }
-
   /* ── Section title ── */
-  .section-title {
-    font-size: 10px;
-    color: #00ff88;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #00ff8818;
+  .section-label {
+    font-size: 10px; font-weight: 700; color: #334155;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
     margin-bottom: 16px;
   }
 
-  /* ── Users table ── */
-  .user-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
-  .filter-btn {
-    padding: 5px 12px;
-    border-radius: 4px;
-    border: 1px solid #30363d;
-    background: #161b22;
-    color: #888;
-    font-family: 'Courier New', monospace;
-    font-size: 10px;
-    letter-spacing: 1px;
-    cursor: pointer;
-    transition: all .15s;
+  /* ── Stats ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
   }
-  .filter-btn.active { border-color: #00ff88; color: #00ff88; background: #00ff8808; }
+
+  .stat-card {
+    background: rgba(14,20,36,0.8);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 18px 16px;
+    text-align: center;
+    transition: border-color .2s;
+  }
+  .stat-card:hover { border-color: rgba(255,255,255,0.1); }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: #00e676; letter-spacing: -1px; }
+  .stat-card .lbl { font-size: 10px; font-weight: 600; color: #1e293b; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+  .stat-card.warn .num { color: #fbbf24; }
+  .stat-card.danger .num { color: #f87171; }
+  .stat-card.blue .num { color: #60a5fa; }
+
+  /* ── Users ── */
+  .user-filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+
+  .filter-btn {
+    padding: 5px 13px; border-radius: 99px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: transparent; color: #334155;
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  .filter-btn.active { border-color: rgba(245,158,11,0.4); color: #f59e0b; background: rgba(245,158,11,0.08); }
+  .filter-btn:hover:not(.active) { color: #64748b; border-color: rgba(255,255,255,0.12); }
 
   .users-list { display: flex; flex-direction: column; gap: 8px; }
 
   .user-card {
-    background: #0d1117;
-    border: 1px solid #ffffff08;
-    border-radius: 8px;
-    padding: 12px 16px;
+    background: rgba(14,20,36,0.7);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-left: 3px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
-    transition: border-color .15s;
+    transition: all .15s;
   }
-  .user-card:hover { border-color: #00ff8825; }
-  .user-card.pending { border-left: 3px solid #ffaa00; }
-  .user-card.approved { border-left: 3px solid #00ff88; }
-  .user-card.rejected, .user-card.revoked { border-left: 3px solid #ff4444; opacity: .7; }
+  .user-card:hover { border-color: rgba(255,255,255,0.1); border-left-color: rgba(255,255,255,0.1); }
+  .user-card.pending  { border-left-color: #fbbf24; }
+  .user-card.approved { border-left-color: #00e676; }
+  .user-card.rejected, .user-card.revoked { border-left-color: #f87171; opacity: .6; }
 
-  .user-info { flex: 1; min-width: 180px; }
-  .user-name { font-size: 13px; color: #e0e0e0; font-weight: bold; }
-  .user-meta { font-size: 10px; color: #444; margin-top: 3px; letter-spacing: .5px; }
-  .user-reason { font-size: 11px; color: #666; margin-top: 4px; font-style: italic; }
+  .user-info { flex: 1; min-width: 160px; }
+  .user-name  { font-size: 14px; color: #f1f5f9; font-weight: 600; }
+  .user-meta  { font-size: 11px; color: #334155; margin-top: 3px; font-family: monospace; }
+  .user-reason { font-size: 12px; color: #475569; margin-top: 4px; }
 
   .user-key {
-    font-size: 10px;
-    color: #333;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    padding: 4px 8px;
-    letter-spacing: .5px;
-    cursor: pointer;
-    transition: all .15s;
-    white-space: nowrap;
+    font-size: 10px; color: #1e293b;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px; padding: 4px 9px;
+    font-family: monospace; cursor: pointer; transition: all .15s; white-space: nowrap;
   }
-  .user-key:hover { color: #00ff88; border-color: #00ff8840; }
+  .user-key:hover { color: #f59e0b; border-color: rgba(245,158,11,0.3); }
 
   .status-badge {
-    font-size: 9px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    white-space: nowrap;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 3px 9px; border-radius: 99px; text-transform: uppercase; white-space: nowrap;
   }
-  .badge-approved { background: #00ff8820; color: #00ff88; border: 1px solid #00ff8840; }
-  .badge-pending  { background: #ffaa0020; color: #ffaa00; border: 1px solid #ffaa0040; }
-  .badge-rejected { background: #ff444420; color: #ff4444; border: 1px solid #ff444440; }
-  .badge-revoked  { background: #ff444420; color: #ff4444; border: 1px solid #ff444440; }
+  .badge-approved { background: rgba(0,230,118,0.1); color: #00e676; border: 1px solid rgba(0,230,118,0.2); }
+  .badge-pending  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+  .badge-rejected { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+  .badge-revoked  { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
 
   .user-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   .act-btn {
-    padding: 5px 12px;
-    border-radius: 4px;
-    border: none;
-    font-family: 'Courier New', monospace;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: .5px;
-    cursor: pointer;
-    transition: all .15s;
-    white-space: nowrap;
+    padding: 5px 12px; border-radius: 7px; border: none;
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
   }
-  .act-approve { background: #00ff8820; color: #00ff88; border: 1px solid #00ff8840; }
-  .act-approve:hover { background: #00ff8835; }
-  .act-reject  { background: #ff444420; color: #ff4444; border: 1px solid #ff444440; }
-  .act-reject:hover  { background: #ff444430; }
-  .act-revoke  { background: #ffaa0020; color: #ffaa00; border: 1px solid #ffaa0040; }
-  .act-revoke:hover  { background: #ffaa0035; }
-  .act-remove  { background: transparent; color: #444; border: 1px solid #333; }
-  .act-remove:hover  { color: #ff4444; border-color: #ff4444; }
+  .act-approve { background: rgba(0,230,118,0.1); color: #00e676; border: 1px solid rgba(0,230,118,0.2); }
+  .act-approve:hover { background: rgba(0,230,118,0.18); }
+  .act-reject  { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+  .act-reject:hover  { background: rgba(248,113,113,0.18); }
+  .act-revoke  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+  .act-revoke:hover  { background: rgba(251,191,36,0.18); }
+  .act-remove  { background: transparent; color: #334155; border: 1px solid rgba(255,255,255,0.07); }
+  .act-remove:hover  { color: #f87171; border-color: rgba(248,113,113,0.3); }
 
-  .empty-users { text-align: center; color: #333; padding: 40px; font-size: 12px; letter-spacing: 1px; }
+  .empty-users { text-align: center; color: #1e293b; padding: 40px; font-size: 13px; font-weight: 500; }
 
   /* ── Add user row ── */
-  .add-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-  }
+  .add-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
   .add-row input {
-    flex: 1;
-    min-width: 160px;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e0e0e0;
-    padding: 8px 12px;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    outline: none;
-    transition: border-color .2s;
+    flex: 1; min-width: 160px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0;
+    padding: 9px 13px; font-family: 'Inter', sans-serif; font-size: 13px;
+    outline: none; transition: border-color .2s;
   }
-  .add-row input:focus { border-color: #00ff88; }
+  .add-row input:focus { border-color: rgba(245,158,11,0.4); box-shadow: 0 0 0 3px rgba(245,158,11,0.07); }
+  .add-row input::placeholder { color: #1e293b; }
   .add-row button {
-    padding: 8px 18px;
-    background: linear-gradient(135deg, #00ff88, #00cc6a);
-    border: none;
-    border-radius: 6px;
-    color: #000;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all .2s;
+    padding: 9px 18px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border: none; border-radius: 9px; color: #000;
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all .2s;
+    box-shadow: 0 4px 12px rgba(245,158,11,0.2);
   }
-  .add-row button:hover { transform: translateY(-1px); box-shadow: 0 3px 10px #00ff8840; }
+  .add-row button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,0.3); }
 
   /* ── Toast ── */
   #toast {
-    position: fixed;
-    bottom: 26px;
-    right: 26px;
-    background: #0d1117;
-    border: 1px solid #00ff8840;
-    color: #00ff88;
-    padding: 10px 18px;
-    border-radius: 6px;
-    font-size: 12px;
-    letter-spacing: .5px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .25s;
-    z-index: 999;
+    position: fixed; bottom: 24px; right: 24px;
+    background: rgba(14,20,36,0.95); backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,230,118,0.25); color: #00e676;
+    padding: 11px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   }
   #toast.show { opacity: 1; }
-  #toast.err { border-color: #ff444460; color: #ff4444; }
+  #toast.err { border-color: rgba(248,113,113,0.3); color: #f87171; }
 
   /* ── Domains ── */
-  .domains-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .domains-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   @media (max-width: 700px) { .domains-grid { grid-template-columns: 1fr; } }
-
-  .domain-section { display: flex; flex-direction: column; gap: 10px; }
+  .domain-section { display: flex; flex-direction: column; gap: 8px; }
 
   .domain-pill {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #aaa;
-    gap: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 9px 13px; font-size: 13px; color: #94a3b8; gap: 10px;
+    transition: border-color .15s;
   }
+  .domain-pill:hover { border-color: rgba(255,255,255,0.1); }
   .domain-pill .rm {
-    background: none;
-    border: none;
-    color: #333;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0 2px;
-    transition: color .15s;
-    line-height: 1;
+    background: none; border: none; color: #1e293b; cursor: pointer;
+    font-size: 16px; padding: 0 2px; transition: color .15s; line-height: 1;
   }
-  .domain-pill .rm:hover { color: #ff4444; }
+  .domain-pill .rm:hover { color: #f87171; }
 
-  .dm-pass-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-  }
+  .dm-pass-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
   .dm-pass-row input {
-    flex: 1;
-    min-width: 120px;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e0e0e0;
-    padding: 7px 10px;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    outline: none;
-    transition: border-color .2s;
+    flex: 1; min-width: 120px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0; padding: 8px 12px;
+    font-family: 'Inter', sans-serif; font-size: 13px; outline: none; transition: border-color .2s;
   }
-  .dm-pass-row input:focus { border-color: #00ff88; }
+  .dm-pass-row input:focus { border-color: rgba(245,158,11,0.4); }
+  .dm-pass-row input::placeholder { color: #1e293b; }
   .dm-pass-row .save-btn {
-    padding: 7px 14px;
-    background: #00ff8820;
-    border: 1px solid #00ff8840;
-    border-radius: 5px;
-    color: #00ff88;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all .15s;
-    white-space: nowrap;
+    padding: 8px 16px;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 8px; color: #f59e0b;
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
   }
-  .dm-pass-row .save-btn:hover { background: #00ff8830; }
+  .dm-pass-row .save-btn:hover { background: rgba(245,158,11,0.18); }
 
   .custom-domain-form { display: flex; flex-direction: column; gap: 8px; }
   .custom-domain-form input {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e0e0e0;
-    padding: 7px 10px;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    outline: none;
-    transition: border-color .2s;
-    width: 100%;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0; padding: 8px 12px;
+    font-family: 'Inter', sans-serif; font-size: 13px; outline: none;
+    transition: border-color .2s; width: 100%;
   }
-  .custom-domain-form input:focus { border-color: #00ff88; }
+  .custom-domain-form input:focus { border-color: rgba(0,230,118,0.35); }
+  .custom-domain-form input::placeholder { color: #1e293b; }
   .custom-domain-form button {
-    padding: 8px;
-    background: #00ff8820;
-    border: 1px solid #00ff8840;
-    border-radius: 5px;
-    color: #00ff88;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all .15s;
+    padding: 9px;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 9px; color: #00e676;
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
   }
-  .custom-domain-form button:hover { background: #00ff8830; }
+  .custom-domain-form button:hover { background: rgba(0,230,118,0.15); }
 
-  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #00ff8830; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
+
+  /* ── Create accounts tab ── */
+  #page-create {
+    padding: 0;
+    max-width: none;
+    height: calc(100vh - 112px);
+    overflow: hidden;
+  }
+
+  .cr-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: 100%;
+  }
+
+  .cr-sidebar {
+    background: rgba(10,15,26,0.6);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 20px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .cr-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .cr-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(10,15,26,0.8);
+    flex-shrink: 0;
+    padding: 0 20px;
+  }
+  .cr-tab {
+    padding: 13px 16px; font-size: 12px; font-weight: 500;
+    color: #334155; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all .2s;
+  }
+  .cr-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+  .cr-tab:hover:not(.active) { color: #64748b; }
+
+  .cr-tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+  .cr-tab-content.active { display: flex; }
+
+  #c-log-panel {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+    font-size: 12px; line-height: 1.8;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .c-log-line { display: flex; gap: 10px; align-items: baseline; }
+  .c-log-ts { color: #1e293b; font-size: 10px; flex-shrink: 0; }
+  .c-log-msg { flex: 1; word-break: break-all; }
+  .c-log-info    .c-log-msg { color: #475569; }
+  .c-log-success .c-log-msg { color: #00e676; }
+  .c-log-warn    .c-log-msg { color: #fbbf24; }
+  .c-log-error   .c-log-msg { color: #f87171; }
+
+  #c-accts-panel {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .c-acct-card {
+    background: rgba(14,20,36,0.8);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+    position: relative; transition: border-color .2s;
+  }
+  .c-acct-card:hover { border-color: rgba(0,230,118,0.15); }
+
+  .c-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; color: #1e293b;
+    gap: 12px; text-align: center; padding: 40px;
+  }
+
+  .cr-fg { display: flex; flex-direction: column; gap: 5px; }
+  .cr-fg label { font-size: 12px; font-weight: 500; color: #64748b; }
+  .cr-fg select, .cr-fg input {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0; padding: 9px 12px;
+    font-family: 'Inter', sans-serif; font-size: 13px; outline: none;
+    transition: border-color .2s; width: 100%; -webkit-appearance: none;
+  }
+  .cr-fg select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+  }
+  .cr-fg select:focus, .cr-fg input:focus { border-color: rgba(96,165,250,0.4); box-shadow: 0 0 0 3px rgba(96,165,250,0.07); }
+  .cr-fg input::placeholder { color: #1e293b; }
+  .cr-fg select option { background: #0e1420; }
+
+  .cr-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .cr-stat {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 10px 8px; text-align: center;
+  }
+  .cr-stat-num { font-size: 20px; font-weight: 700; color: #60a5fa; letter-spacing: -0.5px; }
+  .cr-stat-lbl { font-size: 9px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-top: 2px; }
+
+  .cr-prog-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .cr-prog-meta { display: flex; justify-content: space-between; font-size: 11px; color: #334155; font-weight: 500; }
+  .cr-prog-track { height: 4px; background: rgba(255,255,255,0.05); border-radius: 99px; overflow: hidden; }
+  .cr-prog-fill { height: 100%; background: linear-gradient(90deg,#60a5fa,#3b82f6); border-radius: 99px; transition: width .4s ease; width: 0%; }
+
+  .cr-btn {
+    padding: 11px; border-radius: 10px; border: none;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; letter-spacing: -0.1px; width: 100%; transition: all .2s;
+  }
+  .cr-btn-start { background: linear-gradient(135deg,#60a5fa,#3b82f6); color: #fff; box-shadow: 0 4px 16px rgba(96,165,250,0.25); }
+  .cr-btn-start:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(96,165,250,0.35); }
+  .cr-btn-start:disabled { background: rgba(96,165,250,0.1); color: rgba(96,165,250,0.25); cursor: not-allowed; box-shadow: none; transform: none; }
+  .cr-btn-stop { background: transparent; border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
+  .cr-btn-stop:hover:not(:disabled) { background: rgba(239,68,68,0.08); }
+  .cr-btn-stop:disabled { opacity: 0.25; cursor: not-allowed; }
+  .cr-btn-dl { background: transparent; border: 1px solid rgba(255,255,255,0.08); color: #475569; }
+  .cr-btn-dl:hover { background: rgba(255,255,255,0.04); color: #64748b; }
+
+  .c-copy-btn {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 6px; color: #334155; cursor: pointer; padding: 3px 9px;
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+    transition: all .15s; flex-shrink: 0;
+  }
+  .c-copy-btn:hover { color: #00e676; border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.06); }
+
+  @media (max-width: 768px) {
+    .cr-container { grid-template-columns: 1fr; height: auto; overflow-y: auto; }
+    .cr-main { min-height: 70vh; }
+    #page-create { height: auto; overflow: auto; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="logo-text">WEYN</div>
-    <div class="logo-sub">Admin Panel</div>
+  <div class="logo-mark">W</div>
+  <span class="logo-text">WEYN</span>
+  <div class="logo-sep"></div>
+  <span class="admin-badge">ADMIN</span>
+  <div class="header-actions">
+    <button class="btn-hdr btn-hdr-user" onclick="window.location.href='/'">👤 User View</button>
+    <button class="btn-hdr btn-hdr-logout" onclick="logout()">Sign Out</button>
   </div>
-  <span class="admin-badge">⚡ ADMIN</span>
-  <button class="logout-btn" onclick="logout()">LOGOUT</button>
 </header>
 
 <nav>
   <div class="nav-tab active" onclick="showPage('overview')">Overview</div>
-  <div class="nav-tab" onclick="showPage('users')">Users <span id="pendingBadge" style="display:none;color:#ffaa00;"> ●</span></div>
+  <div class="nav-tab" onclick="showPage('users')">Users <span id="pendingBadge" style="display:none;color:#fbbf24;"> ●</span></div>
   <div class="nav-tab" onclick="showPage('domains')">Domains</div>
-  <div class="nav-tab" onclick="showPage('create')" style="color:#00b4ff99;">Create Accounts</div>
+  <div class="nav-tab create-tab" onclick="showPage('create')">Create Accounts</div>
 </nav>
 
 <!-- OVERVIEW -->
@@ -356,20 +458,20 @@
     <div class="stat-card"><div class="num" id="ov-approved">—</div><div class="lbl">Approved</div></div>
     <div class="stat-card warn"><div class="num" id="ov-pending">—</div><div class="lbl">Pending</div></div>
     <div class="stat-card danger"><div class="num" id="ov-rejected">—</div><div class="lbl">Rejected / Revoked</div></div>
-    <div class="stat-card"><div class="num" id="ov-accounts">—</div><div class="lbl">FB Accounts Created</div></div>
+    <div class="stat-card blue"><div class="num" id="ov-accounts">—</div><div class="lbl">FB Accounts Created</div></div>
   </div>
-  <div class="section-title">Pending Requests</div>
+  <div class="section-label">Pending Requests</div>
   <div id="pendingList" class="users-list"></div>
 </div>
 
 <!-- USERS -->
 <div class="page" id="page-users">
-  <div class="section-title">Add User Directly</div>
+  <div class="section-label">Add User Directly</div>
   <div class="add-row">
     <input type="text" id="newUserName" placeholder="Full name">
-    <button onclick="addUser()">+ ADD &amp; APPROVE</button>
+    <button onclick="addUser()">+ Add & Approve</button>
   </div>
-  <div class="section-title">All Users</div>
+  <div class="section-label">All Users</div>
   <div class="user-filters">
     <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
     <button class="filter-btn" onclick="setFilter('approved', this)">Approved</button>
@@ -382,27 +484,27 @@
 
 <!-- DOMAINS -->
 <div class="page" id="page-domains">
-  <div class="section-title">Domain Password</div>
-  <div class="dm-pass-row" style="margin-bottom:24px;">
+  <div class="section-label">Domain Password</div>
+  <div class="dm-pass-row" style="margin-bottom:28px;">
     <input type="text" id="dmPass" placeholder="Current domain password">
-    <button class="save-btn" onclick="saveDmPass()">SAVE PASSWORD</button>
+    <button class="save-btn" onclick="saveDmPass()">Save Password</button>
   </div>
 
   <div class="domains-grid">
     <div>
-      <div class="section-title">Temp Domains (Auto API)</div>
+      <div class="section-label">Temp Domains — Auto API</div>
       <div class="add-row">
         <input type="text" id="newTempDomain" placeholder="e.g. tempmail.net">
-        <button onclick="addTempDomain()">+ ADD</button>
+        <button onclick="addTempDomain()">+ Add</button>
       </div>
       <div id="tempDomainList" class="domain-section"></div>
     </div>
     <div>
-      <div class="section-title">Custom Domains (IMAP)</div>
+      <div class="section-label">Custom Domains — IMAP</div>
       <div class="custom-domain-form">
         <input type="text" id="newCustomDomain" placeholder="Domain  e.g. weyn.store">
-        <input type="password" id="newCustomPass" placeholder="IMAP password (optional)">
-        <button onclick="addCustomDomain()">+ ADD CUSTOM DOMAIN</button>
+        <input type="password" id="newCustomPass" placeholder="IMAP password (optional — leave blank if none)">
+        <button onclick="addCustomDomain()">+ Add Custom Domain</button>
       </div>
       <div id="customDomainList" class="domain-section" style="margin-top:12px;"></div>
     </div>
@@ -410,129 +512,14 @@
 </div>
 
 <!-- CREATE ACCOUNTS -->
-<div class="page" id="page-create" style="height:calc(100vh - 57px);overflow:hidden;">
-<style>
-  .cr-container {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    height: 100%;
-  }
-  .cr-sidebar {
-    background: #0d1117;
-    border-right: 1px solid #00ff8815;
-    padding: 20px 18px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .cr-main {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #070b10;
-  }
-  .cr-tabs {
-    display: flex;
-    border-bottom: 1px solid #00ff8815;
-    background: #0d1117;
-    flex-shrink: 0;
-  }
-  .cr-tab {
-    padding: 12px 20px;
-    font-size: 11px;
-    color: #555;
-    cursor: pointer;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    border-bottom: 2px solid transparent;
-    transition: all .2s;
-  }
-  .cr-tab.active { color: #00ff88; border-bottom-color: #00ff88; }
-  .cr-tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
-  .cr-tab-content.active { display: flex; }
-  #c-log-panel {
-    flex: 1; overflow-y: auto;
-    padding: 14px 18px;
-    font-size: 12px; line-height: 1.7;
-  }
-  .c-log-line { display: flex; gap: 8px; align-items: baseline; }
-  .c-log-ts { color: #333; font-size: 10px; flex-shrink: 0; }
-  .c-log-msg { flex: 1; word-break: break-all; }
-  .c-log-info    .c-log-msg { color: #aaa; }
-  .c-log-success .c-log-msg { color: #00ff88; }
-  .c-log-warn    .c-log-msg { color: #ffaa00; }
-  .c-log-error   .c-log-msg { color: #ff4444; }
-  #c-accts-panel {
-    flex: 1; overflow-y: auto;
-    padding: 14px 16px;
-    display: flex; flex-direction: column; gap: 10px;
-  }
-  .c-acct-card {
-    background: #0d1117;
-    border: 1px solid #00ff8818;
-    border-radius: 8px;
-    padding: 12px 14px;
-    display: flex; flex-direction: column; gap: 6px;
-    position: relative;
-    transition: border-color .2s;
-  }
-  .c-acct-card:hover { border-color: #00ff8840; }
-  .c-acct-num { position: absolute; top: 10px; right: 12px; font-size: 10px; color: #333; }
-  .c-acct-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .c-acct-lbl { font-size: 9px; color: #444; letter-spacing: 1.5px; text-transform: uppercase; width: 58px; flex-shrink: 0; }
-  .c-acct-val { font-size: 12px; word-break: break-all; flex: 1; min-width: 0; }
-  .c-val-name  { color: #e0e0e0; font-weight: bold; }
-  .c-val-email { color: #00b4ff; }
-  .c-val-pass  { color: #888; }
-  .c-val-uid   { color: #00ff88; }
-  .c-copy-btn {
-    background: #161b22; border: 1px solid #30363d; border-radius: 4px;
-    color: #444; cursor: pointer; padding: 2px 8px; font-size: 11px;
-    transition: all .15s; flex-shrink: 0; font-family: 'Courier New', monospace;
-  }
-  .c-copy-btn:hover { color: #00ff88; border-color: #00ff8860; background: #00ff8808; }
-  .c-copy-btn.copied { color: #00ff88; border-color: #00ff88; }
-  .c-empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
-    flex: 1; color: #333; gap: 10px; text-align: center; padding: 40px; }
-  .cr-fg { display: flex; flex-direction: column; gap: 6px; }
-  .cr-fg label { font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; }
-  .cr-fg select, .cr-fg input {
-    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
-    color: #e0e0e0; padding: 9px 12px; font-family: 'Courier New', monospace;
-    font-size: 13px; outline: none; transition: border-color .2s; width: 100%;
-  }
-  .cr-fg select:focus, .cr-fg input:focus { border-color: #00ff88; box-shadow: 0 0 0 2px #00ff8815; }
-  .cr-stats { display: flex; gap: 8px; }
-  .cr-stat { flex: 1; background: #161b22; border: 1px solid #00ff8820; border-radius: 6px; padding: 10px; text-align: center; }
-  .cr-stat-num { font-size: 22px; font-weight: bold; color: #00ff88; }
-  .cr-stat-lbl { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
-  .cr-btn { padding: 11px; border-radius: 6px; border: none; font-family: 'Courier New', monospace;
-    font-size: 13px; font-weight: bold; cursor: pointer; letter-spacing: 1px; width: 100%; }
-  .cr-btn-start { background: linear-gradient(135deg,#00ff88,#00cc6a); color: #000; }
-  .cr-btn-start:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
-  .cr-btn-start:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
-  .cr-btn-stop { background: transparent; border: 1px solid #ff4444; color: #ff4444; }
-  .cr-btn-stop:hover { background: #ff444415; }
-  .cr-btn-stop:disabled { opacity: 0.3; cursor: not-allowed; }
-  .cr-btn-dl { background: transparent; border: 1px solid #00ff88; color: #00ff88; }
-  .cr-btn-dl:hover { background: #00ff8815; }
-  .cr-prog-bar-wrap { background: #161b22; border-radius: 4px; height: 6px; overflow: hidden; }
-  .cr-prog-bar { height: 100%; background: linear-gradient(90deg,#00ff88,#00cc6a); border-radius: 4px; transition: width .4s ease; width: 0%; }
-  @media (max-width: 768px) {
-    .cr-container { grid-template-columns: 1fr; height: auto; overflow-y: auto; }
-    .cr-main { min-height: 70vh; }
-  }
-</style>
-
+<div class="page" id="page-create">
 <div class="cr-container">
 
-  <!-- SIDEBAR -->
   <div class="cr-sidebar">
 
     <div>
-      <div class="section-title">Configuration</div>
-      <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="section-label">Configuration</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="cr-fg">
           <label>Name Type</label>
           <select id="c-nameType">
@@ -577,41 +564,40 @@
     </div>
 
     <div>
-      <div class="section-title">Progress</div>
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:6px;">
+      <div class="section-label">Progress</div>
+      <div class="cr-prog-wrap" style="margin-bottom:10px;">
+        <div class="cr-prog-meta">
           <span id="c-progressLabel">Ready</span>
           <span id="c-progressPct">0%</span>
         </div>
-        <div class="cr-prog-bar-wrap"><div class="cr-prog-bar" id="c-progressBar"></div></div>
+        <div class="cr-prog-track"><div class="cr-prog-fill" id="c-progressBar"></div></div>
       </div>
       <div class="cr-stats">
         <div class="cr-stat"><div class="cr-stat-num" id="c-statCreated">0</div><div class="cr-stat-lbl">Created</div></div>
-        <div class="cr-stat"><div class="cr-stat-num" id="c-statTotal">—</div><div class="cr-stat-lbl">Target</div></div>
-        <div class="cr-stat"><div class="cr-stat-num" id="c-statRate">—</div><div class="cr-stat-lbl">Rate</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statTotal" style="color:#475569;">—</div><div class="cr-stat-lbl">Target</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statRate" style="color:#475569;">—</div><div class="cr-stat-lbl">Rate</div></div>
       </div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <button class="cr-btn cr-btn-start" id="c-btnStart" onclick="cStartJob()">▶ START CREATION</button>
-      <button class="cr-btn cr-btn-stop"  id="c-btnStop"  onclick="cStopJob()" disabled>■ STOP</button>
-      <button class="cr-btn cr-btn-dl" onclick="window.location.href='/download'">⬇ DOWNLOAD RESULTS</button>
+      <button class="cr-btn cr-btn-start" id="c-btnStart" onclick="cStartJob()">▶ Start Creation</button>
+      <button class="cr-btn cr-btn-stop"  id="c-btnStop"  onclick="cStopJob()" disabled>■ Stop</button>
+      <button class="cr-btn cr-btn-dl" onclick="window.location.href='/download'">⬇ Download Results</button>
     </div>
 
   </div>
 
-  <!-- MAIN PANEL -->
   <div class="cr-main">
     <div class="cr-tabs">
       <div class="cr-tab active" id="c-tab-log"   onclick="cSwitchTab('log')">Console Log</div>
-      <div class="cr-tab"        id="c-tab-accts" onclick="cSwitchTab('accts')">Accounts <span id="c-acctCount" style="color:#555;">(0)</span></div>
+      <div class="cr-tab"        id="c-tab-accts" onclick="cSwitchTab('accts')">Accounts <span id="c-acctCount" style="color:#1e293b;">(0)</span></div>
     </div>
 
     <div class="cr-tab-content active" id="c-tc-log">
       <div id="c-log-panel">
         <div class="c-empty" id="c-logEmpty">
-          <div style="font-size:36px;">⬡</div>
-          <div style="font-size:13px;letter-spacing:1px;">Waiting to start...</div>
+          <div style="font-size:32px;opacity:.3;">⬡</div>
+          <div style="font-size:13px;font-weight:500;color:#1e293b;">Waiting to start…</div>
         </div>
       </div>
     </div>
@@ -619,8 +605,8 @@
     <div class="cr-tab-content" id="c-tc-accts">
       <div id="c-accts-panel">
         <div class="c-empty" id="c-acctEmpty">
-          <div style="font-size:36px;">⬡</div>
-          <div style="font-size:13px;letter-spacing:1px;">No accounts created yet</div>
+          <div style="font-size:32px;opacity:.3;">⬡</div>
+          <div style="font-size:13px;font-weight:500;color:#1e293b;">No accounts created yet</div>
         </div>
       </div>
     </div>
@@ -664,13 +650,11 @@ async function api(url, method, body) {
   return r.json();
 }
 
-// ── Logout ──
 async function logout() {
   await api('/admin/logout', 'POST');
   window.location.reload();
 }
 
-// ── Overview ──
 async function loadOverview() {
   const d = await api('/admin/api/stats');
   document.getElementById('ov-total').textContent    = d.counts.total;
@@ -679,22 +663,16 @@ async function loadOverview() {
   document.getElementById('ov-rejected').textContent = d.counts.rejected + d.counts.revoked;
   document.getElementById('ov-accounts').textContent = d.total_accounts;
 
-  if (d.counts.pending > 0) {
-    document.getElementById('pendingBadge').style.display = '';
-  }
+  if (d.counts.pending > 0) document.getElementById('pendingBadge').style.display = '';
 
   const users = await api('/admin/api/users');
   const pending = users.filter(u => u.status === 'pending');
   const list = document.getElementById('pendingList');
-  if (!pending.length) {
-    list.innerHTML = '<div class="empty-users">No pending requests</div>';
-    return;
-  }
+  if (!pending.length) { list.innerHTML = '<div class="empty-users">No pending requests</div>'; return; }
   list.innerHTML = '';
   pending.forEach(u => list.appendChild(buildCard(u)));
 }
 
-// ── Users ──
 async function loadUsers() {
   allUsers = await api('/admin/api/users');
   renderUsers();
@@ -710,10 +688,7 @@ function setFilter(f, btn) {
 function renderUsers() {
   const list = document.getElementById('userList');
   const filtered = currentFilter === 'all' ? allUsers : allUsers.filter(u => u.status === currentFilter);
-  if (!filtered.length) {
-    list.innerHTML = '<div class="empty-users">No users found</div>';
-    return;
-  }
+  if (!filtered.length) { list.innerHTML = '<div class="empty-users">No users found</div>'; return; }
   list.innerHTML = '';
   filtered.forEach(u => list.appendChild(buildCard(u)));
 }
@@ -741,10 +716,10 @@ function buildCard(u) {
   card.innerHTML = `
     <div class="user-info">
       <div class="user-name">${esc(u.name)}</div>
-      <div class="user-meta">${esc(u.user_id)} &nbsp;·&nbsp; ${ago}</div>
+      <div class="user-meta">${esc(u.user_id)} · ${ago}</div>
       ${u.reason ? `<div class="user-reason">"${esc(u.reason)}"</div>` : ''}
     </div>
-    <span class="user-key" title="Click to copy key" onclick="copyText('${u.key}')">${u.key}</span>
+    <span class="user-key" title="Click to copy" onclick="copyText('${u.key}')">${u.key}</span>
     <span class="status-badge ${badgeClass}">${u.status}</span>
     <div class="user-actions">${actions}</div>
   `;
@@ -753,28 +728,20 @@ function buildCard(u) {
 
 async function approveUser(key, uid) {
   const d = await api(`/admin/api/approve/${key}`, 'POST');
-  if (d.status === 'approved') {
-    toast(`✓ Approved: ${d.name}`);
-    refreshCard(uid, 'approved');
-    loadOverview();
-  } else toast(d.error || 'Error', true);
+  if (d.status === 'approved') { toast(`✓ Approved: ${d.name}`); refreshCard(uid, 'approved'); loadOverview(); }
+  else toast(d.error || 'Error', true);
 }
 
 async function rejectUser(key, uid) {
   const d = await api(`/admin/api/reject/${key}`, 'POST');
-  if (d.status === 'rejected') {
-    toast('Rejected.');
-    refreshCard(uid, 'rejected');
-    loadOverview();
-  } else toast(d.error || 'Error', true);
+  if (d.status === 'rejected') { toast('Rejected.'); refreshCard(uid, 'rejected'); loadOverview(); }
+  else toast(d.error || 'Error', true);
 }
 
 async function revokeUser(uid) {
   const d = await api(`/admin/api/revoke/${uid}`, 'POST');
-  if (d.status === 'revoked') {
-    toast('Access revoked.');
-    refreshCard(uid, 'revoked');
-  } else toast(d.error || 'Error', true);
+  if (d.status === 'revoked') { toast('Access revoked.'); refreshCard(uid, 'revoked'); }
+  else toast(d.error || 'Error', true);
 }
 
 async function removeUser(uid) {
@@ -790,34 +757,23 @@ async function removeUser(uid) {
 
 function refreshCard(uid, newStatus) {
   const u = allUsers.find(x => x.user_id === uid);
-  if (u) {
-    u.status = newStatus;
-    const old = document.getElementById(`card-${uid}`);
-    if (old) old.replaceWith(buildCard(u));
-  }
+  if (u) { u.status = newStatus; const old = document.getElementById(`card-${uid}`); if (old) old.replaceWith(buildCard(u)); }
 }
 
 async function addUser() {
   const name = document.getElementById('newUserName').value.trim();
   if (!name) { toast('Enter a name', true); return; }
   const d = await api('/admin/api/add-user', 'POST', { name });
-  if (d.key) {
-    toast(`✓ Added: ${d.name} — Key: ${d.key}`);
-    document.getElementById('newUserName').value = '';
-    loadUsers();
-    loadOverview();
-  } else toast(d.error || 'Error', true);
+  if (d.key) { toast(`✓ Added: ${d.name} — Key: ${d.key}`); document.getElementById('newUserName').value = ''; loadUsers(); loadOverview(); }
+  else toast(d.error || 'Error', true);
 }
 
-// ── Domains ──
 async function loadDomains() {
   const d = await api('/admin/api/domains');
   document.getElementById('dmPass').value = d.domain_password || '';
-
   const tempList = document.getElementById('tempDomainList');
   tempList.innerHTML = '';
   (d.temp || []).forEach(dom => tempList.appendChild(domainPill(dom)));
-
   const customList = document.getElementById('customDomainList');
   customList.innerHTML = '';
   (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain, true)));
@@ -827,7 +783,7 @@ function domainPill(domain, isCustom) {
   const pill = document.createElement('div');
   pill.className = 'domain-pill';
   pill.innerHTML = `
-    <span>${esc(domain)}${isCustom ? ' <span style="color:#444;font-size:10px;">(IMAP)</span>' : ''}</span>
+    <span>${esc(domain)}${isCustom ? ' <span style="color:#1e293b;font-size:10px;">(IMAP)</span>' : ''}</span>
     <button class="rm" title="Remove domain" onclick="removeDomain('${domain}')">×</button>
   `;
   return pill;
@@ -837,13 +793,9 @@ async function addTempDomain() {
   const domain = document.getElementById('newTempDomain').value.trim().toLowerCase();
   if (!domain) { toast('Enter a domain', true); return; }
   const d = await api('/admin/api/domains/add-temp', 'POST', { domain });
-  if (d.status === 'added') {
-    toast(`✓ Added: ${domain}`);
-    document.getElementById('newTempDomain').value = '';
-    loadDomains();
-  } else if (d.status === 'exists') {
-    toast('Domain already exists', true);
-  } else toast(d.error || 'Error', true);
+  if (d.status === 'added') { toast(`✓ Added: ${domain}`); document.getElementById('newTempDomain').value = ''; loadDomains(); }
+  else if (d.status === 'exists') toast('Domain already exists', true);
+  else toast(d.error || 'Error', true);
 }
 
 async function addCustomDomain() {
@@ -856,18 +808,15 @@ async function addCustomDomain() {
     document.getElementById('newCustomDomain').value = '';
     document.getElementById('newCustomPass').value = '';
     loadDomains();
-  } else if (d.status === 'exists') {
-    toast('Domain already exists', true);
-  } else toast(d.error || 'Error', true);
+  } else if (d.status === 'exists') toast('Domain already exists', true);
+  else toast(d.error || 'Error', true);
 }
 
 async function removeDomain(domain) {
   if (!confirm(`Remove domain "${domain}"?`)) return;
   const d = await api('/admin/api/domains/remove', 'POST', { domain });
-  if (d.status === 'removed') {
-    toast(`Removed: ${domain}`);
-    loadDomains();
-  } else toast('Not found', true);
+  if (d.status === 'removed') { toast(`Removed: ${domain}`); loadDomains(); }
+  else toast('Not found', true);
 }
 
 async function saveDmPass() {
@@ -881,11 +830,8 @@ async function saveDmPass() {
 function copyText(text) {
   navigator.clipboard.writeText(text).catch(() => {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
   });
   toast('Copied!');
 }
@@ -894,11 +840,12 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Create Accounts tab ───────────────────────────────────────────────────────
+// ── Create Accounts tab ──────────────────────────────────────────────────────
 
 let cEventSource   = null;
 let cCreatedCount  = 0;
 let cTargetCount   = 0;
+let cStartTime     = null;
 let _cCustomDomains = [];
 
 async function cLoadDomains() {
@@ -927,8 +874,7 @@ async function cLoadDomains() {
 
 function cOnDomainChange() {
   const v = document.getElementById('c-emailDomain').value;
-  const row = document.getElementById('c-domainPassRow');
-  row.style.display = _cCustomDomains.includes(v) ? 'flex' : 'none';
+  document.getElementById('c-domainPassRow').style.display = _cCustomDomains.includes(v) ? 'flex' : 'none';
 }
 
 function cOnPassTypeChange() {
@@ -937,20 +883,20 @@ function cOnPassTypeChange() {
 }
 
 function cSwitchTab(name) {
-  const logPanel  = document.getElementById('c-log-panel');
-  const acctPanel = document.getElementById('c-accts-panel');
-  const logTab    = document.getElementById('c-tab-log');
-  const acctTab   = document.getElementById('c-tab-accts');
+  const logContainer  = document.getElementById('c-tc-log');
+  const acctContainer = document.getElementById('c-tc-accts');
+  const logTab        = document.getElementById('c-tab-log');
+  const acctTab       = document.getElementById('c-tab-accts');
   if (name === 'log') {
-    logPanel.style.display  = 'block';
-    acctPanel.style.display = 'none';
-    logTab.classList.add('active'); logTab.style.borderBottom = '2px solid #00ff88'; logTab.style.color = '#00ff88';
-    acctTab.classList.remove('active'); acctTab.style.borderBottom = ''; acctTab.style.color = '';
+    logContainer.classList.add('active');
+    acctContainer.classList.remove('active');
+    logTab.classList.add('active');
+    acctTab.classList.remove('active');
   } else {
-    logPanel.style.display  = 'none';
-    acctPanel.style.display = 'flex';
-    acctTab.classList.add('active'); acctTab.style.borderBottom = '2px solid #00ff88'; acctTab.style.color = '#00ff88';
-    logTab.classList.remove('active'); logTab.style.borderBottom = ''; logTab.style.color = '';
+    acctContainer.classList.add('active');
+    logContainer.classList.remove('active');
+    acctTab.classList.add('active');
+    logTab.classList.remove('active');
   }
 }
 
@@ -958,11 +904,11 @@ function cAddLog(msg, level) {
   const panel = document.getElementById('c-log-panel');
   const empty = document.getElementById('c-logEmpty');
   if (empty) empty.remove();
-  const colors = { success: '#00ff88', warn: '#ffaa00', error: '#ff4444', info: '#aaa' };
+  const colors = { success:'#00e676', warn:'#fbbf24', error:'#f87171', info:'#475569' };
   const now = new Date().toTimeString().slice(0, 8);
   const line = document.createElement('div');
-  line.style.cssText = 'display:flex;gap:8px;align-items:baseline;';
-  line.innerHTML = `<span style="color:#333;font-size:10px;flex-shrink:0;">${now}</span><span style="color:${colors[level]||'#aaa'};flex:1;word-break:break-all;">${esc(msg)}</span>`;
+  line.style.cssText = 'display:flex;gap:10px;align-items:baseline;';
+  line.innerHTML = `<span style="color:#1e293b;font-size:10px;flex-shrink:0;">${now}</span><span style="color:${colors[level]||'#475569'};flex:1;word-break:break-all;">${esc(msg)}</span>`;
   panel.appendChild(line);
   panel.scrollTop = panel.scrollHeight;
 }
@@ -974,44 +920,27 @@ function cAddAccount(data) {
   const copyAll = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
 
   const card = document.createElement('div');
-  card.style.cssText = `
-    background:#0d1117;
-    border:1px solid #00ff8822;
-    border-radius:10px;
-    padding:14px 14px 12px;
-    display:flex;
-    flex-direction:column;
-    gap:0;
-    position:relative;
-  `;
+  card.className = 'c-acct-card';
   card.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <span style="font-size:11px;color:#444;letter-spacing:1px;">#${data.num}</span>
-      <button onclick="cCopyField(this,\`${escAttr(copyAll)}\`)"
-        style="background:#161b22;border:1px solid #30363d;border-radius:5px;color:#555;cursor:pointer;padding:3px 10px;font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;transition:all .15s;"
-        title="Copy all">COPY ALL</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:10px;font-weight:600;color:#1e293b;font-family:monospace;">#${data.num}</span>
+      <button onclick="cCopyField(this,\`${escAttr(copyAll)}\`)" class="c-copy-btn">Copy All</button>
     </div>
+    <div style="display:grid;grid-template-columns:60px 1fr;row-gap:8px;align-items:center;">
+      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">Name</span>
+      <span style="font-size:13px;color:#f1f5f9;font-weight:600;">${esc(data.name)}</span>
 
-    <div style="display:grid;grid-template-columns:64px 1fr;row-gap:8px;align-items:center;">
-
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">Name</span>
-      <span style="font-size:13px;color:#e0e0e0;font-weight:bold;">${esc(data.name)}</span>
-
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">Email</span>
-      <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-        <span style="font-size:12px;color:#00b4ff;word-break:break-all;flex:1;">${esc(data.email)}</span>
-        <button onclick="cCopyField(this,'${escAttr(data.email)}')"
-          style="background:linear-gradient(135deg,#00b4ff22,#0088cc22);border:1px solid #00b4ff44;border-radius:5px;color:#00b4ff;cursor:pointer;padding:3px 10px;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;letter-spacing:1px;flex-shrink:0;transition:all .15s;">
-          COPY
-        </button>
+      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">Email</span>
+      <div style="display:flex;align-items:center;gap:7px;min-width:0;">
+        <span style="font-size:12px;color:#60a5fa;word-break:break-all;flex:1;">${esc(data.email)}</span>
+        <button onclick="cCopyField(this,'${escAttr(data.email)}')" class="c-copy-btn">Copy</button>
       </div>
 
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">Password</span>
-      <span style="font-size:12px;color:#888;letter-spacing:.5px;">${esc(data.password)}</span>
+      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">Pass</span>
+      <span style="font-size:12px;color:#475569;font-family:monospace;">${esc(data.password)}</span>
 
-      <span style="font-size:9px;color:#444;letter-spacing:1.5px;text-transform:uppercase;">UID</span>
-      <span style="font-size:12px;color:#00ff88;letter-spacing:.5px;">${esc(data.uid)}</span>
-
+      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">UID</span>
+      <span style="font-size:12px;color:#00e676;font-family:monospace;">${esc(data.uid)}</span>
     </div>
   `;
   panel.appendChild(card);
@@ -1023,6 +952,11 @@ function cAddAccount(data) {
   document.getElementById('c-progressBar').style.width = pct + '%';
   document.getElementById('c-progressPct').textContent = pct + '%';
   document.getElementById('c-progressLabel').textContent = `${cCreatedCount} of ${cTargetCount}`;
+  if (cStartTime && cCreatedCount > 0) {
+    const elapsed = (Date.now() - cStartTime) / 1000 / 60;
+    document.getElementById('c-statRate').textContent = (cCreatedCount / elapsed).toFixed(1) + '/m';
+    document.getElementById('c-statRate').style.color = '';
+  }
 }
 
 function cCopyField(btn, text) {
@@ -1032,16 +966,14 @@ function cCopyField(btn, text) {
     document.execCommand('copy'); document.body.removeChild(ta);
   });
   const orig = btn.textContent;
-  btn.style.color = '#00ff88';
+  btn.style.color = '#00e676';
   btn.textContent = '✓';
   setTimeout(() => { btn.style.color = ''; btn.textContent = orig; }, 1200);
 }
 
 function cSetRunning(running) {
   document.getElementById('c-btnStart').disabled = running;
-  const stop = document.getElementById('c-btnStop');
-  stop.disabled = !running;
-  stop.style.opacity = running ? '1' : '.4';
+  document.getElementById('c-btnStop').disabled = !running;
 }
 
 async function cStartJob() {
@@ -1053,18 +985,17 @@ async function cStartJob() {
   const customPassword = document.getElementById('c-customPassword').value;
   const gender         = document.getElementById('c-gender').value;
 
-  if (passwordType === 'custom' && !customPassword.trim()) {
-    toast('Enter a custom password', true); return;
-  }
+  if (passwordType === 'custom' && !customPassword.trim()) { toast('Enter a custom password', true); return; }
 
-  cCreatedCount = 0; cTargetCount = count;
+  cCreatedCount = 0; cTargetCount = count; cStartTime = Date.now();
   document.getElementById('c-statCreated').textContent = '0';
   document.getElementById('c-statTotal').textContent   = count;
+  document.getElementById('c-statRate').textContent    = '—';
   document.getElementById('c-progressBar').style.width = '0%';
   document.getElementById('c-progressPct').textContent = '0%';
-  document.getElementById('c-progressLabel').textContent = 'Starting...';
-  document.getElementById('c-log-panel').innerHTML = '<div id="c-logEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333;gap:8px;text-align:center;"><div style="font-size:32px;">⬡</div></div>';
-  document.getElementById('c-accts-panel').innerHTML = '<div id="c-acctEmpty" style="color:#333;text-align:center;padding:40px;font-size:12px;letter-spacing:1px;">No accounts yet</div>';
+  document.getElementById('c-progressLabel').textContent = 'Starting…';
+  document.getElementById('c-log-panel').innerHTML = '<div class="c-empty" id="c-logEmpty"><div style="font-size:32px;opacity:.3;">⬡</div><div style="font-size:13px;font-weight:500;color:#1e293b;">Starting…</div></div>';
+  document.getElementById('c-accts-panel').innerHTML = '<div class="c-empty" id="c-acctEmpty"><div style="font-size:32px;opacity:.3;">⬡</div><div style="font-size:13px;font-weight:500;color:#1e293b;">No accounts yet</div></div>';
   document.getElementById('c-acctCount').textContent = '(0)';
   cSwitchTab('log');
 
@@ -1076,10 +1007,7 @@ async function cStartJob() {
       custom_password: customPassword, gender }),
   });
 
-  if (!resp.ok) {
-    const err = await resp.json();
-    toast('Error: ' + (err.error || 'Unknown'), true); return;
-  }
+  if (!resp.ok) { const err = await resp.json(); toast('Error: ' + (err.error || 'Unknown'), true); return; }
 
   cSetRunning(true);
   cAddLog(`Started — ${count} account(s) on ${emailDomain}`, 'info');
@@ -1116,7 +1044,6 @@ function escAttr(s) {
   return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
 }
 
-// Initial load
 loadOverview();
 </script>
 </body>

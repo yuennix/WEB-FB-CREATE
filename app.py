@@ -583,8 +583,8 @@ def admin_add_custom():
     data = request.json or {}
     domain = (data.get('domain') or '').strip().lower()
     imap_pass = (data.get('imap_pass') or '').strip()
-    if not domain or not imap_pass:
-        return jsonify({'error': 'Domain and IMAP password are required'}), 400
+    if not domain:
+        return jsonify({'error': 'Domain is required'}), 400
     ok = dm.add_custom_domain(domain, imap_pass)
     return jsonify({'status': 'added' if ok else 'exists'})
 

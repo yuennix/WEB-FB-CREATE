@@ -3,180 +3,341 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WEYN | Access</title>
+<title>WEYN — Access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    background: #0a0a0f;
-    color: #e0e0e0;
-    font-family: 'Courier New', monospace;
+    background: #060a12;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,230,118,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0,180,255,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
   }
 
   .card {
-    background: #0d1117;
-    border: 1px solid #00ff8825;
-    border-radius: 12px;
-    padding: 40px 36px;
+    background: rgba(14,20,36,0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 20px;
+    padding: 44px 40px;
     width: 100%;
-    max-width: 440px;
-    box-shadow: 0 0 40px #00ff8808;
+    max-width: 448px;
+    position: relative;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,230,118,0.04);
   }
 
-  .logo { text-align: center; margin-bottom: 32px; }
-  .logo-text { font-size: 28px; font-weight: bold; color: #00ff88; letter-spacing: 4px; text-shadow: 0 0 16px #00ff8860; }
-  .logo-sub  { font-size: 10px; color: #444; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
+  .logo {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #00e676, #00b84c);
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -1px;
+    margin-bottom: 14px;
+    box-shadow: 0 8px 24px rgba(0,230,118,0.3);
+  }
+
+  .logo-name {
+    font-size: 24px;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: #475569;
+    margin-top: 4px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
 
   .tabs {
     display: flex;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 3px;
     margin-bottom: 28px;
-    border-bottom: 1px solid #00ff8820;
+    gap: 2px;
   }
+
   .tab {
     flex: 1;
     text-align: center;
-    padding: 10px;
-    font-size: 11px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #444;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-radius: 8px;
     transition: all .2s;
+    user-select: none;
+    letter-spacing: 0;
   }
-  .tab.active { color: #00ff88; border-bottom-color: #00ff88; }
 
-  .panel { display: none; flex-direction: column; gap: 14px; }
+  .tab.active {
+    background: rgba(0,230,118,0.12);
+    color: #00e676;
+    box-shadow: inset 0 0 0 1px rgba(0,230,118,0.2);
+  }
+
+  .tab:hover:not(.active) { color: #94a3b8; }
+
+  .tab.admin-tab { color: #f59e0b88; }
+  .tab.admin-tab:hover { color: #f59e0b; }
+
+  .panel { display: none; flex-direction: column; gap: 16px; }
   .panel.active { display: flex; }
 
-  label { font-size: 10px; color: #666; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 5px; }
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    display: block;
+    margin-bottom: 6px;
+    letter-spacing: 0;
+  }
 
   input[type="text"], textarea {
     width: 100%;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e0e0e0;
-    padding: 10px 13px;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    color: #e2e8f0;
+    padding: 11px 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
     outline: none;
-    transition: border-color .2s;
+    transition: border-color .2s, box-shadow .2s;
     resize: none;
   }
-  input:focus, textarea:focus { border-color: #00ff88; box-shadow: 0 0 0 2px #00ff8812; }
+
+  input:focus, textarea:focus {
+    border-color: rgba(0,230,118,0.4);
+    box-shadow: 0 0 0 3px rgba(0,230,118,0.08);
+  }
+
+  input::placeholder, textarea::placeholder { color: #334155; }
 
   .btn {
     width: 100%;
     padding: 12px;
-    border-radius: 6px;
+    border-radius: 10px;
     border: none;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    font-weight: bold;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
-    letter-spacing: 1px;
     transition: all .2s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
+    letter-spacing: -0.1px;
   }
-  .btn-primary { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #000; }
-  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
-  .btn-primary:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
-  .btn-secondary { background: transparent; border: 1px solid #00ff8840; color: #00ff88; }
-  .btn-secondary:hover:not(:disabled) { background: #00ff8810; border-color: #00ff88; }
-  .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #00e676, #00c853);
+    color: #000;
+    box-shadow: 0 4px 16px rgba(0,230,118,0.25);
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,230,118,0.35);
+  }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-primary:disabled {
+    background: rgba(0,230,118,0.12);
+    color: rgba(0,230,118,0.3);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #64748b;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    border-color: rgba(255,255,255,0.15);
+    color: #94a3b8;
+    background: rgba(255,255,255,0.04);
+  }
+  .btn-ghost:disabled { opacity: 0.3; cursor: not-allowed; }
 
   .msg {
-    font-size: 12px;
-    padding: 10px 13px;
-    border-radius: 6px;
+    font-size: 13px;
+    padding: 11px 14px;
+    border-radius: 10px;
     display: none;
     line-height: 1.5;
+    font-weight: 400;
   }
   .msg.show { display: block; }
-  .msg-success { background: #00ff8812; border: 1px solid #00ff8830; color: #00ff88; }
-  .msg-error   { background: #ff444412; border: 1px solid #ff444430; color: #ff6666; }
-  .msg-warn    { background: #ffaa0012; border: 1px solid #ffaa0030; color: #ffaa00; }
-  .msg-info    { background: #0088ff12; border: 1px solid #0088ff30; color: #66aaff; }
+  .msg-success { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); color: #00e676; }
+  .msg-error   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f87171; }
+  .msg-warn    { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); color: #fbbf24; }
+  .msg-info    { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #60a5fa; }
 
-  /* ── Key display box ── */
   .key-reveal {
     display: none;
     flex-direction: column;
-    gap: 10px;
-    background: #070b10;
-    border: 1px solid #00ff8840;
-    border-radius: 8px;
-    padding: 16px;
+    gap: 12px;
+    background: rgba(0,230,118,0.04);
+    border: 1px solid rgba(0,230,118,0.15);
+    border-radius: 12px;
+    padding: 18px;
   }
   .key-reveal.show { display: flex; }
-  .key-label { font-size: 9px; color: #555; letter-spacing: 2px; text-transform: uppercase; }
+
+  .key-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
   .key-value {
     font-size: 15px;
-    color: #00ff88;
-    letter-spacing: 2px;
+    color: #00e676;
+    letter-spacing: 1px;
     word-break: break-all;
     text-align: center;
-    font-weight: bold;
-    text-shadow: 0 0 10px #00ff8840;
+    font-weight: 700;
     cursor: pointer;
-    padding: 4px 0;
+    padding: 6px 0;
+    transition: opacity .2s;
+    font-family: 'SF Mono', 'Fira Code', monospace;
   }
-  .key-value:hover { text-shadow: 0 0 16px #00ff88; }
-  .key-uid { font-size: 10px; color: #444; text-align: center; letter-spacing: 1px; }
-  .copy-hint { font-size: 9px; color: #333; text-align: center; letter-spacing: 1px; }
+  .key-value:hover { opacity: 0.8; }
 
-  /* ── Step indicator ── */
+  .key-uid {
+    font-size: 11px;
+    color: #334155;
+    text-align: center;
+    font-family: monospace;
+  }
+
+  .copy-hint {
+    font-size: 11px;
+    color: #1e293b;
+    text-align: center;
+  }
+
   .steps {
     display: flex;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 4px;
     gap: 0;
   }
+
   .step {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     flex: 1;
     position: relative;
   }
+
   .step-num {
-    width: 28px; height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: bold;
-    border: 1px solid #30363d;
-    color: #444;
-    background: #0d1117;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1.5px solid rgba(255,255,255,0.08);
+    color: #334155;
+    background: rgba(255,255,255,0.03);
     transition: all .3s;
-    position: relative; z-index: 1;
+    position: relative;
+    z-index: 1;
   }
-  .step.active .step-num { border-color: #00ff88; color: #00ff88; box-shadow: 0 0 8px #00ff8830; }
-  .step.done .step-num { border-color: #00ff88; background: #00ff88; color: #000; }
-  .step-lbl { font-size: 9px; color: #333; letter-spacing: 0.5px; text-align: center; transition: color .3s; }
-  .step.active .step-lbl, .step.done .step-lbl { color: #00ff8880; }
-  .step-line { flex: 1; height: 1px; background: #30363d; margin-top: -14px; transition: background .3s; }
-  .step-line.done { background: #00ff8860; }
+  .step.active .step-num {
+    border-color: #00e676;
+    color: #00e676;
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.1);
+  }
+  .step.done .step-num {
+    border-color: #00e676;
+    background: #00e676;
+    color: #000;
+  }
+
+  .step-lbl {
+    font-size: 10px;
+    font-weight: 500;
+    color: #1e293b;
+    text-align: center;
+    transition: color .3s;
+  }
+  .step.active .step-lbl, .step.done .step-lbl { color: rgba(0,230,118,0.6); }
+
+  .step-line {
+    flex: 1;
+    height: 1.5px;
+    background: rgba(255,255,255,0.06);
+    margin-top: -16px;
+    transition: background .3s;
+  }
+  .step-line.done { background: rgba(0,230,118,0.4); }
 
   .spinner {
-    width: 14px; height: 14px;
-    border: 2px solid #00000030;
+    width: 15px;
+    height: 15px;
+    border: 2px solid transparent;
     border-top-color: #000;
     border-radius: 50%;
     animation: spin .7s linear infinite;
     flex-shrink: 0;
   }
   .spinner-green {
-    width: 12px; height: 12px;
-    border: 2px solid #00ff8830;
-    border-top-color: #00ff88;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(0,230,118,0.2);
+    border-top-color: #00e676;
     border-radius: 50%;
     animation: spin .7s linear infinite;
     flex-shrink: 0;
@@ -185,30 +346,34 @@
   .spinner-green.show { display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .hint { font-size: 10px; color: #444; text-align: center; letter-spacing: 0.5px; }
-  .divider { height: 1px; background: #00ff8815; }
+  .hint {
+    font-size: 12px;
+    color: #334155;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.05); }
 </style>
 </head>
 <body>
+<div class="grid-bg"></div>
 
 <div class="card">
   <div class="logo">
-    <div class="logo-text">WEYN</div>
+    <div class="logo-icon">W</div>
+    <div class="logo-name">WEYN</div>
     <div class="logo-sub">Facebook Account Creator</div>
   </div>
 
   <div class="tabs">
     <div class="tab active" id="tab-request" onclick="switchTab('request')">Get Access</div>
     <div class="tab" id="tab-login" onclick="switchTab('login')">I Have a Key</div>
-    <div class="tab" onclick="window.location.href='/admin'" style="color:#ffaa0080;">Admin</div>
+    <div class="tab admin-tab" onclick="window.location.href='/admin'">Admin</div>
   </div>
 
-  <!-- ══════════════════════════════════════
-       GET ACCESS PANEL  (2-step)
-  ══════════════════════════════════════ -->
   <div class="panel active" id="panel-request">
 
-    <!-- Step indicator -->
     <div class="steps" id="stepIndicator">
       <div class="step active" id="step1">
         <div class="step-num">1</div>
@@ -221,47 +386,44 @@
       </div>
     </div>
 
-    <!-- STEP 1: fill in details -->
     <div id="formArea">
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div>
-          <label>Your Name</label>
+          <label class="field-label">Your Name</label>
           <input type="text" id="reqName" placeholder="e.g. Juan Dela Cruz"
                  onkeydown="if(event.key==='Enter') generateKey()">
         </div>
         <div>
-          <label>Reason (optional)</label>
+          <label class="field-label">Reason <span style="color:#1e293b;font-weight:400;">(optional)</span></label>
           <textarea id="reqReason" rows="2" placeholder="Why do you need access?"></textarea>
         </div>
         <div id="genMsg" class="msg"></div>
         <button class="btn btn-primary" id="btnGenerate" onclick="generateKey()">
           <span class="spinner" id="genSpinner" style="display:none"></span>
-          GENERATE MY KEY
+          Generate My Key
         </button>
         <div class="hint">A unique access key will be created for you.</div>
       </div>
     </div>
 
-    <!-- STEP 2: key shown, send to admin -->
     <div id="keyArea" style="display:none;flex-direction:column;gap:14px;">
 
       <div class="key-reveal show" id="keyReveal">
         <div class="key-label">Your Access Key — Save This!</div>
         <div class="key-value" id="genKey" onclick="copyKey()" title="Click to copy"></div>
         <div class="key-uid" id="genUid"></div>
-        <div class="copy-hint">▲ Click key to copy</div>
+        <div class="copy-hint">↑ Click key to copy</div>
       </div>
 
       <div id="sendMsg" class="msg"></div>
 
       <button class="btn btn-primary" id="btnSend" onclick="sendToAdmin()">
         <span class="spinner" id="sendSpinner" style="display:none"></span>
-        SEND TO ADMIN
+        Send to Admin
       </button>
 
-      <button class="btn btn-secondary" onclick="resetForm()">← Start Over</button>
+      <button class="btn btn-ghost" onclick="resetForm()">← Start Over</button>
 
-      <!-- Waiting state (shown after sending) -->
       <div id="waitArea" style="display:none;flex-direction:column;gap:10px;">
         <div class="divider"></div>
         <div id="waitMsg" class="msg msg-info show">
@@ -274,12 +436,9 @@
 
   </div>
 
-  <!-- ══════════════════════════════════════
-       I HAVE A KEY PANEL
-  ══════════════════════════════════════ -->
   <div class="panel" id="panel-login">
     <div>
-      <label>Access Key</label>
+      <label class="field-label">Access Key</label>
       <input type="text" id="keyInput" placeholder="WEYN-XXXX-XXXX-XXXX-XXXX"
              oninput="this.value=this.value.toUpperCase()"
              onkeydown="if(event.key==='Enter') verifyKey()">
@@ -287,7 +446,7 @@
     <div id="loginMsg" class="msg"></div>
     <button class="btn btn-primary" id="btnVerify" onclick="verifyKey()">
       <span class="spinner" id="verifySpinner" style="display:none"></span>
-      ENTER
+      Enter
     </button>
     <div class="hint">Don't have a key yet? Switch to "Get Access"</div>
   </div>
@@ -314,8 +473,6 @@ function hideMsg(id) {
   document.getElementById(id).className = 'msg';
 }
 
-// ── STEP 1: Generate key ──────────────────────────────────────────────────────
-
 async function generateKey() {
   const name   = document.getElementById('reqName').value.trim();
   const reason = document.getElementById('reqReason').value.trim();
@@ -337,15 +494,12 @@ async function generateKey() {
 
     if (d.key) {
       pendingKey = d.key;
+      document.getElementById('genKey').textContent = d.key;
+      document.getElementById('genUid').textContent = `User ID: ${d.user_id}`;
 
-      document.getElementById('genKey').textContent  = d.key;
-      document.getElementById('genUid').textContent  = `User ID: ${d.user_id}`;
-
-      // Transition to step 2
       document.getElementById('formArea').style.display = 'none';
       document.getElementById('keyArea').style.display  = 'flex';
 
-      // Update step indicator
       document.getElementById('step1').classList.remove('active');
       document.getElementById('step1').classList.add('done');
       document.getElementById('step1').querySelector('.step-num').textContent = '✓';
@@ -362,8 +516,6 @@ async function generateKey() {
 
   sp.style.display = 'none';
 }
-
-// ── STEP 2: Send to admin ─────────────────────────────────────────────────────
 
 async function sendToAdmin() {
   if (!pendingKey) return;
@@ -387,7 +539,6 @@ async function sendToAdmin() {
       btn.style.display = 'none';
       document.getElementById('waitArea').style.display = 'flex';
 
-      // Update step 2 as done
       document.getElementById('step2').classList.remove('active');
       document.getElementById('step2').classList.add('done');
       document.getElementById('step2').querySelector('.step-num').textContent = '✓';
@@ -404,8 +555,6 @@ async function sendToAdmin() {
 
   sp.style.display = 'none';
 }
-
-// ── Polling ───────────────────────────────────────────────────────────────────
 
 function startPolling(key) {
   if (pollInterval) clearInterval(pollInterval);
@@ -442,8 +591,6 @@ function startPolling(key) {
   }, 4000);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function resetForm() {
   if (pollInterval) clearInterval(pollInterval);
   pendingKey = '';
@@ -455,7 +602,6 @@ function resetForm() {
   document.getElementById('btnSend').style.display  = '';
   hideMsg('genMsg'); hideMsg('sendMsg');
 
-  // Reset steps
   document.getElementById('step1').className = 'step active';
   document.getElementById('step1').querySelector('.step-num').textContent = '1';
   document.getElementById('step2').className = 'step';
@@ -479,8 +625,6 @@ function copyKey() {
   setTimeout(() => box.textContent = orig, 1200);
 }
 
-// ── Auto-login from localStorage on page load ────────────────────────────────
-
 async function _tryAutoLogin() {
   const saved = localStorage.getItem('weyn_key');
   if (!saved) return;
@@ -496,13 +640,10 @@ async function _tryAutoLogin() {
     } else if (d.status === 'rejected' || d.status === 'revoked' || d.status === 'invalid') {
       localStorage.removeItem('weyn_key');
     }
-    // if pending, just show login page normally
   } catch(e) {}
 }
 
 document.addEventListener('DOMContentLoaded', _tryAutoLogin);
-
-// ── Enter key panel ───────────────────────────────────────────────────────────
 
 async function verifyKey() {
   const key = document.getElementById('keyInput').value.trim();
@@ -544,6 +685,5 @@ async function verifyKey() {
   sp.style.display = 'none';
 }
 </script>
-
 </body>
 </html>

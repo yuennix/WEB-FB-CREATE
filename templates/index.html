@@ -3,398 +3,496 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WEYN | FB Account Creator</title>
+<title>WEYN — FB Account Creator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #0a0a0f;
-    color: #e0e0e0;
-    font-family: 'Courier New', monospace;
+    background: #060a12;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100vh;
   }
 
+  /* ── Header ── */
   header {
-    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
-    border-bottom: 1px solid #00ff8820;
-    padding: 18px 30px;
+    background: rgba(10,15,26,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 0 24px;
+    height: 56px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #00e676, #00b84c);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #000;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,230,118,0.3);
   }
 
   .logo-text {
-    font-size: 22px;
-    font-weight: bold;
-    color: #00ff88;
-    letter-spacing: 3px;
-    text-shadow: 0 0 12px #00ff8860;
+    font-size: 16px;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.3px;
+  }
+
+  .logo-sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.08);
+    margin: 0 4px;
   }
 
   .logo-sub {
+    font-size: 12px;
+    color: #334155;
+    font-weight: 400;
+  }
+
+  .running-badge {
+    display: none;
     font-size: 11px;
-    color: #666;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    font-weight: 600;
+    color: #00e676;
+    background: rgba(0,230,118,0.1);
+    border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 20px;
+    padding: 3px 10px;
+    animation: fadepulse 1.5s ease-in-out infinite;
+  }
+  .running-badge.visible { display: inline-flex; align-items: center; gap: 5px; }
+  @keyframes fadepulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .user-chip {
+    font-size: 12px;
+    color: #475569;
+    font-weight: 500;
+  }
+
+  .btn-header {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    border: 1px solid rgba(245,158,11,0.25);
+    background: rgba(245,158,11,0.06);
+    color: #f59e0b;
+  }
+  .btn-header:hover {
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(245,158,11,0.4);
   }
 
   .status-dot {
-    width: 8px; height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: #00ff88;
-    box-shadow: 0 0 8px #00ff88;
-    animation: pulse 2s infinite;
-    margin-left: auto;
+    background: #00e676;
+    box-shadow: 0 0 6px #00e676;
+    animation: fadepulse 2s infinite;
   }
-  .status-dot.idle { background: #555; box-shadow: none; animation: none; }
+  .status-dot.idle { background: #1e293b; box-shadow: none; animation: none; }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  .container {
+  /* ── Layout ── */
+  .layout {
     display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 0;
-    height: calc(100vh - 61px);
+    grid-template-columns: 320px 1fr;
+    flex: 1;
+    overflow: hidden;
   }
 
+  /* ── Sidebar ── */
   .sidebar {
-    background: #0d1117;
-    border-right: 1px solid #00ff8815;
-    padding: 24px 20px;
+    background: rgba(10,15,26,0.6);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 20px 18px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 20px;
   }
 
-  .section-title {
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  .section-label {
     font-size: 10px;
-    color: #00ff88;
-    letter-spacing: 2px;
+    font-weight: 600;
+    color: #334155;
     text-transform: uppercase;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #00ff8820;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
   }
 
-  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
 
-  label {
-    font-size: 11px;
-    color: #888;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
   }
 
   select, input[type="text"], input[type="number"], input[type="password"] {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e0e0e0;
-    padding: 9px 12px;
-    font-family: 'Courier New', monospace;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px;
+    color: #e2e8f0;
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
     font-size: 13px;
     outline: none;
-    transition: border-color .2s;
+    transition: border-color .2s, box-shadow .2s;
     width: 100%;
+    -webkit-appearance: none;
   }
-
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
   select:focus, input:focus {
-    border-color: #00ff88;
-    box-shadow: 0 0 0 2px #00ff8815;
+    border-color: rgba(0,230,118,0.35);
+    box-shadow: 0 0 0 3px rgba(0,230,118,0.07);
   }
+  select option { background: #0e1420; }
+  input::placeholder { color: #1e293b; }
 
-  select option { background: #161b22; }
-
-  .domain-pass-row {
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-  }
+  .domain-pass-row { display: none; flex-direction: column; gap: 5px; }
   .domain-pass-row.visible { display: flex; }
-
-  .custom-pass-row {
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-  }
+  .custom-pass-row { display: none; flex-direction: column; gap: 5px; }
   .custom-pass-row.visible { display: flex; }
 
-  .btn {
-    padding: 11px 20px;
-    border-radius: 6px;
-    border: none;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    font-weight: bold;
-    cursor: pointer;
-    letter-spacing: 1px;
-    transition: all .2s;
-    width: 100%;
+  /* ── Progress ── */
+  .progress-wrap { display: flex; flex-direction: column; gap: 8px; }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #334155;
+    font-weight: 500;
   }
 
-  .btn-start {
-    background: linear-gradient(135deg, #00ff88, #00cc6a);
-    color: #000;
-  }
-  .btn-start:hover { transform: translateY(-1px); box-shadow: 0 4px 16px #00ff8840; }
-  .btn-start:disabled { background: #1e2a1e; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
-
-  .btn-stop {
-    background: transparent;
-    border: 1px solid #ff4444;
-    color: #ff4444;
-  }
-  .btn-stop:hover { background: #ff444415; }
-  .btn-stop:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  .btn-download {
-    background: transparent;
-    border: 1px solid #00ff88;
-    color: #00ff88;
-  }
-  .btn-download:hover { background: #00ff8815; }
-
-  .progress-bar-wrap {
-    background: #161b22;
-    border-radius: 4px;
-    height: 6px;
+  .progress-bar-track {
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 99px;
     overflow: hidden;
   }
-  .progress-bar {
+  .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #00ff88, #00cc6a);
-    border-radius: 4px;
+    background: linear-gradient(90deg, #00e676, #00c853);
+    border-radius: 99px;
     transition: width .4s ease;
     width: 0%;
   }
 
   .stats-row {
-    display: flex;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
   }
 
   .stat-box {
-    flex: 1;
-    background: #161b22;
-    border: 1px solid #00ff8820;
-    border-radius: 6px;
-    padding: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 10px 8px;
     text-align: center;
   }
-
   .stat-num {
-    font-size: 22px;
-    font-weight: bold;
-    color: #00ff88;
+    font-size: 20px;
+    font-weight: 700;
+    color: #00e676;
+    letter-spacing: -0.5px;
   }
   .stat-label {
     font-size: 9px;
-    color: #555;
+    color: #334155;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    margin-top: 2px;
   }
 
+  /* ── Buttons ── */
+  .action-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .btn {
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    width: 100%;
+    letter-spacing: -0.1px;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, #00e676, #00c853);
+    color: #000;
+    box-shadow: 0 4px 16px rgba(0,230,118,0.2);
+  }
+  .btn-start:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,230,118,0.3);
+  }
+  .btn-start:disabled {
+    background: rgba(0,230,118,0.1);
+    color: rgba(0,230,118,0.25);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-stop {
+    background: transparent;
+    border: 1px solid rgba(239,68,68,0.25);
+    color: #f87171;
+  }
+  .btn-stop:hover:not(:disabled) { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.4); }
+  .btn-stop:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  .btn-download {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #475569;
+  }
+  .btn-download:hover { background: rgba(255,255,255,0.04); color: #64748b; }
+
+  /* ── Main panel ── */
   .main-panel {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background: #060a12;
   }
 
-  .tabs {
+  .tabs-bar {
     display: flex;
-    border-bottom: 1px solid #00ff8815;
-    background: #0d1117;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(10,15,26,0.8);
+    flex-shrink: 0;
+    padding: 0 20px;
+    gap: 0;
   }
 
   .tab {
-    padding: 12px 22px;
-    font-size: 11px;
-    color: #555;
+    padding: 14px 18px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #334155;
     cursor: pointer;
-    letter-spacing: 1px;
-    text-transform: uppercase;
     border-bottom: 2px solid transparent;
     transition: all .2s;
     user-select: none;
   }
-  .tab.active { color: #00ff88; border-bottom-color: #00ff88; }
-  .tab:hover:not(.active) { color: #888; }
+  .tab.active { color: #00e676; border-bottom-color: #00e676; }
+  .tab:hover:not(.active) { color: #64748b; }
 
   .tab-content { flex: 1; overflow: hidden; display: none; }
   .tab-content.active { display: flex; flex-direction: column; }
 
+  /* ── Log panel ── */
   #log-panel {
     flex: 1;
     overflow-y: auto;
-    padding: 14px 18px;
-    background: #070b10;
+    padding: 16px 20px;
     font-size: 12px;
-    line-height: 1.7;
+    line-height: 1.8;
+    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
   }
+  #log-panel::-webkit-scrollbar { width: 3px; }
+  #log-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
 
-  .log-line { display: flex; gap: 8px; align-items: baseline; }
-  .log-ts { color: #333; font-size: 10px; flex-shrink: 0; }
+  .log-line { display: flex; gap: 10px; align-items: baseline; }
+  .log-ts { color: #1e293b; font-size: 10px; flex-shrink: 0; }
   .log-msg { flex: 1; word-break: break-all; }
-  .log-info  .log-msg { color: #aaa; }
-  .log-success .log-msg { color: #00ff88; }
-  .log-warn  .log-msg { color: #ffaa00; }
-  .log-error .log-msg { color: #ff4444; }
+  .log-info    .log-msg { color: #475569; }
+  .log-success .log-msg { color: #00e676; }
+  .log-warn    .log-msg { color: #fbbf24; }
+  .log-error   .log-msg { color: #f87171; }
 
+  /* ── Accounts panel ── */
   #accounts-panel {
     flex: 1;
     overflow-y: auto;
-    background: #070b10;
-    padding: 14px 16px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
+  #accounts-panel::-webkit-scrollbar { width: 3px; }
+  #accounts-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
 
   .acct-card {
-    background: #0d1117;
-    border: 1px solid #00ff8818;
-    border-radius: 8px;
-    padding: 12px 14px;
+    background: rgba(14,20,36,0.8);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     position: relative;
     transition: border-color .2s;
   }
-  .acct-card:hover { border-color: #00ff8840; }
+  .acct-card:hover { border-color: rgba(0,230,118,0.15); }
 
   .acct-num {
     position: absolute;
-    top: 10px;
-    right: 12px;
+    top: 12px;
+    right: 14px;
     font-size: 10px;
-    color: #333;
-    letter-spacing: 1px;
+    color: #1e293b;
+    font-weight: 600;
+    font-family: monospace;
   }
 
   .acct-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
   }
 
   .acct-field-label {
     font-size: 9px;
-    color: #444;
-    letter-spacing: 1.5px;
+    font-weight: 600;
+    color: #1e293b;
     text-transform: uppercase;
-    width: 58px;
+    letter-spacing: 1px;
+    width: 56px;
     flex-shrink: 0;
   }
 
   .acct-field-value {
-    font-size: 12px;
+    font-size: 13px;
     word-break: break-all;
     flex: 1;
     min-width: 0;
   }
 
-  .acct-name  { color: #e0e0e0; font-weight: bold; }
-  .acct-email { color: #00b4ff; }
-  .acct-pass  { color: #888; }
-  .acct-uid   { color: #00ff88; }
+  .acct-name  { color: #f1f5f9; font-weight: 600; }
+  .acct-email { color: #60a5fa; }
+  .acct-pass  { color: #475569; font-family: monospace; }
+  .acct-uid   { color: #00e676; font-family: monospace; }
 
   .copy-btn {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    color: #444;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 6px;
+    color: #334155;
     cursor: pointer;
-    padding: 2px 7px;
+    padding: 3px 9px;
     font-size: 11px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
     transition: all .15s;
     flex-shrink: 0;
-    line-height: 1.6;
   }
-  .copy-btn:hover { color: #00ff88; border-color: #00ff8860; background: #00ff8808; }
-  .copy-btn.copied { color: #00ff88; border-color: #00ff88; }
+  .copy-btn:hover { color: #00e676; border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.06); }
+  .copy-btn.copied { color: #00e676; border-color: rgba(0,230,118,0.3); }
 
   .acct-copy-all {
     position: absolute;
-    bottom: 10px;
-    right: 12px;
+    bottom: 12px;
+    right: 14px;
     background: none;
     border: none;
-    color: #2a2a2a;
+    color: #1e293b;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 15px;
     padding: 0;
     transition: color .15s;
   }
-  .acct-copy-all:hover { color: #00ff88; }
+  .acct-copy-all:hover { color: #00e676; }
 
+  /* ── Empty states ── */
   .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     flex: 1;
-    color: #333;
-    gap: 10px;
+    color: #1e293b;
+    gap: 12px;
     padding: 40px;
     text-align: center;
   }
-
-  .empty-icon { font-size: 36px; }
-  .empty-text { font-size: 13px; letter-spacing: 1px; }
-
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #00ff8830; border-radius: 2px; }
-
-  .running-badge {
-    display: none;
-    font-size: 10px;
-    color: #00ff88;
-    letter-spacing: 1px;
-    animation: pulse 1.2s infinite;
-  }
-  .running-badge.visible { display: inline; }
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+  .empty-text { font-size: 13px; font-weight: 500; color: #1e293b; }
 
   @media (max-width: 768px) {
-    .container { grid-template-columns: 1fr; height: auto; }
-    .sidebar { border-right: none; border-bottom: 1px solid #00ff8815; }
+    .layout { grid-template-columns: 1fr; height: auto; overflow: auto; }
+    .sidebar { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .main-panel { min-height: 60vh; }
+    body { overflow: auto; height: auto; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="logo-text">WEYN</div>
-    <div class="logo-sub">Facebook Account Creator</div>
-  </div>
-  <span class="running-badge" id="runningBadge">● RUNNING</span>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-    <span id="userNameBadge" style="font-size:11px;color:#00ff8899;letter-spacing:1px;"></span>
-    <button onclick="window.location.href='/admin'" style="background:transparent;border:1px solid #ffaa0060;border-radius:6px;color:#ffaa0099;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;letter-spacing:1px;padding:5px 12px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#ffaa00';this.style.color='#ffaa00';" onmouseout="this.style.borderColor='#ffaa0060';this.style.color='#ffaa0099';">ADMIN</button>
+  <div class="logo-mark">W</div>
+  <span class="logo-text">WEYN</span>
+  <div class="logo-sep"></div>
+  <span class="logo-sub">Account Creator</span>
+  <span class="running-badge" id="runningBadge">
+    <span style="width:6px;height:6px;background:#00e676;border-radius:50%;display:inline-block;"></span>
+    Running
+  </span>
+  <div class="header-right">
+    <span class="user-chip" id="userNameBadge"></span>
+    <button class="btn-header" onclick="window.location.href='/admin'">Admin Panel</button>
     <div class="status-dot idle" id="statusDot"></div>
   </div>
 </header>
 
-<div class="container">
+<div class="layout">
 
-  <!-- SIDEBAR / FORM -->
   <div class="sidebar">
 
     <div>
-      <div class="section-title">Configuration</div>
-
-      <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="section-label">Configuration</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
 
         <div class="form-group">
-          <label>Name Type</label>
+          <label class="field-label">Name Type</label>
           <select id="nameType">
             <option value="1">Filipino Names</option>
             <option value="2">RPW (Fantasy) Names</option>
@@ -402,7 +500,7 @@
         </div>
 
         <div class="form-group">
-          <label>Gender</label>
+          <label class="field-label">Gender</label>
           <select id="gender">
             <option value="3">Mixed</option>
             <option value="1">Male</option>
@@ -411,19 +509,19 @@
         </div>
 
         <div class="form-group">
-          <label>Email Domain</label>
+          <label class="field-label">Email Domain</label>
           <select id="emailDomain" onchange="onDomainChange()">
             <option value="1secmail.com">1secmail (Auto API)</option>
           </select>
         </div>
 
         <div class="domain-pass-row form-group" id="domainPassRow">
-          <label>Domain Password</label>
+          <label class="field-label">Domain Password</label>
           <input type="password" id="domainPassword" placeholder="Enter domain password">
         </div>
 
         <div class="form-group">
-          <label>Password Type</label>
+          <label class="field-label">Password Type</label>
           <select id="passwordType" onchange="onPassTypeChange()">
             <option value="auto">Auto-Generated</option>
             <option value="custom">Custom Password</option>
@@ -431,73 +529,69 @@
         </div>
 
         <div class="custom-pass-row form-group" id="customPassRow">
-          <label>Custom Password</label>
+          <label class="field-label">Custom Password</label>
           <input type="text" id="customPassword" placeholder="Enter password">
         </div>
 
         <div class="form-group">
-          <label>Number of Accounts</label>
+          <label class="field-label">Number of Accounts</label>
           <input type="number" id="count" value="5" min="1" max="200">
         </div>
-
 
       </div>
     </div>
 
     <div>
-      <div class="section-title">Progress</div>
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:6px;">
-          <span id="progressLabel">Ready</span>
-          <span id="progressPct">0%</span>
+      <div class="section-label">Progress</div>
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span id="progressLabel" style="color:#475569;">Ready</span>
+          <span id="progressPct" style="color:#334155;">0%</span>
         </div>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressBar"></div>
         </div>
       </div>
-      <div class="stats-row">
+      <div class="stats-row" style="margin-top:10px;">
         <div class="stat-box">
           <div class="stat-num" id="statCreated">0</div>
           <div class="stat-label">Created</div>
         </div>
         <div class="stat-box">
-          <div class="stat-num" id="statTotal">—</div>
+          <div class="stat-num" id="statTotal" style="color:#475569;">—</div>
           <div class="stat-label">Target</div>
         </div>
         <div class="stat-box">
-          <div class="stat-num" id="statRate">—</div>
+          <div class="stat-num" id="statRate" style="color:#475569;">—</div>
           <div class="stat-label">Rate</div>
         </div>
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <button class="btn btn-start" id="btnStart" onclick="startJob()">▶ START CREATION</button>
-      <button class="btn btn-stop" id="btnStop" onclick="stopJob()" disabled>■ STOP</button>
-      <button class="btn btn-download" onclick="downloadResults()">⬇ DOWNLOAD RESULTS</button>
+    <div class="action-group">
+      <button class="btn btn-start" id="btnStart" onclick="startJob()">▶ Start Creation</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopJob()" disabled>■ Stop</button>
+      <button class="btn btn-download" onclick="downloadResults()">⬇ Download Results</button>
     </div>
 
   </div>
 
-  <!-- MAIN PANEL -->
   <div class="main-panel">
 
-    <div class="tabs">
+    <div class="tabs-bar">
       <div class="tab active" onclick="switchTab('log')">Console Log</div>
-      <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#555">(0)</span></div>
+      <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#1e293b;">(0)</span></div>
     </div>
 
-    <!-- LOG TAB -->
     <div class="tab-content active" id="tab-log">
       <div id="log-panel">
         <div class="empty-state" id="logEmpty">
           <div class="empty-icon">⬡</div>
-          <div class="empty-text">Waiting to start...</div>
+          <div class="empty-text">Waiting to start…</div>
         </div>
       </div>
     </div>
 
-    <!-- ACCOUNTS TAB -->
     <div class="tab-content" id="tab-accounts">
       <div id="accounts-panel">
         <div class="empty-state" id="acctEmpty">
@@ -515,7 +609,6 @@ let eventSource = null;
 let createdCount = 0;
 let targetCount = 0;
 let startTime = null;
-
 let _customDomains = [];
 
 async function loadDomains() {
@@ -553,19 +646,18 @@ function onDomainChange() {
 const _userName = {{ user_name | tojson }};
 document.addEventListener('DOMContentLoaded', () => {
   if (_userName) {
-    document.getElementById('userNameBadge').textContent = '👤 ' + _userName;
+    document.getElementById('userNameBadge').textContent = _userName;
   }
   loadDomains();
 });
 
 function onPassTypeChange() {
   const v = document.getElementById('passwordType').value;
-  const row = document.getElementById('customPassRow');
-  row.classList.toggle('visible', v === 'custom');
+  document.getElementById('customPassRow').classList.toggle('visible', v === 'custom');
 }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t, i) => {
+  document.querySelectorAll('.tabs-bar .tab').forEach((t, i) => {
     t.classList.toggle('active', ['log','accounts'][i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
@@ -576,12 +668,10 @@ function addLog(msg, level) {
   const panel = document.getElementById('log-panel');
   const empty = document.getElementById('logEmpty');
   if (empty) empty.remove();
-
-  const now = new Date();
-  const ts = now.toTimeString().slice(0,8);
+  const now = new Date().toTimeString().slice(0,8);
   const line = document.createElement('div');
   line.className = `log-line log-${level || 'info'}`;
-  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg">${escHtml(msg)}</span>`;
+  line.innerHTML = `<span class="log-ts">${now}</span><span class="log-msg">${escHtml(msg)}</span>`;
   panel.appendChild(line);
   panel.scrollTop = panel.scrollHeight;
 }
@@ -589,7 +679,6 @@ function addLog(msg, level) {
 function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
   const panel = document.getElementById('accounts-panel');
-
   const card = document.createElement('div');
   card.className = 'acct-card';
   const copyAll = `${data.name}\n${data.email}\n${data.password}\n${data.uid}`;
@@ -602,7 +691,7 @@ function addAccount(data) {
     <div class="acct-row">
       <span class="acct-field-label">Email</span>
       <span class="acct-field-value acct-email">${escHtml(data.email)}</span>
-      <button class="copy-btn" title="Copy email" onclick="copyField(this, '${escAttr(data.email)}')">copy</button>
+      <button class="copy-btn" onclick="copyField(this, '${escAttr(data.email)}')">copy</button>
     </div>
     <div class="acct-row">
       <span class="acct-field-label">Password</span>
@@ -615,7 +704,6 @@ function addAccount(data) {
     <button class="acct-copy-all" title="Copy all" onclick="copyField(this, '${escAttr(copyAll)}')">⎘</button>
   `;
   panel.appendChild(card);
-
   createdCount++;
   document.getElementById('statCreated').textContent = createdCount;
   document.getElementById('accountCount').textContent = `(${createdCount})`;
@@ -625,11 +713,8 @@ function addAccount(data) {
 function copyField(btn, text) {
   navigator.clipboard.writeText(text).catch(() => {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
   });
   const orig = btn.textContent;
   btn.classList.add('copied');
@@ -643,7 +728,6 @@ function updateProgress() {
   document.getElementById('progressBar').style.width = pct + '%';
   document.getElementById('progressPct').textContent = pct + '%';
   document.getElementById('progressLabel').textContent = `${createdCount} of ${targetCount}`;
-
   if (startTime && createdCount > 0) {
     const elapsed = (Date.now() - startTime) / 1000 / 60;
     const rate = (createdCount / elapsed).toFixed(1);
@@ -654,37 +738,28 @@ function updateProgress() {
 function setRunning(running) {
   document.getElementById('btnStart').disabled = running;
   document.getElementById('btnStop').disabled = !running;
-  const dot = document.getElementById('statusDot');
-  const badge = document.getElementById('runningBadge');
-  dot.classList.toggle('idle', !running);
-  badge.classList.toggle('visible', running);
+  document.getElementById('statusDot').classList.toggle('idle', !running);
+  document.getElementById('runningBadge').classList.toggle('visible', running);
 }
 
 async function startJob() {
-  const nameType    = document.getElementById('nameType').value;
-  const emailDomain = document.getElementById('emailDomain').value;
+  const nameType       = document.getElementById('nameType').value;
+  const emailDomain    = document.getElementById('emailDomain').value;
   const domainPassword = document.getElementById('domainPassword').value;
-  const count       = parseInt(document.getElementById('count').value) || 1;
-  const passwordType = document.getElementById('passwordType').value;
+  const count          = parseInt(document.getElementById('count').value) || 1;
+  const passwordType   = document.getElementById('passwordType').value;
   const customPassword = document.getElementById('customPassword').value;
-  const gender      = document.getElementById('gender').value;
-  if (passwordType === 'custom' && !customPassword.trim()) {
-    alert('Please enter a custom password.');
-    return;
-  }
+  const gender         = document.getElementById('gender').value;
+  if (passwordType === 'custom' && !customPassword.trim()) { alert('Please enter a custom password.'); return; }
 
-  createdCount = 0;
-  targetCount  = count;
-  startTime    = Date.now();
-
+  createdCount = 0; targetCount = count; startTime = Date.now();
   document.getElementById('statCreated').textContent = '0';
   document.getElementById('statTotal').textContent   = count;
   document.getElementById('statRate').textContent    = '—';
   document.getElementById('progressBar').style.width = '0%';
   document.getElementById('progressPct').textContent = '0%';
-  document.getElementById('progressLabel').textContent = 'Starting...';
-
-  document.getElementById('log-panel').innerHTML = '';
+  document.getElementById('progressLabel').textContent = 'Starting…';
+  document.getElementById('log-panel').innerHTML = '<div class="empty-state" id="logEmpty"><div class="empty-icon">⬡</div><div class="empty-text">Starting…</div></div>';
   const panel = document.getElementById('accounts-panel');
   panel.innerHTML = '<div class="empty-state" id="acctEmpty"><div class="empty-icon">⬡</div><div class="empty-text">No accounts created yet</div></div>';
   document.getElementById('accountCount').textContent = '(0)';
@@ -696,19 +771,12 @@ async function startJob() {
       domain_password: domainPassword, count, password_type: passwordType,
       custom_password: customPassword, gender }),
   });
-
-  if (!resp.ok) {
-    const err = await resp.json();
-    alert('Error: ' + (err.error || 'Unknown'));
-    return;
-  }
+  if (!resp.ok) { const err = await resp.json(); alert('Error: ' + (err.error || 'Unknown')); return; }
 
   setRunning(true);
   addLog(`Job started — creating ${count} account(s) on ${emailDomain}`, 'info');
-
   if (eventSource) eventSource.close();
   eventSource = new EventSource('/stream');
-
   eventSource.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'ping') return;
@@ -721,7 +789,6 @@ async function startJob() {
       document.getElementById('progressLabel').textContent = 'Completed';
     }
   };
-
   eventSource.onerror = () => {
     setRunning(false);
     addLog('Connection lost.', 'warn');
@@ -736,29 +803,12 @@ async function stopJob() {
   if (eventSource) { eventSource.close(); eventSource = null; }
 }
 
-function downloadResults() {
-  window.location.href = '/download';
-}
-
-function copyText(text) {
-  navigator.clipboard.writeText(text).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  });
-}
+function downloadResults() { window.location.href = '/download'; }
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-function escAttr(s) {
-  return String(s).replace(/'/g, "\\'");
-}
+function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
 </script>
-
 </body>
 </html>
