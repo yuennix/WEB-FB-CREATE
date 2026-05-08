@@ -28,7 +28,6 @@ def _save(data):
 
 
 def _count_accounts():
-    """Count total accounts created (lines in weynFBCreate.txt)."""
     try:
         with open(ACCS_FILE) as f:
             return sum(1 for line in f if line.strip())
@@ -58,7 +57,6 @@ def _gen_key(data):
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def generate_key(name, reason=''):
-    """Generate a pending key WITHOUT notifying admin yet."""
     with _lock:
         data    = _load()
         user_id = _gen_user_id(data)
@@ -79,7 +77,6 @@ def generate_key(name, reason=''):
 
 
 def notify_admin(key):
-    """Send Telegram notification with inline approve/decline buttons."""
     with _lock:
         data = _load()
         if key not in data:
@@ -102,8 +99,7 @@ def check_key(key):
         data = _load()
         if key not in data:
             return 'invalid', None
-        entry = data[key]
-        return entry['status'], entry
+        return data[key]['status'], data[key]
 
 
 def touch_key(key):
@@ -226,9 +222,6 @@ def _tg_send(chat_id, text):
 
 
 def _tg_send_buttons(chat_id, text, buttons):
-    """Send a message with inline keyboard buttons.
-    buttons: list of list of {text, callback_data}
-    """
     _tg_post('sendMessage', {
         'chat_id':      chat_id,
         'text':         text,
@@ -244,16 +237,42 @@ def _tg_answer_callback(callback_id, text=''):
     })
 
 
-def _tg_edit_message(chat_id, message_id, text):
-    _tg_post('editMessageText', {
+def _tg_edit_message(chat_id, message_id, text, buttons=None):
+    payload = {
         'chat_id':    chat_id,
         'message_id': message_id,
         'text':       text,
         'parse_mode': 'Markdown',
+    }
+    if buttons is not None:
+        payload['reply_markup'] = {'inline_keyboard': buttons}
+    _tg_post('editMessageText', payload)
+
+
+def _tg_edit_remove_buttons(chat_id, message_id, text):
+    _tg_post('editMessageText', {
+        'chat_id':      chat_id,
+        'message_id':   message_id,
+        'text':         text,
+        'parse_mode':   'Markdown',
+        'reply_markup': {'inline_keyboard': []},
     })
 
 
-# ── Admin notification with inline buttons ────────────────────────────────────
+# ── Register bot menu commands ────────────────────────────────────────────────
+
+def _register_commands():
+    _tg_post('setMyCommands', {
+        'commands': [
+            {'command': 'start',  'description': '👋 Welcome message'},
+            {'command': 'stats',  'description': '📊 Total users & accounts created'},
+            {'command': 'users',  'description': '👥 View all users with revoke buttons'},
+            {'command': 'remove', 'description': '🗑 Remove user — /remove USR-XXXX'},
+        ]
+    })
+
+
+# ── Admin notification with Approve / Decline buttons ────────────────────────
 
 def _notify_admin_request(user_id, key, name, reason):
     if not TG_TOKEN or not TG_CHAT:
@@ -272,7 +291,7 @@ def _notify_admin_request(user_id, key, name, reason):
     _tg_send_buttons(TG_CHAT, text, buttons)
 
 
-# ── Callback query handler (button presses) ───────────────────────────────────
+# ── Callback query handler (inline button presses) ────────────────────────────
 
 def _handle_callback(callback_id, chat_id, message_id, data_str):
     if chat_id != str(TG_CHAT):
@@ -284,13 +303,14 @@ def _handle_callback(callback_id, chat_id, message_id, data_str):
         _tg_answer_callback(callback_id, 'Unknown action')
         return
 
-    action, key = parts[0], parts[1].upper()
+    action, value = parts[0], parts[1]
 
     if action == 'approve':
+        key = value.upper()
         ok, entry = approve_key(key)
         if ok:
             _tg_answer_callback(callback_id, '✅ Approved!')
-            _tg_edit_message(chat_id, message_id,
+            _tg_edit_remove_buttons(chat_id, message_id,
                 f"✅ *Approved*\n\n"
                 f"👤 Name:    `{entry['name']}`\n"
                 f"🆔 User ID: `{entry['user_id']}`\n"
@@ -300,10 +320,11 @@ def _handle_callback(callback_id, chat_id, message_id, data_str):
             _tg_answer_callback(callback_id, '⚠️ Key not found')
 
     elif action == 'decline':
+        key = value.upper()
         ok, entry = reject_key(key)
         if ok:
             _tg_answer_callback(callback_id, '❌ Declined')
-            _tg_edit_message(chat_id, message_id,
+            _tg_edit_remove_buttons(chat_id, message_id,
                 f"❌ *Declined*\n\n"
                 f"👤 Name:    `{entry['name']}`\n"
                 f"🆔 User ID: `{entry['user_id']}`\n"
@@ -313,13 +334,15 @@ def _handle_callback(callback_id, chat_id, message_id, data_str):
             _tg_answer_callback(callback_id, '⚠️ Key not found')
 
     elif action == 'revoke':
-        ok, entry = revoke_by_id(key)  # key here is actually user_id
+        uid = value.upper()
+        ok, entry = revoke_by_id(uid)
         if ok:
-            _tg_answer_callback(callback_id, '🚫 Revoked')
-            _tg_edit_message(chat_id, message_id,
+            _tg_answer_callback(callback_id, '🚫 Access revoked')
+            _tg_edit_remove_buttons(chat_id, message_id,
                 f"🚫 *Access Revoked*\n\n"
                 f"👤 Name:    `{entry['name']}`\n"
-                f"🆔 User ID: `{entry['user_id']}`"
+                f"🆔 User ID: `{entry['user_id']}`\n"
+                f"_User can no longer log in._"
             )
         else:
             _tg_answer_callback(callback_id, '⚠️ User not found')
@@ -329,27 +352,18 @@ def _handle_callback(callback_id, chat_id, message_id, data_str):
 
 def _handle_command(chat_id, text):
     parts = text.strip().split()
-    cmd   = parts[0].lower()
+    cmd   = parts[0].lower().split('@')[0]   # strip @botname suffix
 
     # /start
     if cmd == '/start':
         _tg_send(chat_id, (
-            "👋 *Welcome to KYBX Bot*\n\n"
-            "Send /help to see all commands."
-        ))
-
-    # /help
-    elif cmd == '/help':
-        _tg_send(chat_id, (
-            "📋 *KYBX Bot Commands*\n\n"
-            "`/stats`              — total users & accounts created\n"
-            "`/users`              — list all users with remove buttons\n"
-            "`/adduser <name>`     — add an approved user directly\n"
-            "`/approve <KEY>`      — approve a pending key\n"
-            "`/decline <KEY>`      — decline a pending key\n"
-            "`/revoke <USR-ID>`    — revoke access\n"
-            "`/remove <USR-ID>`    — permanently remove user\n"
-            "`/help`               — show this message"
+            "👋 *Welcome to KYBX Admin Bot*\n\n"
+            "Use the *Menu* button to see all commands.\n\n"
+            "📌 *Quick guide:*\n"
+            "• New requests arrive with ✅ Approve / ❌ Decline buttons\n"
+            "• `/stats` — see totals\n"
+            "• `/users` — manage users with revoke buttons\n"
+            "• `/remove USR\\-XXXX` — permanently delete a user"
         ))
 
     # /stats
@@ -361,11 +375,11 @@ def _handle_command(chat_id, text):
 
         lines = [
             "📊 *KYBX Statistics*\n",
-            f"👥 Total Users:       *{counts['total']}*",
-            f"✅ Approved:          *{counts['approved']}*",
-            f"⏳ Pending:           *{counts['pending']}*",
-            f"❌ Rejected/Revoked:  *{counts['rejected'] + counts['revoked']}*",
-            f"\n🤖 Total Accounts Created: *{total_accounts}*",
+            f"👥 Total Users:          *{counts['total']}*",
+            f"✅ Approved:             *{counts['approved']}*",
+            f"⏳ Pending:              *{counts['pending']}*",
+            f"❌ Rejected / Revoked:   *{counts['rejected'] + counts['revoked']}*",
+            f"\n🤖 *Total FB Accounts Created:  {total_accounts}*",
         ]
         if recent:
             lines.append("\n🕐 *Recent Logins*")
@@ -374,111 +388,77 @@ def _handle_command(chat_id, text):
                 lines.append(f"  • `{v['user_id']}` {v['name']} — {ago}m ago")
         _tg_send(chat_id, "\n".join(lines))
 
-    # /users
+    # /users — send each user as its own message with action buttons
     elif cmd == '/users':
         data = list_users()
         if not data:
-            _tg_send(chat_id, "No users yet.")
+            _tg_send(chat_id, "👥 No users registered yet.")
             return
+
+        counts, _ = get_stats()
+        _tg_send(chat_id,
+            f"👥 *User List*  —  {counts['total']} total\n"
+            f"✅ {counts['approved']} approved  •  "
+            f"⏳ {counts['pending']} pending  •  "
+            f"🚫 {counts['revoked']} revoked"
+        )
+
         emoji_map = {'approved': '✅', 'pending': '⏳', 'rejected': '❌', 'revoked': '🚫'}
-        approved = [(k, v) for k, v in data.items() if v.get('status') == 'approved']
-        pending  = [(k, v) for k, v in data.items() if v.get('status') == 'pending']
-        others   = [(k, v) for k, v in data.items() if v.get('status') not in ('approved', 'pending')]
 
-        lines = [f"👥 *All Users* ({len(data)} total)\n"]
-        for section, items in [('✅ Approved', approved), ('⏳ Pending', pending), ('Others', others)]:
-            if items:
-                lines.append(f"\n*{section}*")
-                for k, v in sorted(items, key=lambda x: x[1].get('created_at', 0), reverse=True):
-                    e = emoji_map.get(v['status'], '❓')
-                    lines.append(f"{e} `{v['user_id']}` — *{v['name']}*")
-                    if v.get('status') == 'approved':
-                        lines.append(f"   ↳ `/revoke {v['user_id']}`  or  `/remove {v['user_id']}`")
+        # Sort: approved first, then pending, then rest
+        order = {'approved': 0, 'pending': 1, 'rejected': 2, 'revoked': 3}
+        sorted_users = sorted(
+            data.values(),
+            key=lambda v: (order.get(v.get('status', ''), 9), -v.get('created_at', 0))
+        )
 
-        _tg_send(chat_id, "\n".join(lines))
+        for v in sorted_users:
+            status  = v.get('status', 'unknown')
+            emoji   = emoji_map.get(status, '❓')
+            uid     = v['user_id']
+            name    = v['name']
+            reason  = v.get('reason', '')
 
-    # /adduser <name>
-    elif cmd == '/adduser':
-        if len(parts) < 2:
-            _tg_send(chat_id, "Usage: `/adduser <name>`")
-            return
-        name = ' '.join(parts[1:])
-        key, user_id = add_user(name)
-        _tg_send(chat_id, (
-            f"✅ *User Added*\n\n"
-            f"👤 Name:    `{name}`\n"
-            f"🆔 User ID: `{user_id}`\n"
-            f"🗝 Key:     `{key}`\n\n"
-            f"_Send this key to the user._"
-        ))
+            last = ''
+            if v.get('last_seen'):
+                ago  = int((time.time() - v['last_seen']) / 60)
+                last = f"\n🕐 Last seen: {ago}m ago"
 
-    # /approve <key>
-    elif cmd == '/approve':
-        if len(parts) < 2:
-            _tg_send(chat_id, "Usage: `/approve <KEY>`")
-            return
-        key = parts[1].upper()
-        ok, entry = approve_key(key)
-        if ok:
-            _tg_send(chat_id, (
-                f"✅ *Approved*\n\n"
-                f"👤 Name:    `{entry['name']}`\n"
-                f"🆔 User ID: `{entry['user_id']}`\n"
-                f"🗝 Key:     `{key}`"
-            ))
-        else:
-            _tg_send(chat_id, f"⚠️ Key not found: `{key}`")
+            text = (
+                f"{emoji} *{name}*\n"
+                f"🆔 `{uid}`  •  _{status}_\n"
+                f"📝 {reason}{last}"
+            )
 
-    # /decline <key>
-    elif cmd == '/decline':
-        if len(parts) < 2:
-            _tg_send(chat_id, "Usage: `/decline <KEY>`")
-            return
-        key = parts[1].upper()
-        ok, entry = reject_key(key)
-        if ok:
-            _tg_send(chat_id, f"❌ Declined key for `{entry['name']}` (`{entry['user_id']}`)")
-        else:
-            _tg_send(chat_id, f"⚠️ Key not found: `{key}`")
+            if status == 'approved':
+                buttons = [[{'text': '🚫 Revoke Access', 'callback_data': f'revoke:{uid}'}]]
+                _tg_send_buttons(chat_id, text, buttons)
+            elif status == 'pending':
+                key = v.get('key', '')
+                buttons = [[
+                    {'text': '✅ Approve', 'callback_data': f'approve:{key}'},
+                    {'text': '❌ Decline', 'callback_data': f'decline:{key}'},
+                ]]
+                _tg_send_buttons(chat_id, text, buttons)
+            else:
+                _tg_send(chat_id, text)
 
-    # /reject (alias for /decline)
-    elif cmd == '/reject':
-        if len(parts) < 2:
-            _tg_send(chat_id, "Usage: `/decline <KEY>`")
-            return
-        key = parts[1].upper()
-        ok, entry = reject_key(key)
-        if ok:
-            _tg_send(chat_id, f"❌ Declined key for `{entry['name']}` (`{entry['user_id']}`)")
-        else:
-            _tg_send(chat_id, f"⚠️ Key not found: `{key}`")
-
-    # /revoke <user_id>
-    elif cmd == '/revoke':
-        if len(parts) < 2:
-            _tg_send(chat_id, "Usage: `/revoke <USR-XXXX>`")
-            return
-        uid = parts[1].upper()
-        ok, entry = revoke_by_id(uid)
-        if ok:
-            _tg_send(chat_id, f"🚫 Revoked access for *{entry['name']}* (`{uid}`)")
-        else:
-            _tg_send(chat_id, f"⚠️ User ID not found: `{uid}`")
+            time.sleep(0.05)   # slight delay to avoid Telegram flood limits
 
     # /remove <user_id>
-    elif cmd == '/remove' or cmd == '/removeuser':
+    elif cmd == '/remove':
         if len(parts) < 2:
-            _tg_send(chat_id, "Usage: `/remove <USR-XXXX>`")
+            _tg_send(chat_id, "Usage: `/remove USR-XXXX`")
             return
         uid = parts[1].upper()
         ok, entry = remove_by_id(uid)
         if ok:
-            _tg_send(chat_id, f"🗑 Removed *{entry['name']}* (`{uid}`) permanently.")
+            _tg_send(chat_id, f"🗑 Permanently removed *{entry['name']}* (`{uid}`).")
         else:
             _tg_send(chat_id, f"⚠️ User ID not found: `{uid}`")
 
     else:
-        _tg_send(chat_id, "Unknown command. Send /help for a list of commands.")
+        _tg_send(chat_id, "Use the *Menu* button or send /start for help.")
 
 
 # ── Telegram bot polling ──────────────────────────────────────────────────────
@@ -501,21 +481,22 @@ def _poll_telegram():
             for upd in updates:
                 _last_update_id = upd['update_id']
 
-                # ── Handle inline button presses ──
+                # Inline button presses
                 if 'callback_query' in upd:
-                    cb      = upd['callback_query']
-                    cb_id   = cb['id']
-                    cb_data = cb.get('data', '')
-                    cb_chat = str(cb['message']['chat']['id'])
-                    cb_msg  = cb['message']['message_id']
+                    cb = upd['callback_query']
                     threading.Thread(
                         target=_handle_callback,
-                        args=(cb_id, cb_chat, cb_msg, cb_data),
+                        args=(
+                            cb['id'],
+                            str(cb['message']['chat']['id']),
+                            cb['message']['message_id'],
+                            cb.get('data', ''),
+                        ),
                         daemon=True,
                     ).start()
                     continue
 
-                # ── Handle text commands ──
+                # Text commands
                 msg     = upd.get('message', {})
                 chat_id = str(msg.get('chat', {}).get('id', ''))
                 text    = msg.get('text', '').strip()
@@ -535,5 +516,6 @@ def _poll_telegram():
 
 
 def start_bot():
+    _register_commands()
     t = threading.Thread(target=_poll_telegram, daemon=True)
     t.start()
