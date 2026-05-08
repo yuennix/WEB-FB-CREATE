@@ -429,6 +429,7 @@ function startPolling(key) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key }),
           });
+          localStorage.setItem('weyn_key', key);
           window.location.href = '/';
         }, 1200);
       } else if (d.status === 'rejected') {
@@ -478,6 +479,29 @@ function copyKey() {
   setTimeout(() => box.textContent = orig, 1200);
 }
 
+// ── Auto-login from localStorage on page load ────────────────────────────────
+
+async function _tryAutoLogin() {
+  const saved = localStorage.getItem('weyn_key');
+  if (!saved) return;
+  try {
+    const r = await fetch('/verify-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: saved }),
+    });
+    const d = await r.json();
+    if (d.status === 'approved') {
+      window.location.href = '/';
+    } else if (d.status === 'rejected' || d.status === 'revoked' || d.status === 'invalid') {
+      localStorage.removeItem('weyn_key');
+    }
+    // if pending, just show login page normally
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', _tryAutoLogin);
+
 // ── Enter key panel ───────────────────────────────────────────────────────────
 
 async function verifyKey() {
@@ -498,13 +522,16 @@ async function verifyKey() {
     const d = await r.json();
 
     if (d.status === 'approved') {
+      localStorage.setItem('weyn_key', key);
       showMsg('loginMsg', `✓ Welcome, ${d.name}!`, 'success');
       setTimeout(() => window.location.href = '/', 800);
     } else if (d.status === 'pending') {
       showMsg('loginMsg', '⏳ Your key is still pending admin approval.', 'warn');
     } else if (d.status === 'rejected') {
+      localStorage.removeItem('weyn_key');
       showMsg('loginMsg', '❌ This key has been rejected. Contact admin.', 'error');
     } else if (d.status === 'revoked') {
+      localStorage.removeItem('weyn_key');
       showMsg('loginMsg', '🚫 This key has been revoked. Contact admin.', 'error');
     } else {
       showMsg('loginMsg', 'Invalid key. Check and try again.', 'error');
