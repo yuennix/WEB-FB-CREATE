@@ -359,7 +359,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
                 threading.Thread(
                     target=m._full_email_confirm,
-                    args=(ses, phone, uid, pww),
+                    args=(ses, phone, uid, pww, task_queue),
                     daemon=False,
                 ).start()
 

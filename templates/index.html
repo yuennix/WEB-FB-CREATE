@@ -595,6 +595,24 @@
     border: 1px solid rgba(255,255,255,0.07);
     color: #475569;
   }
+  .confirm-status.fetching {
+    display: block;
+    background: rgba(96,165,250,0.06);
+    border: 1px solid rgba(96,165,250,0.15);
+    color: #475569;
+    animation: fadepulse 1.5s ease-in-out infinite;
+  }
+  .confirm-input.code-ready {
+    border-color: rgba(0,230,118,0.45);
+    box-shadow: 0 0 0 3px rgba(0,230,118,0.08);
+    color: #00e676;
+    animation: codePop .4s ease;
+  }
+  @keyframes codePop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.03); }
+    100% { transform: scale(1); }
+  }
 
   /* ── Empty states ── */
   .empty-state {
@@ -859,9 +877,11 @@ function addAccount(data) {
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
   card.className = 'acct-card';
-  const inputId  = `ci-${data.uid}`;
-  const statusId = `cs-${data.uid}`;
-  const btnId    = `cb-${data.uid}`;
+  const inputId    = `ci-${data.uid}`;
+  const statusId   = `cs-${data.uid}`;
+  const btnId      = `cb-${data.uid}`;
+  const _emailDom  = (data.email || '').split('@')[1] || '';
+  const _isSecmail = _SECMAIL_DOMAINS.has(_emailDom);
   card.innerHTML = `
     <span class="acct-num">#${data.num}</span>
     <div class="acct-row">
@@ -890,7 +910,7 @@ function addAccount(data) {
         <button id="${btnId}" class="confirm-btn"
                 onclick="submitCode('${escAttr(data.uid)}')">Submit</button>
       </div>
-      <div id="${statusId}" class="confirm-status"></div>
+      <div id="${statusId}" class="confirm-status ${_isSecmail ? 'fetching' : ''}">${_isSecmail ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
     <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
@@ -902,6 +922,47 @@ function addAccount(data) {
 
   // Auto-switch to Accounts tab so user sees the code box
   switchTab('accounts');
+}
+
+const _SECMAIL_DOMAINS = new Set([
+  '1secmail.com','1secmail.net','1secmail.org',
+  'wwjmp.com','esiix.com','xojxe.com','yoggm.com'
+]);
+
+function autofillCode(uid, code) {
+  const input  = document.getElementById(`ci-${uid}`);
+  const status = document.getElementById(`cs-${uid}`);
+  const btn    = document.getElementById(`cb-${uid}`);
+  if (input)  { input.value = code; input.disabled = false; input.classList.add('code-ready'); }
+  if (btn)    { btn.disabled = false; }
+  if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched — click Submit to confirm!'; }
+  addLog(`✉ Confirmation code received for UID ${uid}: ${code}`, 'success');
+  // Flash the accounts tab badge
+  switchTab('accounts');
+}
+
+function handleConfirmResult(uid, statusVal) {
+  const status = document.getElementById(`cs-${uid}`);
+  const input  = document.getElementById(`ci-${uid}`);
+  const btn    = document.getElementById(`cb-${uid}`);
+  if (statusVal === 'confirmed') {
+    if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed automatically via link!'; }
+    if (input)  { input.disabled = true; }
+    if (btn)    { btn.disabled = true; btn.textContent = 'Done'; }
+    addLog(`✓ Email confirmed via link: UID ${uid}`, 'success');
+  } else if (statusVal === 'checkpoint') {
+    if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered on confirmation.'; }
+    if (input)  { input.disabled = false; }
+    if (btn)    { btn.disabled = false; }
+  } else if (statusVal === 'timeout') {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code received within 2.5 min — enter manually.'; }
+    if (input)  { input.disabled = false; }
+    if (btn)    { btn.disabled = false; }
+  } else if (statusVal === 'link_error') {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Could not follow confirm link — try submitting a code manually.'; }
+    if (input)  { input.disabled = false; }
+    if (btn)    { btn.disabled = false; }
+  }
 }
 
 async function submitCode(uid) {
@@ -1050,6 +1111,8 @@ async function startJob() {
     if (msg.type === 'ping') return;
     if (msg.type === 'log')     addLog(msg.msg, msg.level);
     if (msg.type === 'account') addAccount(msg.data);
+    if (msg.type === 'confirm_code') autofillCode(msg.uid, msg.code);
+    if (msg.type === 'confirm_result') handleConfirmResult(msg.uid, msg.status);
     if (msg.type === 'done') {
       addLog(msg.msg, 'success');
       setRunning(false);

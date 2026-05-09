@@ -1787,11 +1787,11 @@ def trigger_email_confirmation(ses, email, uid):
         pass
 
 
-def _full_email_confirm(ses, email, uid, password=''):
+def _full_email_confirm(ses, email, uid, password='', result_queue=None):
     """
     After account creation:
     - Custom domains (weyn.store etc): fire resend triggers so FB emails the inbox.
-    - 1secmail domains: fire resend triggers + poll inbox + print code in console.
+    - 1secmail domains: fire resend triggers + poll inbox + auto-fill code via queue.
     """
     _SECMAIL_DOMAINS = {
         '1secmail.com', '1secmail.net', '1secmail.org',
@@ -1924,6 +1924,16 @@ def _full_email_confirm(ses, email, uid, password=''):
                         print(f"{G}║{W}  EMAIL {DIM}│{G} {_el}{' '*(37-len(_el))}{G}║")
                         print(f"{G}║{W}  LINK  {DIM}│{C} {_ll}{' '*(37-len(_ll))}{G}║")
                         print(f"{G}╚{'═'*47}╝{W}")
+                        # Auto-follow the link (no code to type) and report result
+                        if result_queue:
+                            try:
+                                _lr = ses.get(_link, headers=_ch, timeout=12, allow_redirects=True)
+                                if 'checkpoint' in str(_lr.url):
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'checkpoint'})
+                                else:
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'confirmed'})
+                            except Exception:
+                                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'link_error'})
                         _stop_poll.set()
                         return
                     # Try numeric code
@@ -1937,6 +1947,9 @@ def _full_email_confirm(ses, email, uid, password=''):
                             print(f"{G}║{W}  EMAIL {DIM}│{G} {_el}{' '*(37-len(_el))}{G}║")
                             print(f"{G}║{W}  CODE  {DIM}│{Y}  {_c}{' '*(36-len(_c))}{G}║")
                             print(f"{G}╚{'═'*47}╝{W}")
+                            # Push code to web UI so it auto-fills the input box
+                            if result_queue:
+                                result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                             _stop_poll.set()
                             return
             except Exception:
@@ -1944,6 +1957,8 @@ def _full_email_confirm(ses, email, uid, password=''):
             time.sleep(2)
         if not _stop_poll.is_set():
             print(f"{Y}  [!] No code received for {email} within 2.5 min{W}")
+            if result_queue:
+                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
 
     try:
         if _is_secmail:
