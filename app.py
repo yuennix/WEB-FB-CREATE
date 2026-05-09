@@ -29,7 +29,7 @@ def _get_stable_secret():
     _sto.save('flask_secret', {'key': key})
     return key
 
-app.secret_key = os.environ.get('SECRET_KEY') or _get_stable_secret()
+app.secret_key = _get_stable_secret()
 app.permanent_session_lifetime = _dt.timedelta(days=30)
 
 # ── Global job state ─────────────────────────────────────────────────────────
@@ -299,7 +299,8 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 }
                 result_store.append(result)
 
-                _sto.save_account(session_id, uid, pww)
+                _sto.save_account(session_id, uid, pww,
+                                  name=f'{firstname} {lastname}', email=phone)
 
 
                 task_queue.put({'type': 'account', 'data': result,

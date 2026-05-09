@@ -40,8 +40,15 @@ def _ensure_table():
                 session_id TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
                 uid        TEXT NOT NULL,
                 password   TEXT NOT NULL,
+                name       TEXT DEFAULT '',
+                email      TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT NOW()
             )
+        """)
+        cur.execute("""
+            ALTER TABLE accounts
+                ADD COLUMN IF NOT EXISTS name  TEXT DEFAULT '',
+                ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''
         """)
         conn.commit()
         cur.close()
@@ -187,7 +194,7 @@ def save_session(session_id, count, domain):
             print(f'[storage] save_session file error: {e}')
 
 
-def save_account(session_id, uid, password):
+def save_account(session_id, uid, password, name='', email=''):
     """Persist a created account to DB or file."""
     if _DB_URL:
         _init_db()
@@ -195,8 +202,8 @@ def save_account(session_id, uid, password):
             conn = _get_conn()
             cur  = conn.cursor()
             cur.execute(
-                "INSERT INTO accounts (session_id, uid, password) VALUES (%s, %s, %s)",
-                (session_id, uid, password)
+                "INSERT INTO accounts (session_id, uid, password, name, email) VALUES (%s, %s, %s, %s, %s)",
+                (session_id, uid, password, name, email)
             )
             conn.commit()
             cur.close()
@@ -206,7 +213,7 @@ def save_account(session_id, uid, password):
     else:
         try:
             with open('weynFBCreate.txt', 'a') as f:
-                f.write(f"{uid}|{password}\n")
+                f.write(f"{name}|{email}|{uid}|{password}\n")
         except Exception as e:
             print(f'[storage] save_account file error: {e}')
 
@@ -220,7 +227,7 @@ def get_accounts_text():
             cur  = conn.cursor()
             cur.execute("""
                 SELECT s.session_id, s.started_at, s.count, s.domain,
-                       a.uid, a.password
+                       a.uid, a.password, a.name, a.email
                 FROM   sessions s
                 JOIN   accounts a ON a.session_id = s.session_id
                 ORDER  BY s.started_at ASC, a.id ASC
@@ -234,14 +241,14 @@ def get_accounts_text():
 
             lines         = []
             current_sid   = None
-            for sid, started_at, count, domain, uid, password in rows:
+            for sid, started_at, count, domain, uid, password, name, email in rows:
                 if sid != current_sid:
                     current_sid = sid
                     ts = started_at.strftime('%Y-%m-%d %H:%M:%S') if started_at else '—'
                     lines.append(f"\n{'='*60}")
                     lines.append(f" SESSION {ts} | {count} account(s) | {domain}")
                     lines.append('='*60)
-                lines.append(f"{uid}|{password}")
+                lines.append(f"{name}|{email}|{uid}|{password}")
             return '\n'.join(lines)
         except Exception as e:
             print(f'[storage] get_accounts_text error: {e}')
@@ -261,11 +268,11 @@ def get_accounts_list():
         try:
             conn = _get_conn()
             cur  = conn.cursor()
-            cur.execute("SELECT uid, password FROM accounts ORDER BY id ASC")
+            cur.execute("SELECT uid, password, name, email FROM accounts ORDER BY id ASC")
             rows = cur.fetchall()
             cur.close()
             conn.close()
-            return [f"{uid}|{password}" for uid, password in rows]
+            return [f"{name}|{email}|{uid}|{password}" for uid, password, name, email in rows]
         except Exception as e:
             print(f'[storage] get_accounts_list error: {e}')
             return []
