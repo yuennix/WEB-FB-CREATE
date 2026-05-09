@@ -502,10 +502,12 @@ def fb_confirm_proxy(uid):
         'User-Agent': m.FB_LITE_UA,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Encoding': 'gzip, deflate',
     }
     try:
-        r = ses.get('https://m.facebook.com/confirmemail.php', headers=_ch, timeout=15, allow_redirects=True)
+        r = ses.get('https://m.facebook.com/confirmemail.php', headers=_ch, timeout=15,
+                    allow_redirects=True)
+        r.encoding = r.apparent_encoding or 'utf-8'
         html = r.text
     except Exception as e:
         return f'<p style="color:red">Failed to fetch page: {e}</p>', 502

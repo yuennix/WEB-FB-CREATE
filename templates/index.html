@@ -1068,10 +1068,7 @@ function addAccount(data) {
       <div class="confirm-row">
         <input id="${inputId}" class="confirm-input" type="text"
                maxlength="8" placeholder="_ _ _ _ _"
-               oninput="this.value=this.value.replace(/[^0-9]/g,'')"
-               onkeydown="if(event.key==='Enter')submitCode('${escAttr(data.uid)}')">
-        <button id="${btnId}" class="confirm-btn"
-                onclick="submitCode('${escAttr(data.uid)}')">Submit</button>
+               oninput="this.value=this.value.replace(/[^0-9]/g,'')" readonly>
       </div>
       <div id="${statusId}" class="confirm-status ${_isSecmail ? 'fetching' : ''}">${_isSecmail ? '⏳ Fetching code from inbox…' : ''}</div>
       <button class="confirm-page-btn" onclick="openConfirmDrawer('${escAttr(data.uid)}')">
