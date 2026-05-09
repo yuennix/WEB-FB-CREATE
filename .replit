@@ -33,3 +33,8 @@ waitForPort = 5000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+PUBLIC_URL = "https://web-production-cf4f5.up.railway.app"
