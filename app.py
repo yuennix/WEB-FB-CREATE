@@ -49,7 +49,7 @@ WORKERS = 50   # 50 parallel workers
 # ── Session store for confirmation codes (uid → session + meta) ───────────────
 _session_store = {}
 _session_lock  = threading.Lock()
-_SESSION_TTL   = 3600  # keep sessions for 1 hour
+_SESSION_TTL   = 21600  # keep sessions for 6 hours
 
 def _prune_sessions():
     """Remove sessions older than TTL."""
@@ -483,6 +483,191 @@ def status():
 
 # ── Confirm code endpoint ──────────────────────────────────────────────────────
 
+from bs4 import BeautifulSoup as _BS4
+
+def _check_confirmed(url, text):
+    """Return True if the response indicates the email is now confirmed."""
+    u = url.lower()
+    t = text.lower()
+    if 'checkpoint' in u:
+        return None   # checkpoint
+    if ('home.php' in u or u.rstrip('/').endswith('facebook.com')
+            or 'confirmed' in t or 'verified' in t
+            or 'thank' in t or 'success' in t):
+        return True
+    return False
+
+
+def _submit_confirm_form(ses, page_html, page_url, code, email, uid):
+    """
+    Parse the confirmation form from page_html, fill in the code, POST it.
+    Returns (resp_url, resp_text) or raises.
+    """
+    soup = _BS4(page_html, 'html.parser')
+
+    # Find the form — FB mobile sometimes wraps it inside a specific div
+    form = soup.find('form')
+    if not form:
+        return None, None
+
+    # Resolve action URL
+    action = form.get('action', '').strip()
+    if action and not action.startswith('http'):
+        action = 'https://m.facebook.com' + action
+    if not action:
+        action = 'https://m.facebook.com/confirmemail.php'
+
+    # Collect ALL hidden + visible inputs
+    form_data = {}
+    for inp in form.find_all('input'):
+        name = inp.get('name', '').strip()
+        val  = inp.get('value', '')
+        if name:
+            form_data[name] = val
+
+    # Inject the confirmation code into the right field
+    _code_names = ['code', 'n', 'confirm_code', 'confirmation_code', 'ccode']
+    injected = False
+    for fn in _code_names:
+        if fn in form_data:
+            form_data[fn] = code
+            injected = True
+            break
+
+    if not injected:
+        # Find the first unfilled text/number/tel input — that's the code box
+        for inp in form.find_all('input'):
+            itype = (inp.get('type') or 'text').lower()
+            iname = inp.get('name', '').strip()
+            ival  = inp.get('value', '').strip()
+            if itype in ('text', 'number', 'tel') and iname and not ival:
+                form_data[iname] = code
+                injected = True
+                break
+
+    if not injected:
+        form_data['code'] = code
+
+    _ph = {
+        'User-Agent':      m.FB_LITE_UA,
+        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Content-Type':    'application/x-www-form-urlencoded',
+        'Origin':          'https://m.facebook.com',
+        'Referer':         page_url,
+        'Cache-Control':   'max-age=0',
+        'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-platform': '"Android"',
+        'sec-fetch-dest':  'document',
+        'sec-fetch-mode':  'navigate',
+        'sec-fetch-site':  'same-origin',
+        'upgrade-insecure-requests': '1',
+        'x-requested-with': 'com.facebook.lite',
+    }
+
+    resp = ses.post(action, data=form_data, headers=_ph,
+                    allow_redirects=True, timeout=18)
+    return str(resp.url), resp.text
+
+
+def _submit_cliff(ses, page_html, email, uid, code):
+    """
+    Try the confirmation_cliff/ endpoint using tokens extracted from page_html.
+    Returns (resp_url, resp_text) or (None, None) if tokens are missing.
+    """
+    def _ext(patterns, src):
+        for pat in patterns:
+            mm = _re.search(pat, src)
+            if mm:
+                return mm.group(1)
+        return ''
+
+    # Parse tokens with BeautifulSoup first (more reliable)
+    soup     = _BS4(page_html, 'html.parser')
+    fb_dtsg  = ''
+    jazoest  = ''
+    lsd      = ''
+
+    for inp in soup.find_all('input', {'name': True}):
+        n = inp['name']
+        v = inp.get('value', '')
+        if n == 'fb_dtsg':   fb_dtsg = v
+        elif n == 'jazoest': jazoest = v
+        elif n == 'lsd':     lsd     = v
+
+    # Fallback to regex
+    if not fb_dtsg:
+        fb_dtsg = _ext([r'"token":"([^"]+)"',
+                        r'name="fb_dtsg"\s+value="([^"]+)"',
+                        r'\["DTSGInitData"[^\]]*\],\{"token":"([^"]+)"'], page_html)
+    if not jazoest:
+        jazoest = _ext([r'name="jazoest"\s+value="(\d+)"', r'"jazoest":"(\d+)"'], page_html)
+    if not lsd:
+        lsd = _ext([r'name="lsd"\s+value="([^"]+)"',
+                    r'"LSD",\[\],\{"token":"([^"]+)"\}',
+                    r'"lsd":"([^"]+)"'], page_html)
+
+    if not fb_dtsg:
+        return None, None   # can't proceed without CSRF token
+
+    rev = (_ext([r'"client_revision":(\d+)', r'"server_revision":(\d+)'], page_html)
+           or '1015920645')
+
+    _ph = {
+        'User-Agent':      m.FB_LITE_UA,
+        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+        'Cache-Control':   'max-age=0',
+        'Content-Type':    'application/x-www-form-urlencoded',
+        'Origin':          'https://m.facebook.com',
+        'Referer':         'https://m.facebook.com/confirmemail.php?soft=hjk',
+        'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-platform': '"Android"',
+        'sec-fetch-dest':  'document',
+        'sec-fetch-mode':  'navigate',
+        'sec-fetch-site':  'same-origin',
+        'upgrade-insecure-requests': '1',
+        'x-requested-with': 'com.facebook.lite',
+        'x-fb-lsd':        lsd,
+    }
+
+    resp = ses.post(
+        'https://m.facebook.com/confirmation_cliff/',
+        params={
+            'contact':       email,
+            'type':          'submit',
+            'is_soft_cliff': 'false',
+            'medium':        'email',
+            'code':          code,
+        },
+        data={
+            'fb_dtsg':     fb_dtsg,
+            'jazoest':     jazoest,
+            'lsd':         lsd,
+            '__dyn':       '',
+            '__csr':       '',
+            '__req':       str(_random.randint(4, 12)),
+            '__a':         '1',
+            '__user':      uid,
+            '__rev':       rev,
+            '__s':         (f'{_random.randint(0,9)}:{_random.randint(0,9)}'
+                            f':{_random.randint(0,9)}'),
+            '__hsi':       str(_random.randint(7000000000000000000,
+                                               7999999999999999999)),
+            '__comet_req': '0',
+            'action':      'confirm',
+        },
+        headers=_ph,
+        allow_redirects=True,
+        timeout=18,
+    )
+    return str(resp.url), resp.text
+
+
 @app.route('/confirm-code', methods=['POST'])
 def confirm_code_route():
     if not _require_auth():
@@ -498,11 +683,10 @@ def confirm_code_route():
     with _session_lock:
         entry = _session_store.get(uid)
     if not entry:
-        return jsonify({'error': 'Session expired — account was created too long ago'}), 404
+        return jsonify({'error': 'Session expired — re-create the account to try again'}), 404
 
-    ses      = entry['ses']
-    email    = entry['email']
-    password = entry['password']
+    ses   = entry['ses']
+    email = entry['email']
 
     try:
         _ch = {
@@ -513,84 +697,63 @@ def confirm_code_route():
             'x-requested-with': 'com.facebook.lite',
         }
 
-        # Fetch confirm page to get form tokens
-        cp        = ses.get('https://m.facebook.com/confirmemail.php?soft=hjk',
-                            headers=_ch, timeout=12, allow_redirects=True)
-        page_html = cp.text if cp.status_code == 200 else ''
+        # ── Step 1: Load the confirmation page (try several URLs) ────────────
+        page_html = ''
+        page_url  = ''
+        for _try in [
+            'https://m.facebook.com/confirmemail.php',
+            'https://m.facebook.com/confirmemail.php?soft=hjk',
+            'https://m.facebook.com/confirmemail.php?soft=1',
+        ]:
+            try:
+                _r = ses.get(_try, headers=_ch, timeout=12, allow_redirects=True)
+                _ru = str(_r.url)
+                # Already on home → already confirmed
+                if ('home.php' in _ru
+                        or _ru.rstrip('/').lower().endswith('facebook.com')):
+                    return jsonify({'status': 'confirmed'})
+                if 'checkpoint' in _ru:
+                    return jsonify({'status': 'checkpoint'})
+                if _r.status_code == 200 and len(_r.text) > 200:
+                    page_html = _r.text
+                    page_url  = _try
+                    break
+            except Exception:
+                continue
 
-        def _ext(patterns, src):
-            for pat in patterns:
-                mm = _re.search(pat, src)
-                if mm:
-                    return mm.group(1)
-            return ''
+        if not page_html:
+            return jsonify({'error': 'Could not load Facebook confirmation page'}), 500
 
-        fb_dtsg = _ext([r'"token":"([^"]+)"',
-                        r'name="fb_dtsg" value="([^"]+)"',
-                        r'\["DTSGInitData"[^\]]*\],\{"token":"([^"]+)"'], page_html)
-        jazoest = _ext([r'name="jazoest" value="(\d+)"',
-                        r'"jazoest":"(\d+)"'], page_html)
-        lsd     = _ext([r'name="lsd" value="([^"]+)"',
-                        r'"LSD",\[\],\{"token":"([^"]+)"\}',
-                        r'"lsd":"([^"]+)"'], page_html)
-        rev     = _ext([r'"client_revision":(\d+)',
-                        r'"server_revision":(\d+)'], page_html) or '1015920645'
+        # ── Step 2: Try form-parse-and-submit (most reliable) ────────────────
+        ru, rt = _submit_confirm_form(ses, page_html, page_url, code, email, uid)
+        if ru is not None:
+            chk = _check_confirmed(ru, rt)
+            if chk is True:
+                return jsonify({'status': 'confirmed'})
+            if chk is None:
+                return jsonify({'status': 'checkpoint'})
 
-        url     = 'https://m.facebook.com/confirmation_cliff/'
-        params  = {
-            'contact':        email,
-            'type':           'submit',
-            'is_soft_cliff':  'false',
-            'medium':         'email',
-            'code':           code,
-        }
-        payload = {
-            'fb_dtsg':      fb_dtsg,
-            'jazoest':      jazoest,
-            'lsd':          lsd,
-            '__dyn':        '7xeUmwlEnwn8K2WnFwn84a2i5U4e1Fx-ewSwAyUrxCG2O1aDxu2e0GE8xojxi3-4UABwrUmwlE8G-1-2h1px-0nE7i2i3iaohx2-0gKGq326EheV5mxvumFoqmCFoqm_9U9U2Jy5mzU',
-            '__csr':        '',
-            '__req':        str(_random.randint(4, 12)),
-            '__a':          '1',
-            '__user':       uid,
-            '__rev':        rev,
-            '__s':          f'{_random.randint(0,9)}:{_random.randint(0,9)}:{_random.randint(0,9)}',
-            '__hsi':        str(_random.randint(7000000000000000000, 7999999999999999999)),
-            '__comet_req':  '0',
-            'action':       'confirm',
-        }
-        post_headers = {
-            'User-Agent':      m.FB_LITE_UA,
-            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
-            'Cache-Control':   'max-age=0',
-            'Content-Type':    'application/x-www-form-urlencoded',
-            'Origin':          'https://m.facebook.com',
-            'Referer':         'https://m.facebook.com/confirmemail.php?soft=hjk',
-            'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
-            'sec-ch-ua-mobile': '?1',
-            'sec-ch-ua-platform': '"Android"',
-            'sec-fetch-dest':  'document',
-            'sec-fetch-mode':  'navigate',
-            'sec-fetch-site':  'same-origin',
-            'upgrade-insecure-requests': '1',
-            'x-requested-with': 'com.facebook.lite',
-            'x-fb-lsd':        lsd,
-        }
+        # ── Step 3: Fallback — confirmation_cliff/ with CSRF tokens ──────────
+        ru2, rt2 = _submit_cliff(ses, page_html, email, uid, code)
+        if ru2 is not None:
+            chk2 = _check_confirmed(ru2, rt2)
+            if chk2 is True:
+                return jsonify({'status': 'confirmed'})
+            if chk2 is None:
+                return jsonify({'status': 'checkpoint'})
 
-        response = ses.post(url, params=params, data=payload,
-                            headers=post_headers, allow_redirects=True, timeout=15)
-        resp_url  = str(response.url)
-        resp_text = response.text.lower()
-
-        if 'checkpoint' in resp_url:
-            return jsonify({'status': 'checkpoint'})
-
-        if ('confirmed' in resp_text or 'verified' in resp_text
-                or 'home.php' in resp_url
-                or resp_url.rstrip('/').endswith('facebook.com')):
-            return jsonify({'status': 'confirmed'})
+        # ── Step 4: Check current account state (maybe it was already done) ──
+        try:
+            _ck = ses.get('https://m.facebook.com/', headers=_ch,
+                          timeout=10, allow_redirects=True)
+            _cku = str(_ck.url)
+            if ('home.php' in _cku
+                    or _cku.rstrip('/').lower().endswith('facebook.com')):
+                return jsonify({'status': 'confirmed'})
+            if 'checkpoint' in _cku:
+                return jsonify({'status': 'checkpoint'})
+        except Exception:
+            pass
 
         return jsonify({'status': 'submitted'})
 
