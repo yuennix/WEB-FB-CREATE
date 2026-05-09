@@ -921,6 +921,8 @@ function addAccount(data) {
   document.getElementById('accountCount').textContent = `(${createdCount})`;
   updateProgress();
 
+  if (_isSecmail) _startFetchTimer(data.uid);
+
   // Auto-switch to Accounts tab so user sees the code box
   switchTab('accounts');
 }
@@ -931,7 +933,26 @@ const _SECMAIL_DOMAINS = new Set([
   'harakirimail.com'
 ]);
 
+const _fetchTimers = {};
+
+function _startFetchTimer(uid) {
+  if (_fetchTimers[uid]) clearTimeout(_fetchTimers[uid]);
+  _fetchTimers[uid] = setTimeout(() => {
+    const status = document.getElementById(`cs-${uid}`);
+    const retry  = document.getElementById(`retry-row-${uid}`);
+    if (status && status.classList.contains('fetching')) {
+      retry.style.display = '';
+    }
+    delete _fetchTimers[uid];
+  }, 5000);
+}
+
+function _clearFetchTimer(uid) {
+  if (_fetchTimers[uid]) { clearTimeout(_fetchTimers[uid]); delete _fetchTimers[uid]; }
+}
+
 function autofillCode(uid, code) {
+  _clearFetchTimer(uid);
   const input  = document.getElementById(`ci-${uid}`);
   const status = document.getElementById(`cs-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
@@ -943,6 +964,7 @@ function autofillCode(uid, code) {
 }
 
 function handleConfirmResult(uid, statusVal) {
+  _clearFetchTimer(uid);
   const status = document.getElementById(`cs-${uid}`);
   const input  = document.getElementById(`ci-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
@@ -969,6 +991,7 @@ async function retryConfirm(uid) {
   if (retry)  retry.style.display = 'none';
   if (input)  { input.value = ''; input.classList.remove('code-ready'); }
   if (status) { status.className = 'confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
+  _startFetchTimer(uid);
   try {
     const resp = await fetch('/retry-confirm', {
       method: 'POST',
