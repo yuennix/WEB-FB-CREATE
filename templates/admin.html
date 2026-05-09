@@ -886,9 +886,10 @@ async function addUser() {
 }
 
 let _webhookToken = '';
+let _siteBaseUrl  = location.origin;
 
 function _webhookUrl(token) {
-  return `${location.origin}/webhook/email?secret=${token}`;
+  return `${_siteBaseUrl}/webhook/email?secret=${token}`;
 }
 
 function onCustomTypeChange() {
@@ -902,8 +903,12 @@ function onCustomTypeChange() {
 
 async function loadWebhookSecret() {
   try {
-    const d = await api('/admin/api/webhook-secret');
-    _webhookToken = d.token || '';
+    const [sd, cd] = await Promise.all([
+      api('/admin/api/webhook-secret'),
+      api('/admin/api/site-config'),
+    ]);
+    _siteBaseUrl  = (cd.base_url || location.origin).replace(/\/$/, '');
+    _webhookToken = sd.token || '';
     document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
     document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
     document.getElementById('webhookUrlPreview').textContent = _webhookUrl(_webhookToken);

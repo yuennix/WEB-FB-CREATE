@@ -812,6 +812,24 @@ def admin_add_custom():
     return jsonify({'status': 'added' if ok else 'exists'})
 
 
+def _get_base_url():
+    """Return the public base URL, preferring Railway/custom env vars over request host."""
+    public = os.environ.get('PUBLIC_URL', '').rstrip('/')
+    if public:
+        return public
+    railway = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+    if railway:
+        return f'https://{railway.rstrip("/")}'
+    return request.host_url.rstrip('/')
+
+
+@app.route('/admin/api/site-config')
+def admin_site_config():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify({'base_url': _get_base_url()})
+
+
 @app.route('/admin/api/webhook-secret')
 def admin_webhook_secret():
     if not _require_admin():
