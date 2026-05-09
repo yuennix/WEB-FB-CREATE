@@ -35,7 +35,10 @@ RESET = '\033[0m'    # Reset
 
 # Initialize Faker and UserAgent
 fake = Faker()
-ua = UserAgent()
+try:
+    ua = UserAgent()
+except Exception:
+    ua = None
 
 
 
@@ -97,10 +100,25 @@ device = {
 
 
 # User-Agent generation
-ua = UserAgent()
+try:
+    ua = UserAgent()
+except Exception:
+    ua = None
+
+_FALLBACK_UA = (
+    "Mozilla/5.0 (Linux; Android 11; Redmi Note 8 Build/RP1A.200720.011; wv) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 "
+    "Chrome/109.0.5414.118 Mobile Safari/537.36"
+)
+
 def ugenX():
-    ualist = [ua.random for _ in range(50)]
-    return str(random.choice(ualist))
+    try:
+        if ua:
+            ualist = [ua.random for _ in range(50)]
+            return str(random.choice(ualist))
+    except Exception:
+        pass
+    return _FALLBACK_UA
 
 ugen=[]
 for xd in range(10000):
