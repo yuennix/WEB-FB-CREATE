@@ -1090,7 +1090,10 @@ function cAddAccount(data) {
       <span class="c-confirm-label">✉ Confirmation Code</span>
       <div class="c-confirm-row">
         <input id="cci-${data.uid}" class="c-confirm-input" type="text"
-               maxlength="8" placeholder="_ _ _ _ _" readonly>
+               maxlength="8" placeholder="_ _ _ _ _" readonly
+               title="Tap to copy"
+               onclick="if(this.value){navigator.clipboard.writeText(this.value).catch(()=>{});this.select();const s=document.getElementById('ccs-${data.uid}');const o=s&&s.textContent;if(s){s.textContent='✓ Copied!';setTimeout(()=>{if(s)s.textContent=o;},1000);}}"
+               style="cursor:pointer;">
       </div>
       <div id="c-retry-row-${data.uid}" style="display:none;margin-top:4px;">
         <button class="c-confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="cRetryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
@@ -1210,8 +1213,7 @@ function cAutofillCode(uid, code) {
   if (input)  { input.value = code; input.classList.add('code-ready'); }
   if (status) { status.className = 'c-confirm-status loading'; status.textContent = `✉ Code fetched: ${code}`; }
   if (retry)  retry.style.display = '';
-  navigator.clipboard.writeText(code).catch(() => {});
-  cAddLog(`✉ Code ${code} fetched & copied for UID ${uid}`, 'success');
+  cAddLog(`✉ Code ${code} fetched for UID ${uid}`, 'success');
 }
 
 function cHandleConfirmResult(uid, statusVal) {
@@ -1258,8 +1260,7 @@ async function cRetryConfirm(uid) {
       if (input)  { input.value = result.code; input.classList.add('code-ready'); }
       if (status) { status.className = 'c-confirm-status loading'; status.textContent = '✉ Code fetched: ' + result.code; }
       if (retry)  retry.style.display = '';
-      navigator.clipboard.writeText(result.code).catch(() => {});
-      cAddLog(`✉ Code ${result.code} fetched & copied for UID ${uid}`, 'success');
+      cAddLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
     } else if (result.status === 'not_found') {
       if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
       if (retry)  retry.style.display = '';
