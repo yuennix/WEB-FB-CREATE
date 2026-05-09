@@ -937,6 +937,7 @@ let cStartTime     = null;
 let _cCustomDomains = [];
 let _cTimerTick = null;
 let cAllAccounts   = [];
+const _cAcqtEmails = {};  // uid -> email for retry fetch
 
 function _cStartTicker() {
   if (_cTimerTick) clearInterval(_cTimerTick);
@@ -1054,6 +1055,7 @@ function cAddAccount(data) {
   const empty = document.getElementById('c-acctEmpty');
   if (empty) empty.remove();
   cAllAccounts.push(`${data.uid}|${data.password}`);
+  if (data.uid && data.email) _cAcqtEmails[data.uid] = data.email;
   const panel = document.getElementById('c-accts-panel');
   const copyAll = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
 
@@ -1069,19 +1071,19 @@ function cAddAccount(data) {
       <button onclick="cCopyField(this,\`${escAttr(copyAll)}\`)" class="c-copy-btn">Copy All</button>
     </div>
     <div style="display:grid;grid-template-columns:60px 1fr;row-gap:8px;align-items:center;">
-      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">Name</span>
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Name</span>
       <span style="font-size:13px;color:#f1f5f9;font-weight:600;">${esc(data.name)}</span>
 
-      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">Email</span>
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Email</span>
       <div style="display:flex;align-items:center;gap:7px;min-width:0;">
         <span style="font-size:12px;color:#60a5fa;word-break:break-all;flex:1;">${esc(data.email)}</span>
         <button onclick="cCopyField(this,'${escAttr(data.email)}')" class="c-copy-btn">Copy</button>
       </div>
 
-      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">Pass</span>
-      <span style="font-size:12px;color:#475569;font-family:monospace;">${esc(data.password)}</span>
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Pass</span>
+      <span style="font-size:12px;color:#e2e8f0;font-family:monospace;">${esc(data.password)}</span>
 
-      <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">UID</span>
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">UID</span>
       <span style="font-size:12px;color:#00e676;font-family:monospace;">${esc(data.uid)}</span>
     </div>
     <div class="c-confirm-section">
@@ -1235,21 +1237,33 @@ async function cRetryConfirm(uid) {
   const status = document.getElementById(`ccs-${uid}`);
   const retry  = document.getElementById(`c-retry-row-${uid}`);
   const input  = document.getElementById(`cci-${uid}`);
+  const email  = _cAcqtEmails[uid] || '';
+
   if (retry)  retry.style.display = 'none';
   if (input)  { input.value = ''; input.classList.remove('code-ready'); }
   if (status) { status.className = 'c-confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
+
+  cAddLog(`🔄 Retrying inbox fetch for UID ${uid}`, 'info');
+
   try {
-    const resp = await fetch('/retry-confirm', {
+    const resp = await fetch('/fetch-code-now', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid }),
+      body: JSON.stringify({ uid, email }),
     });
     const result = await resp.json();
-    if (!resp.ok) {
-      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
+
+    if (result.code) {
+      if (input)  { input.value = result.code; input.classList.add('code-ready'); }
+      if (status) { status.className = 'c-confirm-status loading'; status.textContent = '✉ Code fetched: ' + result.code; }
+      if (retry)  retry.style.display = '';
+      cAddLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+    } else if (result.status === 'not_found') {
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
       if (retry)  retry.style.display = '';
     } else {
-      cAddLog(`🔄 Retry started for UID ${uid}`, 'info');
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
+      if (retry)  retry.style.display = '';
     }
   } catch(e) {
     if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ Network error — try again.'; }
