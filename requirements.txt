@@ -19,3 +19,10 @@ flask
 psycopg2-binary
 pyotp
 requests
+beautifulsoup4
+fake-useragent
+faker
+flask
+psycopg2-binary
+pyotp
+requests
