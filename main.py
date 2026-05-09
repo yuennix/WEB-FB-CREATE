@@ -1793,15 +1793,18 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
     - Custom domains (weyn.store etc): fire resend triggers so FB emails the inbox.
     - 1secmail domains: fire resend triggers + poll inbox + auto-fill code via queue.
     - harakirimail.com: scrape inbox page + auto-fill code via queue.
+    - tempmail.io: poll REST API + auto-fill code via queue.
     """
     _SECMAIL_DOMAINS = {
         '1secmail.com', '1secmail.net', '1secmail.org',
         'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
     }
-    _HARAKIRI_DOMAINS = {'harakirimail.com'}
+    _HARAKIRI_DOMAINS  = {'harakirimail.com'}
+    _TEMPMAIL_IO_DOMAINS = {'tempmail.io'}
     _domain = email.split('@')[1].lower() if '@' in email else ''
-    _is_secmail   = _domain in _SECMAIL_DOMAINS
-    _is_harakiri  = _domain in _HARAKIRI_DOMAINS
+    _is_secmail      = _domain in _SECMAIL_DOMAINS
+    _is_harakiri     = _domain in _HARAKIRI_DOMAINS
+    _is_tempmail_io  = _domain in _TEMPMAIL_IO_DOMAINS
 
     _ch = {
         'User-Agent': FB_LITE_UA,
@@ -2267,6 +2270,194 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             if result_queue:
                 result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
 
+    def _poll_tempmail_io():
+        """
+        Poll tempmail.io REST API for up to 2.5 min.
+        Endpoints:
+          - List : GET https://api.tempmail.io/v1/messages?address={email}
+                   → {messages:[{id, from, subject, body, html}]}
+          - Also tries token-based endpoint if address-based fails.
+        """
+        _login    = email.split('@')[0]
+        _deadline = time.time() + 150
+        _seen_ids = set()
+
+        _hdrs = {
+            'User-Agent':      ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
+                                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                'Chrome/109.0.5414.118 Mobile Safari/537.36'),
+            'Accept':          'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer':         f'https://tempmail.io/inbox/{_login}',
+        }
+
+        # tempmail.io token-based auth — fetch the token for this address first
+        _token = None
+        try:
+            _tr = requests.post(
+                'https://api.tempmail.io/v1/token',
+                json={'email': email},
+                headers={**_hdrs, 'Content-Type': 'application/json'},
+                timeout=10
+            )
+            if _tr.status_code in (200, 201):
+                _td = _tr.json()
+                _token = _td.get('token') or _td.get('access_token')
+        except Exception:
+            pass
+
+        while time.time() < _deadline and not _stop_poll.is_set():
+            try:
+                # Try address-based endpoint first
+                _msgs = []
+                for _url in [
+                    f'https://api.tempmail.io/v1/messages?address={email}',
+                    f'https://api.tempmail.io/v1/mailbox/{_login}',
+                    f'https://tempmail.io/api/v1/messages?email={email}',
+                ]:
+                    _req_hdrs = dict(_hdrs)
+                    if _token:
+                        _req_hdrs['Authorization'] = f'Bearer {_token}'
+                    _r = requests.get(_url, headers=_req_hdrs, timeout=12)
+                    if _r.status_code == 200:
+                        _data = _r.json()
+                        _msgs = (_data.get('messages') or _data.get('mails') or
+                                 _data.get('emails') or _data.get('data') or [])
+                        if isinstance(_msgs, list) and _msgs:
+                            break
+                        # Response might be the list directly
+                        if isinstance(_data, list):
+                            _msgs = _data
+                            break
+
+                for _msg in _msgs:
+                    _mid = str(_msg.get('id') or _msg.get('_id') or '')
+                    if not _mid or _mid in _seen_ids:
+                        continue
+
+                    _from_t = str(_msg.get('from', '')).lower()
+                    _subj_t = str(_msg.get('subject', '')).lower()
+                    _is_fb  = ('facebook' in _from_t or 'facebookmail' in _from_t
+                               or 'meta'         in _from_t
+                               or 'confirm'      in _subj_t
+                               or 'registration' in _subj_t
+                               or 'code'         in _subj_t
+                               or 'verification' in _subj_t)
+                    _seen_ids.add(_mid)
+                    if not _is_fb:
+                        continue
+
+                    print(f"{G}  [tempmail.io] FB email found — id={_mid} subj={_msg.get('subject','')}{W}")
+
+                    # Body may already be in the list response
+                    _body = str(_msg.get('body_html') or _msg.get('html') or
+                                _msg.get('body') or _msg.get('text') or
+                                _msg.get('bodyhtml') or _msg.get('bodytext') or '')
+
+                    # If not, fetch the individual message
+                    if not _body:
+                        try:
+                            _req_hdrs2 = dict(_hdrs)
+                            if _token:
+                                _req_hdrs2['Authorization'] = f'Bearer {_token}'
+                            for _emurl in [
+                                f'https://api.tempmail.io/v1/messages/{_mid}',
+                                f'https://api.tempmail.io/v1/mail/{_mid}',
+                            ]:
+                                _er = requests.get(_emurl, headers=_req_hdrs2, timeout=12)
+                                if _er.status_code == 200:
+                                    try:
+                                        _ed = _er.json()
+                                        _body = str(_ed.get('body_html') or _ed.get('html') or
+                                                    _ed.get('body') or _ed.get('text') or
+                                                    _ed.get('bodyhtml') or _ed.get('bodytext') or '')
+                                    except Exception:
+                                        _body = _er.text
+                                    if _body:
+                                        break
+                        except Exception as _fe:
+                            print(f"{Y}  [tempmail.io] email fetch error: {_fe}{W}")
+
+                    if _body:
+                        # Reuse the same _process_body logic from harakiri
+                        # ── 1) FB confirmation link ─────────────────────────────────────
+                        _lm = re.search(
+                            r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
+                            _body, re.IGNORECASE
+                        )
+                        if _lm:
+                            _link = _lm.group(0).replace('&amp;', '&').rstrip('.')
+                            print(f"{G}  [tempmail.io] Confirm link → {_link[:60]}{W}")
+                            if result_queue:
+                                try:
+                                    _lr = ses.get(_link, headers=_ch, timeout=12, allow_redirects=True)
+                                    _st = ('checkpoint' if 'checkpoint' in str(_lr.url) else 'confirmed')
+                                except Exception:
+                                    _st = 'link_error'
+                                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _st})
+                            _stop_poll.set()
+                            return
+
+                        try:
+                            _plain = BeautifulSoup(_body, 'html.parser').get_text(separator=' ')
+                        except Exception:
+                            _plain = _body
+                        _clean = re.sub(r'https?://\S+', ' ', _plain)
+                        _clean = re.sub(r'\s+', ' ', _clean)
+
+                        _ctx_pats = [
+                            r'(?:confirmation|verification|confirm(?:ation)?)\s*code[:\s\-]+(\d{5,6})',
+                            r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
+                            r'code[:\s\-]+(\d{5,6})\b',
+                            r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm|to\s+verify)',
+                            r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
+                            r'(?:^|\s)(\d{5,6})(?:\s|$)',
+                        ]
+                        _found = False
+                        for _pat in _ctx_pats:
+                            for _c in re.findall(_pat, _clean, re.IGNORECASE | re.MULTILINE):
+                                _n = int(_c)
+                                if 1900 <= _n <= 2100:
+                                    continue
+                                print(f"{G}  [tempmail.io] Code fetched → {_c}{W}")
+                                _as = _auto_submit_code(_c)
+                                if result_queue:
+                                    if _as == 'confirmed':
+                                        result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                                          'status': 'confirmed', 'method': 'code'})
+                                    elif _as == 'checkpoint':
+                                        result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                                          'status': 'checkpoint'})
+                                    else:
+                                        result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                                _stop_poll.set()
+                                _found = True
+                                break
+                            if _found:
+                                return
+
+                        for _c in re.findall(r'\b(\d{5,6})\b', _clean):
+                            _n = int(_c)
+                            if 1900 <= _n <= 2100:
+                                continue
+                            print(f"{G}  [tempmail.io] Code (last-resort) → {_c}{W}")
+                            if result_queue:
+                                result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                            _stop_poll.set()
+                            return
+                    else:
+                        print(f"{Y}  [tempmail.io] empty body for id={_mid}{W}")
+
+            except Exception as _pe:
+                print(f"{Y}  [tempmail.io] poll error: {_pe}{W}")
+
+            time.sleep(3)
+
+        if not _stop_poll.is_set():
+            print(f"{Y}  [!] No tempmail.io code for {email} within 2.5 min{W}")
+            if result_queue:
+                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
+
     try:
         if _is_secmail:
             # Start polling immediately, triggers run in parallel
@@ -2277,6 +2468,12 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         elif _is_harakiri:
             # Harakiri: poll inbox page + fire FB resend triggers
             _pt = _th2.Thread(target=_poll_harakiri, daemon=True)
+            _pt.start()
+            _run_triggers()
+            _pt.join(timeout=150)
+        elif _is_tempmail_io:
+            # tempmail.io: poll REST API + fire FB resend triggers
+            _pt = _th2.Thread(target=_poll_tempmail_io, daemon=True)
             _pt.start()
             _run_triggers()
             _pt.join(timeout=150)

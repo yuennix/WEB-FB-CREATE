@@ -484,10 +484,33 @@ def retry_confirm():
     return jsonify({'status': 'retrying'})
 
 
+def _extract_code_from_body(body):
+    """Extract FB confirmation code from an email body string. Returns code string or None."""
+    from bs4 import BeautifulSoup as _BS
+    plain = _BS(body, 'html.parser').get_text(separator=' ') if body else ''
+    clean = _re.sub(r'https?://\S+', ' ', plain)
+    pats  = [
+        r'(?:confirmation|verification)\s*code[:\s\-]+(\d{5,6})',
+        r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
+        r'code[:\s\-]+(\d{5,6})\b',
+        r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm)',
+        r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
+        r'(?:^|\s)(\d{5,6})(?:\s|$)',
+    ]
+    for pat in pats:
+        match = _re.search(pat, clean, _re.IGNORECASE | _re.MULTILINE)
+        if match:
+            code = match.group(1)
+            if not (1900 <= int(code) <= 2100):
+                return code
+    return None
+
+
 @app.route('/fetch-code-now', methods=['POST'])
 def fetch_code_now():
-    """Directly poll harakirimail inbox and return the FB confirmation code.
-    Called by the Retry Fetch button — no SSE dependency."""
+    """Directly poll supported temp-mail inboxes and return the FB confirmation code.
+    Called by the Retry Fetch button — no SSE dependency.
+    Supports: harakirimail.com, tempmail.io"""
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
     data  = request.json or {}
@@ -499,30 +522,109 @@ def fetch_code_now():
     domain = email.split('@')[1].lower() if '@' in email else ''
     login  = email.split('@')[0]
 
-    if 'harakirimail' not in domain:
-        return jsonify({'status': 'unsupported_domain'}), 400
-
-    hdrs = {
+    base_hdrs = {
         'User-Agent':     ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
                            'AppleWebKit/537.36 (KHTML, like Gecko) '
                            'Chrome/109.0.5414.118 Mobile Safari/537.36'),
         'Accept':         'application/json',
         'Accept-Language':'en-US,en;q=0.9',
-        'Referer':        f'https://harakirimail.com/inbox/{login}',
     }
 
     deadline = time.time() + 30
     seen_ids = set()
 
-    while time.time() < deadline:
+    # ── harakirimail ──────────────────────────────────────────────────────────
+    if 'harakirimail' in domain:
+        hdrs = {**base_hdrs, 'Referer': f'https://harakirimail.com/inbox/{login}'}
+        while time.time() < deadline:
+            try:
+                r = m.requests.get(
+                    f'https://harakirimail.com/api/v1/inbox/{login}',
+                    headers=hdrs, timeout=10
+                )
+                if r.status_code == 200:
+                    for msg in (r.json().get('emails') or []):
+                        mid    = str(msg.get('_id') or '')
+                        if not mid or mid in seen_ids:
+                            continue
+                        from_t = str(msg.get('from', '')).lower()
+                        subj_t = str(msg.get('subject', '')).lower()
+                        is_fb  = ('facebook' in from_t or 'facebookmail' in from_t
+                                   or 'confirm' in subj_t or 'code' in subj_t
+                                   or 'verification' in subj_t)
+                        seen_ids.add(mid)
+                        if not is_fb:
+                            continue
+                        try:
+                            er = m.requests.get(
+                                f'https://harakirimail.com/api/v1/email/{mid}',
+                                headers=hdrs, timeout=10
+                            )
+                            if er.status_code == 200:
+                                try:
+                                    ed   = er.json()
+                                    body = str(ed.get('bodyhtml') or ed.get('bodytext') or
+                                               ed.get('html') or ed.get('body') or
+                                               ed.get('text') or '')
+                                except Exception:
+                                    body = er.text
+                                code = _extract_code_from_body(body)
+                                if code:
+                                    task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                    return jsonify({'code': code})
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            time.sleep(3)
+        return jsonify({'status': 'not_found'})
+
+    # ── tempmail.io ───────────────────────────────────────────────────────────
+    if 'tempmail.io' in domain:
+        hdrs = {**base_hdrs, 'Referer': f'https://tempmail.io/inbox/{login}'}
+
+        # Attempt to get a token first
+        _token = None
         try:
-            r = m.requests.get(
-                f'https://harakirimail.com/api/v1/inbox/{login}',
-                headers=hdrs, timeout=10
+            _tr = m.requests.post(
+                'https://api.tempmail.io/v1/token',
+                json={'email': email},
+                headers={**hdrs, 'Content-Type': 'application/json'},
+                timeout=8
             )
-            if r.status_code == 200:
-                for msg in (r.json().get('emails') or []):
-                    mid    = str(msg.get('_id') or '')
+            if _tr.status_code in (200, 201):
+                _td = _tr.json()
+                _token = _td.get('token') or _td.get('access_token')
+        except Exception:
+            pass
+
+        while time.time() < deadline:
+            try:
+                req_hdrs = dict(hdrs)
+                if _token:
+                    req_hdrs['Authorization'] = f'Bearer {_token}'
+
+                msgs = []
+                for url in [
+                    f'https://api.tempmail.io/v1/messages?address={email}',
+                    f'https://api.tempmail.io/v1/mailbox/{login}',
+                    f'https://tempmail.io/api/v1/messages?email={email}',
+                ]:
+                    try:
+                        r = m.requests.get(url, headers=req_hdrs, timeout=10)
+                        if r.status_code == 200:
+                            d = r.json()
+                            msgs = (d.get('messages') or d.get('mails') or
+                                    d.get('emails') or d.get('data') or [])
+                            if isinstance(d, list):
+                                msgs = d
+                            if msgs:
+                                break
+                    except Exception:
+                        pass
+
+                for msg in msgs:
+                    mid    = str(msg.get('id') or msg.get('_id') or '')
                     if not mid or mid in seen_ids:
                         continue
                     from_t = str(msg.get('from', '')).lower()
@@ -533,45 +635,41 @@ def fetch_code_now():
                     seen_ids.add(mid)
                     if not is_fb:
                         continue
-                    try:
-                        er = m.requests.get(
-                            f'https://harakirimail.com/api/v1/email/{mid}',
-                            headers=hdrs, timeout=10
-                        )
-                        if er.status_code == 200:
-                            try:
-                                ed   = er.json()
-                                body = str(ed.get('bodyhtml') or ed.get('bodytext') or
-                                           ed.get('html') or ed.get('body') or
-                                           ed.get('text') or '')
-                            except Exception:
-                                body = er.text
-                            from bs4 import BeautifulSoup as _BS
-                            plain = _BS(body, 'html.parser').get_text(separator=' ') if body else ''
-                            clean = _re.sub(r'https?://\S+', ' ', plain)
-                            pats  = [
-                                r'(?:confirmation|verification)\s*code[:\s\-]+(\d{5,6})',
-                                r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
-                                r'code[:\s\-]+(\d{5,6})\b',
-                                r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm)',
-                                r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
-                                r'(?:^|\s)(\d{5,6})(?:\s|$)',
-                            ]
-                            for pat in pats:
-                                match = _re.search(pat, clean, _re.IGNORECASE | _re.MULTILINE)
-                                if match:
-                                    code = match.group(1)
-                                    if not (1900 <= int(code) <= 2100):
-                                        task_queue.put({'type': 'confirm_code',
-                                                        'uid': uid, 'code': code})
-                                        return jsonify({'code': code})
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        time.sleep(3)
 
-    return jsonify({'status': 'not_found'})
+                    # Body may be inline or need a separate fetch
+                    body = str(msg.get('body_html') or msg.get('html') or
+                               msg.get('body') or msg.get('text') or
+                               msg.get('bodyhtml') or msg.get('bodytext') or '')
+                    if not body:
+                        try:
+                            for emurl in [
+                                f'https://api.tempmail.io/v1/messages/{mid}',
+                                f'https://api.tempmail.io/v1/mail/{mid}',
+                            ]:
+                                er = m.requests.get(emurl, headers=req_hdrs, timeout=10)
+                                if er.status_code == 200:
+                                    try:
+                                        ed = er.json()
+                                        body = str(ed.get('body_html') or ed.get('html') or
+                                                   ed.get('body') or ed.get('text') or
+                                                   ed.get('bodyhtml') or ed.get('bodytext') or '')
+                                    except Exception:
+                                        body = er.text
+                                    if body:
+                                        break
+                        except Exception:
+                            pass
+
+                    code = _extract_code_from_body(body)
+                    if code:
+                        task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                        return jsonify({'code': code})
+            except Exception:
+                pass
+            time.sleep(3)
+        return jsonify({'status': 'not_found'})
+
+    return jsonify({'status': 'unsupported_domain'}), 400
 
 
 @app.route('/status')

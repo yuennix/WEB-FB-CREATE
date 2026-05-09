@@ -6,7 +6,7 @@ _lock = threading.Lock()
 
 _DEFAULT = {
     "domain_password": "yuennix",
-    "temp": ["1secmail.com", "harakirimail.com"],
+    "temp": ["1secmail.com", "harakirimail.com", "tempmail.io"],
     "custom": [
         {"domain": "weyn.store",    "imap_host": "mail.weyn.store",    "imap_user": "admin@weyn.store",    "imap_pass": "yuennix"},
         {"domain": "jhames.shop",   "imap_host": "mail.jhames.shop",   "imap_user": "admin@jhames.shop",   "imap_pass": "yuennix"},
