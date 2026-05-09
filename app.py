@@ -305,8 +305,16 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 }
                 result_store.append(result)
 
+                _tmail_tok = ''
+                _phone_dom = phone.split('@')[1].lower() if '@' in phone else ''
+                if _phone_dom in m._TEMPMAIL_IO_DOMAIN_SET:
+                    with m._TEMPMAIL_IO_TOKEN_LOCK:
+                        _tmail_tok = m._TEMPMAIL_IO_TOKEN_STORE.get(phone, '')
                 with _session_lock:
-                    _session_store[uid] = {'ses': ses, 'email': phone, 'password': pww}
+                    _session_store[uid] = {
+                        'ses': ses, 'email': phone, 'password': pww,
+                        'tmail_token': _tmail_tok,
+                    }
 
                 _sto.save_account(session_id, uid, pww,
                                   name=f'{firstname} {lastname}', email=phone)
@@ -584,32 +592,19 @@ def fetch_code_now():
         _TMAIL_API = m._TEMPMAIL_IO_API
         _tmail_hdrs = dict(m._TEMPMAIL_IO_HDRS)
 
-        # Look up pre-stored token from email generation
-        with m._TEMPMAIL_IO_TOKEN_LOCK:
-            _token = m._TEMPMAIL_IO_TOKEN_STORE.get(email)
+        # 1) Look up token stored per-uid in session store (survives beyond creation thread)
+        _token = ''
+        with _session_lock:
+            _sess_entry = _session_store.get(uid) or {}
+        _token = _sess_entry.get('tmail_token', '')
 
-        # No stored token — create a fresh inbox on same domain as fallback
+        # 2) Fallback: look up by email in the global token store
         if not _token:
-            try:
-                _cr = m.requests.post(
-                    f'{_TMAIL_API}/v3/email/new',
-                    json={'domain': domain,
-                          'min_name_length': 8, 'max_name_length': 14},
-                    headers={**_tmail_hdrs, 'Content-Type': 'application/json'},
-                    timeout=10,
-                )
-                if _cr.status_code == 200:
-                    _cd = _cr.json()
-                    _token = _cd.get('token', '')
-                    _new_email = _cd.get('email', '')
-                    if _token and _new_email:
-                        with m._TEMPMAIL_IO_TOKEN_LOCK:
-                            m._TEMPMAIL_IO_TOKEN_STORE[_new_email] = _token
-            except Exception:
-                pass
+            with m._TEMPMAIL_IO_TOKEN_LOCK:
+                _token = m._TEMPMAIL_IO_TOKEN_STORE.get(email, '')
 
         if not _token:
-            return jsonify({'status': 'not_found'})
+            return jsonify({'status': 'not_found', 'error': 'Token not found — account may have been created before this session'})
 
         _msg_url = f'{_TMAIL_API}/v3/email/{_token}/messages'
 

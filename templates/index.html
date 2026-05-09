@@ -883,8 +883,10 @@ function addAccount(data) {
   const inputId    = `ci-${data.uid}`;
   const statusId   = `cs-${data.uid}`;
   const btnId      = `cb-${data.uid}`;
-  const _emailDom  = (data.email || '').split('@')[1] || '';
-  const _isSecmail = _SECMAIL_DOMAINS.has(_emailDom);
+  const _emailDom     = (data.email || '').split('@')[1] || '';
+  const _isSecmail    = _SECMAIL_DOMAINS.has(_emailDom);
+  const _isTmailIo    = _TEMPMAIL_IO_DOMAINS.has(_emailDom);
+  const _isAutoFetch  = _isSecmail || _isTmailIo;
   card.innerHTML = `
     <span class="acct-num">#${data.num}</span>
     <div class="acct-row">
@@ -918,7 +920,7 @@ function addAccount(data) {
       <div id="retry-row-${data.uid}" style="display:none;margin-top:4px;">
         <button class="confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="retryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
       </div>
-      <div id="${statusId}" class="confirm-status ${_isSecmail ? 'fetching' : ''}">${_isSecmail ? '⏳ Fetching code from inbox…' : ''}</div>
+      <div id="${statusId}" class="confirm-status ${_isAutoFetch ? 'fetching' : ''}">${_isAutoFetch ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
     <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
@@ -928,7 +930,7 @@ function addAccount(data) {
   document.getElementById('accountCount').textContent = `(${createdCount})`;
   updateProgress();
 
-  if (_isSecmail) _startFetchTimer(data.uid);
+  if (_isAutoFetch) _startFetchTimer(data.uid);
 
   // Auto-switch to Accounts tab so user sees the code box
   switchTab('accounts');
@@ -938,6 +940,11 @@ const _SECMAIL_DOMAINS = new Set([
   '1secmail.com','1secmail.net','1secmail.org',
   'wwjmp.com','esiix.com','xojxe.com','yoggm.com',
   'harakirimail.com'
+]);
+
+const _TEMPMAIL_IO_DOMAINS = new Set([
+  'bltiwd.com','wnbaldwy.com','bwmyga.com','ozsaip.com',
+  'yzcalo.com','lnovic.com','ruutukf.com','gmeenramy.com'
 ]);
 
 const _fetchTimers = {};

@@ -2441,6 +2441,11 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                                 if 1900 <= _n <= 2100:
                                     continue
                                 print(f"{G}  [tempmail.io] Code fetched → {_c}{W}")
+                                # Always show code in UI first (same as harakirimail)
+                                if result_queue:
+                                    result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                                _stop_poll.set()
+                                # Also try auto-submit; emit result if it worked
                                 _as = _auto_submit_code(_c)
                                 if result_queue:
                                     if _as == 'confirmed':
@@ -2449,9 +2454,6 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                                     elif _as == 'checkpoint':
                                         result_queue.put({'type': 'confirm_result', 'uid': uid,
                                                           'status': 'checkpoint'})
-                                    else:
-                                        result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
-                                _stop_poll.set()
                                 _found = True
                                 break
                             if _found:
