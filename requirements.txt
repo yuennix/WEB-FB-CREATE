@@ -5,17 +5,3 @@ requests>=2.32.5
 flask>=3.0.0
 pyotp>=2.9.0
 psycopg2-binary>=2.9.9
-beautifulsoup4
-fake-useragent
-faker
-flask
-psycopg2-binary
-pyotp
-requests
-beautifulsoup4
-fake-useragent
-faker
-flask
-psycopg2-binary
-pyotp
-requests
