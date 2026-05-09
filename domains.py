@@ -4,13 +4,16 @@ import storage
 
 _lock = threading.Lock()
 
+_TEMPMAIL_IO_DOMAINS = [
+    "bltiwd.com", "wnbaldwy.com", "bwmyga.com", "ozsaip.com",
+    "yzcalo.com", "lnovic.com", "ruutukf.com", "gmeenramy.com",
+]
+
 _DEFAULT = {
     "domain_password": "yuennix",
     "temp": [
         "1secmail.com", "harakirimail.com",
-        "bltiwd.com", "wnbaldwy.com", "bwmyga.com", "ozsaip.com",
-        "yzcalo.com", "lnovic.com", "ruutukf.com", "gmeenramy.com",
-    ],
+    ] + _TEMPMAIL_IO_DOMAINS,
     "custom": [
         {"domain": "weyn.store",    "imap_host": "mail.weyn.store",    "imap_user": "admin@weyn.store",    "imap_pass": "yuennix"},
         {"domain": "jhames.shop",   "imap_host": "mail.jhames.shop",   "imap_user": "admin@jhames.shop",   "imap_pass": "yuennix"},
@@ -18,11 +21,23 @@ _DEFAULT = {
     ]
 }
 
+_BAD_PLACEHOLDERS = {"tempmail.io"}
+
 
 def _load():
     data = storage.load('domains', default=None)
     if data is None:
         return json.loads(json.dumps(_DEFAULT))
+    changed = False
+    temp = data.get('temp', [])
+    temp = [d for d in temp if d not in _BAD_PLACEHOLDERS]
+    for dom in _DEFAULT['temp']:
+        if dom not in temp:
+            temp.append(dom)
+            changed = True
+    if len(temp) != len(data.get('temp', [])) or changed:
+        data['temp'] = temp
+        storage.save('domains', data)
     return data
 
 
