@@ -40,6 +40,10 @@ result_store = []
 job_running  = False
 job_lock     = threading.Lock()
 
+# ── Session store for retry-confirm ──────────────────────────────────────────
+_session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str}
+_session_lock  = threading.Lock()
+
 lock       = threading.Lock()
 done_count = [0]
 cp_count   = [0]
@@ -300,6 +304,9 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 }
                 result_store.append(result)
 
+                with _session_lock:
+                    _session_store[uid] = {'ses': ses, 'email': phone, 'password': pww}
+
                 _sto.save_account(session_id, uid, pww,
                                   name=f'{firstname} {lastname}', email=phone)
 
@@ -450,6 +457,29 @@ def download():
         return send_file(buf, as_attachment=True, download_name='weynFBCreate.txt',
                          mimetype='text/plain')
     return jsonify({'error': 'No results yet'}), 404
+
+
+@app.route('/retry-confirm', methods=['POST'])
+def retry_confirm():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json or {}
+    uid  = (data.get('uid') or '').strip()
+    if not uid:
+        return jsonify({'error': 'uid required'}), 400
+    with _session_lock:
+        entry = _session_store.get(uid)
+    if not entry:
+        return jsonify({'error': 'Session expired — cannot retry'}), 404
+    ses      = entry['ses']
+    email    = entry['email']
+    password = entry['password']
+    threading.Thread(
+        target=m._full_email_confirm,
+        args=(ses, email, uid, password, task_queue),
+        daemon=False,
+    ).start()
+    return jsonify({'status': 'retrying'})
 
 
 @app.route('/status')

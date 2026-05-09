@@ -908,6 +908,10 @@ function addAccount(data) {
         <input id="${inputId}" class="confirm-input" type="text"
                maxlength="8" placeholder="_ _ _ _ _"
                oninput="this.value=this.value.replace(/[^0-9]/g,'')" readonly>
+        <button id="${btnId}" class="confirm-btn" onclick="submitCode('${escAttr(data.uid)}')" disabled>Submit</button>
+      </div>
+      <div id="retry-row-${data.uid}" style="display:none;margin-top:4px;">
+        <button class="confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="retryConfirm('${escAttr(data.uid)}')">🔄 Retry Code Fetch</button>
       </div>
       <div id="${statusId}" class="confirm-status ${_isSecmail ? 'fetching' : ''}">${_isSecmail ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
@@ -957,13 +961,49 @@ function handleConfirmResult(uid, statusVal, method) {
     if (input)  { input.disabled = false; }
     if (btn)    { btn.disabled = false; }
   } else if (statusVal === 'timeout') {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code received within 2.5 min — enter manually.'; }
-    if (input)  { input.disabled = false; }
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code received — enter manually or retry.'; }
+    if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
     if (btn)    { btn.disabled = false; }
+    const retryRow = document.getElementById(`retry-row-${uid}`);
+    if (retryRow) retryRow.style.display = '';
   } else if (statusVal === 'link_error') {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Could not follow confirm link — try submitting a code manually.'; }
-    if (input)  { input.disabled = false; }
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Could not follow confirm link — retry or enter code manually.'; }
+    if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
     if (btn)    { btn.disabled = false; }
+    const retryRow2 = document.getElementById(`retry-row-${uid}`);
+    if (retryRow2) retryRow2.style.display = '';
+  }
+}
+
+async function retryConfirm(uid) {
+  const status   = document.getElementById(`cs-${uid}`);
+  const retryRow = document.getElementById(`retry-row-${uid}`);
+  const input    = document.getElementById(`ci-${uid}`);
+  const btn      = document.getElementById(`cb-${uid}`);
+  if (retryRow) retryRow.style.display = 'none';
+  if (input)    { input.disabled = true; input.setAttribute('readonly', ''); }
+  if (btn)      btn.disabled = true;
+  if (status)   { status.className = 'confirm-status fetching'; status.textContent = '⏳ Retrying code fetch…'; }
+  try {
+    const resp = await fetch('/retry-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) {
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
+      if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
+      if (btn)    btn.disabled = false;
+      if (retryRow) retryRow.style.display = '';
+    } else {
+      addLog(`🔄 Retry started for UID ${uid}`, 'info');
+    }
+  } catch(e) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error — try again.'; }
+    if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
+    if (btn)    btn.disabled = false;
+    if (retryRow) retryRow.style.display = '';
   }
 }
 

@@ -468,6 +468,49 @@
     #page-create { height: auto; overflow: auto; }
   }
 
+  /* ── Confirm code section (admin) ── */
+  .c-confirm-section {
+    margin-top: 8px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .c-confirm-label {
+    font-size: 9px; font-weight: 700; color: #334155;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .c-confirm-row { display: flex; gap: 6px; align-items: center; }
+  .c-confirm-input {
+    flex: 1; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+    color: #e2e8f0; padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 15px;
+    font-weight: 600; letter-spacing: 4px; outline: none;
+    transition: border-color .2s, box-shadow .2s; text-align: center;
+  }
+  .c-confirm-input:focus { border-color: rgba(96,165,250,0.5); box-shadow: 0 0 0 3px rgba(96,165,250,0.08); }
+  .c-confirm-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .c-confirm-input.code-ready { border-color: rgba(0,230,118,0.45); box-shadow: 0 0 0 3px rgba(0,230,118,0.08); color: #00e676; }
+  .c-confirm-btn {
+    padding: 8px 14px; border-radius: 8px; border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+    background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.25); color: #60a5fa;
+    flex-shrink: 0; white-space: nowrap;
+  }
+  .c-confirm-btn:hover:not(:disabled) { background: rgba(96,165,250,0.2); border-color: rgba(96,165,250,0.45); }
+  .c-confirm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .c-confirm-status {
+    font-size: 11px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif;
+    display: none; padding: 5px 10px; border-radius: 6px; text-align: center;
+  }
+  .c-confirm-status.confirmed  { display:block; background:rgba(0,230,118,0.1);  border:1px solid rgba(0,230,118,0.2);  color:#00e676; }
+  .c-confirm-status.checkpoint { display:block; background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); color:#fbbf24; }
+  .c-confirm-status.submitted  { display:block; background:rgba(96,165,250,0.1); border:1px solid rgba(96,165,250,0.2);  color:#60a5fa; }
+  .c-confirm-status.error      { display:block; background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);color:#f87171; }
+  .c-confirm-status.loading    { display:block; background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);color:#475569; }
+  .c-confirm-status.fetching   { display:block; background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);color:#475569; animation:fadepulse 1.5s ease-in-out infinite; }
+  @keyframes fadepulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
 </style>
 </head>
 <body>
@@ -995,6 +1038,18 @@ function cCopyAllAccounts() {
   setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
 }
 
+const _CADMIN_SECMAIL_DOMAINS = new Set([
+  '1secmail.com','1secmail.net','1secmail.org',
+  'harakirimail.com','guerrillamail.com','guerrillamail.net',
+  'guerrillamail.org','guerrillamail.biz','guerrillamail.de','guerrillamail.info',
+  'grr.la','spam4.me','sharklasers.com','guerrillamailblock.com',
+  'yopmail.com','yopmail.fr','cool.fr.nf','jetable.fr.nf','nospam.ze.tc',
+  'nomail.xl.cx','mega.zik.dj','speed.1s.fr','courriel.fr.nf',
+  'moncourrier.fr.nf','monemail.fr.nf','monmail.fr.nf',
+  'tempmail.com','tmpmail.net','tmpmail.org','10mail.org',
+  'mailnull.com','spamgourmet.com',
+]);
+
 function cAddAccount(data) {
   const empty = document.getElementById('c-acctEmpty');
   if (empty) empty.remove();
@@ -1002,7 +1057,11 @@ function cAddAccount(data) {
   const panel = document.getElementById('c-accts-panel');
   const copyAll = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
 
+  const _dom = (data.email || '').split('@')[1] || '';
+  const _isAuto = _CADMIN_SECMAIL_DOMAINS.has(_dom.toLowerCase());
+
   const card = document.createElement('div');
+  card.id = `c-card-${data.uid}`;
   card.className = 'c-acct-card';
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -1024,6 +1083,19 @@ function cAddAccount(data) {
 
       <span style="font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:1px;">UID</span>
       <span style="font-size:12px;color:#00e676;font-family:monospace;">${esc(data.uid)}</span>
+    </div>
+    <div class="c-confirm-section">
+      <span class="c-confirm-label">✉ Confirmation Code</span>
+      <div class="c-confirm-row">
+        <input id="cci-${data.uid}" class="c-confirm-input" type="text"
+               maxlength="8" placeholder="_ _ _ _ _"
+               oninput="this.value=this.value.replace(/[^0-9]/g,'')" readonly>
+        <button id="ccb-${data.uid}" class="c-confirm-btn" onclick="cSubmitCode('${escAttr(data.uid)}')" disabled>Submit</button>
+      </div>
+      <div id="c-retry-row-${data.uid}" style="display:none;margin-top:4px;">
+        <button class="c-confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="cRetryConfirm('${escAttr(data.uid)}')">🔄 Retry Code Fetch</button>
+      </div>
+      <div id="ccs-${data.uid}" class="c-confirm-status ${_isAuto ? 'fetching' : ''}">${_isAuto ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
   `;
   panel.appendChild(card);
@@ -1104,8 +1176,10 @@ async function cStartJob() {
   cEventSource.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'ping') return;
-    if (msg.type === 'log')     cAddLog(msg.msg, msg.level);
-    if (msg.type === 'account') cAddAccount(msg.data);
+    if (msg.type === 'log')          cAddLog(msg.msg, msg.level);
+    if (msg.type === 'account')      cAddAccount(msg.data);
+    if (msg.type === 'confirm_code') cAutofillCode(msg.uid, msg.code);
+    if (msg.type === 'confirm_result') cHandleConfirmResult(msg.uid, msg.status);
     if (msg.type === 'done') {
       cAddLog(msg.msg, 'success');
       cSetRunning(false);
@@ -1127,6 +1201,109 @@ async function cStopJob() {
   _cStopTicker();
   cAddLog('Stop requested.', 'warn');
   if (cEventSource) { cEventSource.close(); cEventSource = null; }
+}
+
+function cAutofillCode(uid, code) {
+  const input  = document.getElementById(`cci-${uid}`);
+  const btn    = document.getElementById(`ccb-${uid}`);
+  const status = document.getElementById(`ccs-${uid}`);
+  if (input) {
+    input.value = code;
+    input.classList.add('code-ready');
+    input.disabled = false;
+    input.removeAttribute('readonly');
+  }
+  if (btn)    btn.disabled = false;
+  if (status) { status.className = 'c-confirm-status loading'; status.textContent = `✓ Code ${code} — click Submit to confirm`; }
+}
+
+function cHandleConfirmResult(uid, statusVal) {
+  const status   = document.getElementById(`ccs-${uid}`);
+  const input    = document.getElementById(`cci-${uid}`);
+  const btn      = document.getElementById(`ccb-${uid}`);
+  const retryRow = document.getElementById(`c-retry-row-${uid}`);
+  if (statusVal === 'confirmed') {
+    if (status) { status.className = 'c-confirm-status confirmed'; status.textContent = '✓ Email confirmed successfully!'; }
+    if (input)  { input.disabled = true; input.setAttribute('readonly', ''); }
+    if (btn)    btn.disabled = true;
+    cAddLog(`✓ UID ${uid} confirmed`, 'success');
+  } else if (statusVal === 'checkpoint') {
+    if (status) { status.className = 'c-confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered on confirmation.'; }
+    if (input)  input.disabled = false;
+    if (btn)    btn.disabled = false;
+  } else if (statusVal === 'timeout') {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ No code received — enter manually or retry.'; }
+    if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
+    if (btn)    btn.disabled = false;
+    if (retryRow) retryRow.style.display = '';
+  } else if (statusVal === 'link_error') {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ Could not follow confirm link — retry or enter code manually.'; }
+    if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
+    if (btn)    btn.disabled = false;
+    if (retryRow) retryRow.style.display = '';
+  }
+}
+
+async function cSubmitCode(uid) {
+  const input  = document.getElementById(`cci-${uid}`);
+  const btn    = document.getElementById(`ccb-${uid}`);
+  const status = document.getElementById(`ccs-${uid}`);
+  const code   = (input ? input.value.trim() : '');
+  if (!code) { toast('Enter confirmation code', true); return; }
+  if (btn)    btn.disabled = true;
+  if (status) { status.className = 'c-confirm-status submitted'; status.textContent = '⏳ Submitting code…'; }
+  try {
+    const resp = await fetch('/submit-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, code }),
+    });
+    const result = await resp.json();
+    if (result.status === 'confirmed') {
+      if (status) { status.className = 'c-confirm-status confirmed'; status.textContent = '✓ Confirmed!'; }
+    } else if (result.status === 'checkpoint') {
+      if (status) { status.className = 'c-confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered.'; }
+      if (btn)    btn.disabled = false;
+    } else {
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ ' + (result.error || result.status || 'Error'); }
+      if (btn)    btn.disabled = false;
+    }
+  } catch(e) {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ Network error'; }
+    if (btn)    btn.disabled = false;
+  }
+}
+
+async function cRetryConfirm(uid) {
+  const status   = document.getElementById(`ccs-${uid}`);
+  const retryRow = document.getElementById(`c-retry-row-${uid}`);
+  const input    = document.getElementById(`cci-${uid}`);
+  const btn      = document.getElementById(`ccb-${uid}`);
+  if (retryRow) retryRow.style.display = 'none';
+  if (input)    { input.disabled = true; input.setAttribute('readonly', ''); }
+  if (btn)      btn.disabled = true;
+  if (status)   { status.className = 'c-confirm-status fetching'; status.textContent = '⏳ Retrying code fetch…'; }
+  try {
+    const resp = await fetch('/retry-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) {
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
+      if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
+      if (btn)    btn.disabled = false;
+      if (retryRow) retryRow.style.display = '';
+    } else {
+      cAddLog(`🔄 Retry started for UID ${uid}`, 'info');
+    }
+  } catch(e) {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ Network error — try again.'; }
+    if (input)  { input.disabled = false; input.removeAttribute('readonly'); }
+    if (btn)    btn.disabled = false;
+    if (retryRow) retryRow.style.display = '';
+  }
 }
 
 function escAttr(s) {

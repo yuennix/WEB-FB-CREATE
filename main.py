@@ -2105,110 +2105,123 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
 
     def _poll_harakiri():
         """
-        Poll harakirimail.com inbox page every 5 s for up to 2.5 min.
-        Scrapes https://harakirimail.com/inbox/{login}, follows message links,
-        extracts FB confirmation codes or links, and pushes them to result_queue.
+        Poll harakirimail.com for up to 2.5 min.
+        Real endpoints discovered from /js/inbox-ck.js:
+          - List : GET /api/v1/inbox/{login}  → {emails:[{_id,from,subject,received}]}
+          - Email: GET /email/{_id}           → JSON with html/body/content field
         """
-        _login     = email.split('@')[0]
-        _inbox_url = f'https://harakirimail.com/inbox/{_login}'
-        _hdrs      = {
-            'User-Agent': ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
-                           'AppleWebKit/537.36 (KHTML, like Gecko) '
-                           'Chrome/109.0.5414.118 Mobile Safari/537.36'),
-            'Accept':     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
+        _login    = email.split('@')[0]
+        _deadline = time.time() + 150
+        _seen_ids = set()
+
+        _hdrs = {
+            'User-Agent':     ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
+                               'AppleWebKit/537.36 (KHTML, like Gecko) '
+                               'Chrome/109.0.5414.118 Mobile Safari/537.36'),
+            'Accept':         'application/json',
+            'Accept-Language':'en-US,en;q=0.9',
+            'Referer':        f'https://harakirimail.com/inbox/{_login}',
         }
-        _seen_hrefs = set()
-        _deadline   = time.time() + 150
+
+        def _process_body(_body_str):
+            """Try to extract FB confirm link or numeric code. Returns True if handled."""
+            # 1) Confirmation link
+            _lm = re.search(
+                r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
+                _body_str, re.IGNORECASE
+            )
+            if _lm:
+                _link = _lm.group(0).replace('&amp;', '&').rstrip('.')
+                print(f"{G}  [harakiri] Confirm link → {_link[:60]}{W}")
+                if result_queue:
+                    try:
+                        _lr = ses.get(_link, headers=_ch, timeout=12, allow_redirects=True)
+                        _st = ('checkpoint' if 'checkpoint' in str(_lr.url) else 'confirmed')
+                    except Exception:
+                        _st = 'link_error'
+                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _st})
+                _stop_poll.set()
+                return True
+
+            # 2) Numeric code (5–8 digits, not a year)
+            for _c in re.findall(r'\b([0-9]{5,8})\b', _body_str):
+                if not (1900 <= int(_c) <= 2100):
+                    print(f"{G}  [harakiri] Code → {_c}{W}")
+                    _as = _auto_submit_code(_c)
+                    print(f"{G}  [auto] Result: {_as}{W}")
+                    if result_queue:
+                        if _as == 'confirmed':
+                            result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                              'status': 'confirmed', 'method': 'code'})
+                        elif _as == 'checkpoint':
+                            result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                              'status': 'checkpoint'})
+                        else:
+                            result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                    _stop_poll.set()
+                    return True
+            return False
 
         while time.time() < _deadline and not _stop_poll.is_set():
             try:
-                _r = requests.get(_inbox_url, headers=_hdrs, timeout=12)
+                _r = requests.get(
+                    f'https://harakirimail.com/api/v1/inbox/{_login}',
+                    headers=_hdrs, timeout=15
+                )
                 if _r.status_code == 200:
-                    _soup = BeautifulSoup(_r.text, 'html.parser')
-                    # HarakiriMail inbox: table rows or .email-item elements
-                    _rows = _soup.select('table tr, .email-item, .message-row')
-                    if not _rows:
-                        _rows = _soup.find_all('tr')
+                    _data   = _r.json()
+                    _emails = _data.get('emails') or []
 
-                    for _row in _rows:
-                        if _row.find('th'):
-                            continue
-                        _a = _row.find('a', href=True)
-                        if not _a:
-                            continue
-                        _href = _a.get('href', '').strip()
-                        if not _href or _href in _seen_hrefs:
+                    for _msg in _emails:
+                        _mid = str(_msg.get('_id') or '')
+                        if not _mid or _mid in _seen_ids:
                             continue
 
-                        # Filter to Facebook-related emails only
-                        _cells   = _row.find_all('td')
-                        _from_t  = (_cells[0].get_text(strip=True) if len(_cells) > 0 else '').lower()
-                        _subj_t  = (_cells[1].get_text(strip=True) if len(_cells) > 1 else '').lower()
-                        _is_fb   = ('facebook' in _from_t or 'meta' in _from_t or
-                                    'confirm'  in _subj_t  or 'registration' in _subj_t or
-                                    'code'     in _subj_t  or 'verification' in _subj_t)
-                        _seen_hrefs.add(_href)
+                        _from_t = str(_msg.get('from', '')).lower()
+                        _subj_t = str(_msg.get('subject', '')).lower()
+                        _is_fb  = ('facebook' in _from_t or 'facebookmail' in _from_t
+                                   or 'meta'  in _from_t
+                                   or 'confirm'      in _subj_t
+                                   or 'registration' in _subj_t
+                                   or 'code'         in _subj_t
+                                   or 'verification' in _subj_t)
+                        _seen_ids.add(_mid)
+
                         if not _is_fb:
+                            print(f"  [harakiri] skip non-FB email: {_msg.get('from','')} / {_msg.get('subject','')}")
                             continue
 
-                        # Fetch the individual message page
-                        _msg_url = (_href if _href.startswith('http')
-                                    else f'https://harakirimail.com{_href}')
+                        print(f"{G}  [harakiri] FB email found — id={_mid} subj={_msg.get('subject','')}{W}")
+
+                        # Fetch the full email body via /email/{_id}
+                        _body = ''
                         try:
-                            _mr = requests.get(_msg_url, headers=_hdrs, timeout=12)
-                            if _mr.status_code != 200:
-                                continue
-                            _body = _mr.text
-
-                            # 1) Try FB confirmation link
-                            _lm = re.search(
-                                r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
-                                _body, re.IGNORECASE
+                            _er = requests.get(
+                                f'https://harakirimail.com/email/{_mid}',
+                                headers=_hdrs, timeout=15
                             )
-                            if _lm:
-                                _link = _lm.group(0).replace('&amp;', '&').rstrip('.')
-                                print(f"{G}  [harakiri] Confirm link → {_link[:60]}{W}")
-                                if result_queue:
-                                    try:
-                                        _lr = ses.get(_link, headers=_ch, timeout=12,
-                                                      allow_redirects=True)
-                                        _status = ('checkpoint'
-                                                   if 'checkpoint' in str(_lr.url)
-                                                   else 'confirmed')
-                                    except Exception:
-                                        _status = 'link_error'
-                                    result_queue.put({'type': 'confirm_result',
-                                                      'uid': uid, 'status': _status})
-                                _stop_poll.set()
-                                return
+                            if _er.status_code == 200:
+                                try:
+                                    _ed   = _er.json()
+                                    _body = str(_ed.get('html') or _ed.get('body') or
+                                                _ed.get('content') or _ed.get('text') or '')
+                                    # If all specific fields empty, dump the whole JSON as text
+                                    if not _body:
+                                        _body = _er.text
+                                except Exception:
+                                    _body = _er.text
+                        except Exception as _fe:
+                            print(f"{Y}  [harakiri] email fetch error: {_fe}{W}")
 
-                            # 2) Try numeric confirmation code
-                            _codes = re.findall(r'\b([0-9]{5,8})\b', _body)
-                            for _c in _codes:
-                                if not (1900 <= int(_c) <= 2100):
-                                    print(f"{G}  [harakiri] Code → {_c}{W}")
-                                    # Auto-submit immediately; fall back to manual UI
-                                    print(f"{G}  [auto] Submitting code {_c} for UID {uid}…{W}")
-                                    _as = _auto_submit_code(_c)
-                                    print(f"{G}  [auto] Result: {_as}{W}")
-                                    if result_queue:
-                                        if _as == 'confirmed':
-                                            result_queue.put({'type': 'confirm_result',
-                                                              'uid': uid, 'status': 'confirmed',
-                                                              'method': 'code'})
-                                        elif _as == 'checkpoint':
-                                            result_queue.put({'type': 'confirm_result',
-                                                              'uid': uid, 'status': 'checkpoint'})
-                                        else:
-                                            result_queue.put({'type': 'confirm_code',
-                                                              'uid': uid, 'code': _c})
-                                    _stop_poll.set()
-                                    return
-                        except Exception:
-                            continue
-            except Exception:
-                pass
+                        if _body:
+                            if _process_body(_body):
+                                return
+                        else:
+                            print(f"{Y}  [harakiri] empty body for id={_mid}{W}")
+
+            except Exception as _pe:
+                print(f"{Y}  [harakiri] poll error: {_pe}{W}")
+
             time.sleep(5)
 
         if not _stop_poll.is_set():
