@@ -699,22 +699,24 @@
     color: #475569;
     font-family: monospace;
   }
-  .fb-drawer-close {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.07);
-    color: #475569;
-    cursor: pointer;
+  .fb-drawer-back {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 15px;
+    gap: 7px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    background: rgba(0,230,118,0.08);
+    border: 1px solid rgba(0,230,118,0.2);
+    color: #00e676;
+    cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
     transition: all .15s;
     flex-shrink: 0;
   }
-  .fb-drawer-close:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #f87171; }
+  .fb-drawer-back:hover { background: rgba(0,230,118,0.15); border-color: rgba(0,230,118,0.4); }
+  .fb-drawer-back-arrow { font-size: 17px; line-height: 1; }
 
   .fb-drawer-toolbar {
     display: flex;
@@ -921,10 +923,11 @@
 <div class="fb-drawer-overlay" id="fbDrawerOverlay" onclick="closeConfirmDrawer(event)">
   <div class="fb-drawer" onclick="event.stopPropagation()">
     <div class="fb-drawer-header">
-      <div style="width:26px;height:26px;background:linear-gradient(135deg,#00e676,#00b84c);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">W</div>
-      <span class="fb-drawer-title">Facebook Confirm Page</span>
+      <button class="fb-drawer-back" onclick="closeConfirmDrawer()">
+        <span class="fb-drawer-back-arrow">←</span> Back to Accounts
+      </button>
+      <span class="fb-drawer-title" style="text-align:center;">Facebook Confirm Page</span>
       <span class="fb-drawer-uid" id="fbDrawerUid"></span>
-      <button class="fb-drawer-close" onclick="closeConfirmDrawer()">✕</button>
     </div>
     <div class="fb-drawer-toolbar">
       <button class="fb-drawer-toolbar-btn" onclick="reloadDrawer()">↺ Reload</button>
