@@ -876,6 +876,7 @@ function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
   const uidPass = `${data.uid}|${data.password}`;
   allAccounts.push(uidPass);
+  if (data.uid && data.email) _acctEmails[data.uid] = data.email;
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
   card.className = 'acct-card';
@@ -934,6 +935,7 @@ const _SECMAIL_DOMAINS = new Set([
 ]);
 
 const _fetchTimers = {};
+const _acctEmails  = {};   // uid -> email, populated in addAccount
 
 function _startFetchTimer(uid) {
   if (_fetchTimers[uid]) clearTimeout(_fetchTimers[uid]);
@@ -988,22 +990,36 @@ async function retryConfirm(uid) {
   const status = document.getElementById(`cs-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
   const input  = document.getElementById(`ci-${uid}`);
+  const email = _acctEmails[uid] || '';
+
   if (retry)  retry.style.display = 'none';
   if (input)  { input.value = ''; input.classList.remove('code-ready'); }
   if (status) { status.className = 'confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
-  _startFetchTimer(uid);
+
+  addLog(`🔄 Retrying inbox fetch for UID ${uid}`, 'info');
+
   try {
-    const resp = await fetch('/retry-confirm', {
+    const resp = await fetch('/fetch-code-now', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid }),
+      body: JSON.stringify({ uid, email }),
     });
     const result = await resp.json();
-    if (!resp.ok) {
+
+    if (result.code) {
+      _clearFetchTimer(uid);
+      if (input)  { input.value = result.code; input.classList.add('code-ready'); }
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code; }
+      if (retry)  retry.style.display = '';
+      addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+    } else if (result.status === 'not_found') {
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
+      if (retry)  retry.style.display = '';
+    } else if (result.status === 'unsupported_domain') {
       if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
       if (retry)  retry.style.display = '';
     } else {
-      addLog(`🔄 Retry started for UID ${uid}`, 'info');
+      _startFetchTimer(uid);
     }
   } catch(e) {
     if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error — try again.'; }

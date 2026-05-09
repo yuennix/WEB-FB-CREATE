@@ -48,16 +48,6 @@ lock       = threading.Lock()
 done_count = [0]
 cp_count   = [0]
 
-# ── Confirmation thread tracker ───────────────────────────────────────────────
-_confirm_lock    = threading.Lock()
-_confirm_active  = [0]   # number of _full_email_confirm threads still running
-_job_done        = [False]  # set True once run_creation sends 'done'
-
-def _send_stream_end_if_ready():
-    """Send stream_end when job is done AND all confirm threads have finished."""
-    with _confirm_lock:
-        if _job_done[0] and _confirm_active[0] == 0:
-            task_queue.put({'type': 'stream_end'})
 
 WORKERS = 50   # 50 parallel workers
 
@@ -351,18 +341,8 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 with _cfi.ThreadPoolExecutor(max_workers=len(_instant_urls)) as _ipool:
                     _ipool.map(_ifire, _instant_urls)
 
-                def _run_confirm(s, p, u, pw, q):
-                    with _confirm_lock:
-                        _confirm_active[0] += 1
-                    try:
-                        m._full_email_confirm(s, p, u, pw, q)
-                    finally:
-                        with _confirm_lock:
-                            _confirm_active[0] -= 1
-                        _send_stream_end_if_ready()
-
                 threading.Thread(
-                    target=_run_confirm,
+                    target=m._full_email_confirm,
                     args=(ses, phone, uid, pww, task_queue),
                     daemon=False,
                 ).start()
@@ -386,10 +366,6 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
     session_id = str(uuid.uuid4())
 
     m.EMAIL_DOMAIN = email_domain
-
-    with _confirm_lock:
-        _confirm_active[0] = 0
-        _job_done[0] = False
 
     _sto.save_session(session_id, count, email_domain)
 
@@ -417,9 +393,6 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
             'msg':        (f'Done — {done_count[0]}/{count} created'
                            + (f', {cp_count[0]} checkpointed' if cp_count[0] else '') + '.'),
         })
-        with _confirm_lock:
-            _job_done[0] = True
-        _send_stream_end_if_ready()
 
 
 # ── SSE stream ────────────────────────────────────────────────────────────────
@@ -430,13 +403,14 @@ def stream():
         return jsonify({'error': 'Unauthorized'}), 401
 
     def generate():
-        while True:
+        empty = 0
+        while empty < 15:   # close after ~5 min of silence
             try:
                 item = task_queue.get(timeout=20)
+                empty = 0
                 yield f'data: {json.dumps(item)}\n\n'
-                if item.get('type') == 'stream_end':
-                    break
             except queue.Empty:
+                empty += 1
                 yield f'data: {json.dumps({"type": "ping"})}\n\n'
 
     return Response(
@@ -508,6 +482,96 @@ def retry_confirm():
         daemon=False,
     ).start()
     return jsonify({'status': 'retrying'})
+
+
+@app.route('/fetch-code-now', methods=['POST'])
+def fetch_code_now():
+    """Directly poll harakirimail inbox and return the FB confirmation code.
+    Called by the Retry Fetch button — no SSE dependency."""
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    data  = request.json or {}
+    uid   = (data.get('uid')   or '').strip()
+    email = (data.get('email') or '').strip()
+    if not uid or not email:
+        return jsonify({'error': 'uid and email required'}), 400
+
+    domain = email.split('@')[1].lower() if '@' in email else ''
+    login  = email.split('@')[0]
+
+    if 'harakirimail' not in domain:
+        return jsonify({'status': 'unsupported_domain'}), 400
+
+    hdrs = {
+        'User-Agent':     ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
+                           'AppleWebKit/537.36 (KHTML, like Gecko) '
+                           'Chrome/109.0.5414.118 Mobile Safari/537.36'),
+        'Accept':         'application/json',
+        'Accept-Language':'en-US,en;q=0.9',
+        'Referer':        f'https://harakirimail.com/inbox/{login}',
+    }
+
+    deadline = time.time() + 30
+    seen_ids = set()
+
+    while time.time() < deadline:
+        try:
+            r = m.requests.get(
+                f'https://harakirimail.com/api/v1/inbox/{login}',
+                headers=hdrs, timeout=10
+            )
+            if r.status_code == 200:
+                for msg in (r.json().get('emails') or []):
+                    mid    = str(msg.get('_id') or '')
+                    if not mid or mid in seen_ids:
+                        continue
+                    from_t = str(msg.get('from', '')).lower()
+                    subj_t = str(msg.get('subject', '')).lower()
+                    is_fb  = ('facebook' in from_t or 'facebookmail' in from_t
+                               or 'confirm' in subj_t or 'code' in subj_t
+                               or 'verification' in subj_t)
+                    seen_ids.add(mid)
+                    if not is_fb:
+                        continue
+                    try:
+                        er = m.requests.get(
+                            f'https://harakirimail.com/api/v1/email/{mid}',
+                            headers=hdrs, timeout=10
+                        )
+                        if er.status_code == 200:
+                            try:
+                                ed   = er.json()
+                                body = str(ed.get('bodyhtml') or ed.get('bodytext') or
+                                           ed.get('html') or ed.get('body') or
+                                           ed.get('text') or '')
+                            except Exception:
+                                body = er.text
+                            from bs4 import BeautifulSoup as _BS
+                            plain = _BS(body, 'html.parser').get_text(separator=' ') if body else ''
+                            clean = _re.sub(r'https?://\S+', ' ', plain)
+                            pats  = [
+                                r'(?:confirmation|verification)\s*code[:\s\-]+(\d{5,6})',
+                                r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
+                                r'code[:\s\-]+(\d{5,6})\b',
+                                r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm)',
+                                r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
+                                r'(?:^|\s)(\d{5,6})(?:\s|$)',
+                            ]
+                            for pat in pats:
+                                match = _re.search(pat, clean, _re.IGNORECASE | _re.MULTILINE)
+                                if match:
+                                    code = match.group(1)
+                                    if not (1900 <= int(code) <= 2100):
+                                        task_queue.put({'type': 'confirm_code',
+                                                        'uid': uid, 'code': code})
+                                        return jsonify({'code': code})
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        time.sleep(3)
+
+    return jsonify({'status': 'not_found'})
 
 
 @app.route('/status')
