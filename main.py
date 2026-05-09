@@ -1792,13 +1792,16 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
     After account creation:
     - Custom domains (weyn.store etc): fire resend triggers so FB emails the inbox.
     - 1secmail domains: fire resend triggers + poll inbox + auto-fill code via queue.
+    - harakirimail.com: scrape inbox page + auto-fill code via queue.
     """
     _SECMAIL_DOMAINS = {
         '1secmail.com', '1secmail.net', '1secmail.org',
         'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
     }
+    _HARAKIRI_DOMAINS = {'harakirimail.com'}
     _domain = email.split('@')[1].lower() if '@' in email else ''
-    _is_secmail = _domain in _SECMAIL_DOMAINS
+    _is_secmail   = _domain in _SECMAIL_DOMAINS
+    _is_harakiri  = _domain in _HARAKIRI_DOMAINS
 
     _ch = {
         'User-Agent': FB_LITE_UA,
@@ -1960,10 +1963,117 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             if result_queue:
                 result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
 
+    def _poll_harakiri():
+        """
+        Poll harakirimail.com inbox page every 5 s for up to 2.5 min.
+        Scrapes https://harakirimail.com/inbox/{login}, follows message links,
+        extracts FB confirmation codes or links, and pushes them to result_queue.
+        """
+        _login     = email.split('@')[0]
+        _inbox_url = f'https://harakirimail.com/inbox/{_login}'
+        _hdrs      = {
+            'User-Agent': ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
+                           'AppleWebKit/537.36 (KHTML, like Gecko) '
+                           'Chrome/109.0.5414.118 Mobile Safari/537.36'),
+            'Accept':     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        _seen_hrefs = set()
+        _deadline   = time.time() + 150
+
+        while time.time() < _deadline and not _stop_poll.is_set():
+            try:
+                _r = requests.get(_inbox_url, headers=_hdrs, timeout=12)
+                if _r.status_code == 200:
+                    _soup = BeautifulSoup(_r.text, 'html.parser')
+                    # HarakiriMail inbox: table rows or .email-item elements
+                    _rows = _soup.select('table tr, .email-item, .message-row')
+                    if not _rows:
+                        _rows = _soup.find_all('tr')
+
+                    for _row in _rows:
+                        if _row.find('th'):
+                            continue
+                        _a = _row.find('a', href=True)
+                        if not _a:
+                            continue
+                        _href = _a.get('href', '').strip()
+                        if not _href or _href in _seen_hrefs:
+                            continue
+
+                        # Filter to Facebook-related emails only
+                        _cells   = _row.find_all('td')
+                        _from_t  = (_cells[0].get_text(strip=True) if len(_cells) > 0 else '').lower()
+                        _subj_t  = (_cells[1].get_text(strip=True) if len(_cells) > 1 else '').lower()
+                        _is_fb   = ('facebook' in _from_t or 'meta' in _from_t or
+                                    'confirm'  in _subj_t  or 'registration' in _subj_t or
+                                    'code'     in _subj_t  or 'verification' in _subj_t)
+                        _seen_hrefs.add(_href)
+                        if not _is_fb:
+                            continue
+
+                        # Fetch the individual message page
+                        _msg_url = (_href if _href.startswith('http')
+                                    else f'https://harakirimail.com{_href}')
+                        try:
+                            _mr = requests.get(_msg_url, headers=_hdrs, timeout=12)
+                            if _mr.status_code != 200:
+                                continue
+                            _body = _mr.text
+
+                            # 1) Try FB confirmation link
+                            _lm = re.search(
+                                r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
+                                _body, re.IGNORECASE
+                            )
+                            if _lm:
+                                _link = _lm.group(0).replace('&amp;', '&').rstrip('.')
+                                print(f"{G}  [harakiri] Confirm link → {_link[:60]}{W}")
+                                if result_queue:
+                                    try:
+                                        _lr = ses.get(_link, headers=_ch, timeout=12,
+                                                      allow_redirects=True)
+                                        _status = ('checkpoint'
+                                                   if 'checkpoint' in str(_lr.url)
+                                                   else 'confirmed')
+                                    except Exception:
+                                        _status = 'link_error'
+                                    result_queue.put({'type': 'confirm_result',
+                                                      'uid': uid, 'status': _status})
+                                _stop_poll.set()
+                                return
+
+                            # 2) Try numeric confirmation code
+                            _codes = re.findall(r'\b([0-9]{5,8})\b', _body)
+                            for _c in _codes:
+                                if not (1900 <= int(_c) <= 2100):
+                                    print(f"{G}  [harakiri] Code → {_c}{W}")
+                                    if result_queue:
+                                        result_queue.put({'type': 'confirm_code',
+                                                          'uid': uid, 'code': _c})
+                                    _stop_poll.set()
+                                    return
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+            time.sleep(5)
+
+        if not _stop_poll.is_set():
+            print(f"{Y}  [!] No harakiri code for {email} within 2.5 min{W}")
+            if result_queue:
+                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
+
     try:
         if _is_secmail:
             # Start polling immediately, triggers run in parallel
             _pt = _th2.Thread(target=_poll_secmail, daemon=True)
+            _pt.start()
+            _run_triggers()
+            _pt.join(timeout=150)
+        elif _is_harakiri:
+            # Harakiri: poll inbox page + fire FB resend triggers
+            _pt = _th2.Thread(target=_poll_harakiri, daemon=True)
             _pt.start()
             _run_triggers()
             _pt.join(timeout=150)
