@@ -481,6 +481,136 @@ def status():
     return jsonify({'running': job_running, 'count': len(result_store)})
 
 
+# ── FB Confirm Page Proxy ──────────────────────────────────────────────────────
+
+@app.route('/fb-confirm-proxy/<uid>')
+def fb_confirm_proxy(uid):
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    with _session_lock:
+        entry = _session_store.get(uid)
+
+    if not entry:
+        return '''<!DOCTYPE html><html><body style="background:#050810;color:#f87171;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <div style="text-align:center;"><div style="font-size:32px;margin-bottom:16px;">⚠</div>
+        <div style="font-size:16px;font-weight:600;">Session expired or not found.</div>
+        <div style="font-size:13px;color:#475569;margin-top:8px;">Sessions are kept for 6 hours after account creation.</div></div></body></html>''', 404
+
+    ses = entry['ses']
+    _ch = {
+        'User-Agent': m.FB_LITE_UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+    }
+    try:
+        r = ses.get('https://m.facebook.com/confirmemail.php', headers=_ch, timeout=15, allow_redirects=True)
+        html = r.text
+    except Exception as e:
+        return f'<p style="color:red">Failed to fetch page: {e}</p>', 502
+
+    # Rewrite form action to go through our submit proxy
+    import re as _re2
+    from urllib.parse import urljoin
+
+    # Inject base tag and rewrite form action
+    toolbar = f'''<div id="weyn-toolbar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#0a0f1e;border-bottom:1px solid rgba(0,230,118,0.2);padding:8px 16px;display:flex;align-items:center;gap:12px;font-family:sans-serif;">
+  <div style="width:26px;height:26px;background:linear-gradient(135deg,#00e676,#00b84c);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">W</div>
+  <span style="font-size:12px;font-weight:700;color:#f1f5f9;">WEYN — Confirm Email</span>
+  <span style="font-size:11px;color:#475569;margin-left:4px;">UID: {uid}</span>
+  <span style="margin-left:auto;font-size:11px;color:#334155;">Submitting form will use the account session</span>
+</div>
+<div style="height:45px;"></div>'''
+
+    # Add base tag so relative URLs resolve to Facebook
+    base_tag = '<base href="https://m.facebook.com/">'
+
+    # Rewrite all form actions to our submit endpoint
+    def rewrite_action(match):
+        return f'action="/fb-confirm-proxy/{uid}/submit"'
+
+    html = _re2.sub(r'action="[^"]*"', rewrite_action, html)
+    html = _re2.sub(r"action='[^']*'", lambda m2: f"action='/fb-confirm-proxy/{uid}/submit'", html)
+
+    # Inject base tag and toolbar after <head> and <body>
+    html = _re2.sub(r'(<head[^>]*>)', r'\1' + base_tag, html, count=1, flags=_re2.IGNORECASE)
+    html = _re2.sub(r'(<body[^>]*>)', r'\1' + toolbar, html, count=1, flags=_re2.IGNORECASE)
+
+    return Response(html, mimetype='text/html')
+
+
+@app.route('/fb-confirm-proxy/<uid>/submit', methods=['POST'])
+def fb_confirm_proxy_submit(uid):
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    with _session_lock:
+        entry = _session_store.get(uid)
+
+    if not entry:
+        return '''<!DOCTYPE html><html><body style="background:#050810;color:#f87171;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <div style="text-align:center;"><div style="font-size:32px;">⚠</div>
+        <div style="font-size:14px;font-weight:600;margin-top:12px;">Session expired.</div></div></body></html>''', 404
+
+    ses = entry['ses']
+    form_data = dict(request.form)
+
+    _ph = {
+        'User-Agent': m.FB_LITE_UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': 'https://m.facebook.com',
+        'Referer': 'https://m.facebook.com/confirmemail.php',
+        'upgrade-insecure-requests': '1',
+        'x-requested-with': 'com.facebook.lite',
+    }
+
+    try:
+        resp = ses.post('https://m.facebook.com/confirmemail.php', data=form_data,
+                        headers=_ph, allow_redirects=True, timeout=18)
+        html = resp.text
+        final_url = str(resp.url)
+    except Exception as e:
+        return f'<p style="color:red">Submit error: {e}</p>', 502
+
+    import re as _re2
+
+    # Detect result
+    u = final_url.lower()
+    t = html.lower()
+    if 'checkpoint' in u:
+        result_banner_color = '#fbbf24'
+        result_banner_text = '⚠ Checkpoint triggered — account may need manual review.'
+    elif ('home.php' in u or u.rstrip('/').endswith('facebook.com')
+            or 'confirmed' in t or 'verified' in t or 'thank' in t or 'success' in t):
+        result_banner_color = '#00e676'
+        result_banner_text = '✓ Email confirmed successfully!'
+    else:
+        result_banner_color = '#60a5fa'
+        result_banner_text = '↑ Code submitted — check response below.'
+
+    toolbar = f'''<div id="weyn-toolbar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#0a0f1e;border-bottom:1px solid rgba(0,230,118,0.2);padding:8px 16px;display:flex;align-items:center;gap:12px;font-family:sans-serif;">
+  <div style="width:26px;height:26px;background:linear-gradient(135deg,#00e676,#00b84c);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">W</div>
+  <span style="font-size:12px;font-weight:700;color:{result_banner_color};">{result_banner_text}</span>
+  <button onclick="window.location.href='/fb-confirm-proxy/{uid}'" style="margin-left:auto;padding:5px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#94a3b8;font-size:11px;cursor:pointer;">↩ Back</button>
+</div>
+<div style="height:45px;"></div>'''
+
+    base_tag = '<base href="https://m.facebook.com/">'
+
+    def rewrite_action(match):
+        return f'action="/fb-confirm-proxy/{uid}/submit"'
+
+    html = _re2.sub(r'action="[^"]*"', rewrite_action, html)
+    html = _re2.sub(r"action='[^']*'", lambda m2: f"action='/fb-confirm-proxy/{uid}/submit'", html)
+    html = _re2.sub(r'(<head[^>]*>)', r'\1' + base_tag, html, count=1, flags=_re2.IGNORECASE)
+    html = _re2.sub(r'(<body[^>]*>)', r'\1' + toolbar, html, count=1, flags=_re2.IGNORECASE)
+
+    return Response(html, mimetype='text/html')
+
+
 # ── Confirm code endpoint ──────────────────────────────────────────────────────
 
 from bs4 import BeautifulSoup as _BS4

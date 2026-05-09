@@ -635,6 +635,145 @@
     .main-panel { min-height: 60vh; }
     body { overflow: auto; height: auto; }
   }
+
+  /* ── Confirm Page Drawer ── */
+  .confirm-page-btn {
+    margin-top: 4px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(96,165,250,0.2);
+    background: rgba(96,165,250,0.06);
+    color: #60a5fa;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    width: 100%;
+    letter-spacing: 0.1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .confirm-page-btn:hover {
+    background: rgba(96,165,250,0.13);
+    border-color: rgba(96,165,250,0.4);
+  }
+
+  .fb-drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+  .fb-drawer-overlay.open { display: flex; align-items: flex-end; justify-content: flex-end; }
+
+  .fb-drawer {
+    width: 420px;
+    height: 100vh;
+    background: #0a0f1e;
+    border-left: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -12px 0 48px rgba(0,0,0,0.5);
+    animation: drawerIn .25s ease;
+  }
+  @keyframes drawerIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .fb-drawer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    flex-shrink: 0;
+  }
+  .fb-drawer-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f1f5f9;
+    flex: 1;
+  }
+  .fb-drawer-uid {
+    font-size: 11px;
+    color: #475569;
+    font-family: monospace;
+  }
+  .fb-drawer-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: #475569;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all .15s;
+    flex-shrink: 0;
+  }
+  .fb-drawer-close:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #f87171; }
+
+  .fb-drawer-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+  }
+  .fb-drawer-toolbar-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    color: #475569;
+    font-size: 11px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .fb-drawer-toolbar-btn:hover { background: rgba(255,255,255,0.08); color: #94a3b8; }
+
+  .fb-drawer-iframe {
+    flex: 1;
+    border: none;
+    background: #fff;
+  }
+
+  .fb-drawer-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #0a0f1e;
+    gap: 14px;
+    pointer-events: none;
+    transition: opacity .3s;
+  }
+  .fb-drawer-loading.hidden { opacity: 0; }
+  .fb-spinner {
+    width: 28px; height: 28px;
+    border: 2px solid rgba(0,230,118,0.15);
+    border-top-color: #00e676;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fb-drawer-loading-text { font-size: 12px; color: #475569; font-weight: 500; }
+
+  .fb-drawer-body {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
 </style>
 </head>
 <body>
@@ -781,6 +920,30 @@
   </div>
 </div>
 
+<!-- ── FB Confirm Page Drawer ── -->
+<div class="fb-drawer-overlay" id="fbDrawerOverlay" onclick="closeConfirmDrawer(event)">
+  <div class="fb-drawer" onclick="event.stopPropagation()">
+    <div class="fb-drawer-header">
+      <div style="width:26px;height:26px;background:linear-gradient(135deg,#00e676,#00b84c);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">W</div>
+      <span class="fb-drawer-title">Facebook Confirm Page</span>
+      <span class="fb-drawer-uid" id="fbDrawerUid"></span>
+      <button class="fb-drawer-close" onclick="closeConfirmDrawer()">✕</button>
+    </div>
+    <div class="fb-drawer-toolbar">
+      <button class="fb-drawer-toolbar-btn" onclick="reloadDrawer()">↺ Reload</button>
+      <button class="fb-drawer-toolbar-btn" onclick="openDrawerNewTab()">↗ Open in new tab</button>
+    </div>
+    <div class="fb-drawer-body">
+      <div class="fb-drawer-loading" id="fbDrawerLoading">
+        <div class="fb-spinner"></div>
+        <span class="fb-drawer-loading-text">Loading Facebook confirm page…</span>
+      </div>
+      <iframe class="fb-drawer-iframe" id="fbDrawerIframe" src="about:blank"
+              onload="onDrawerLoad()"></iframe>
+    </div>
+  </div>
+</div>
+
 <script>
 let eventSource = null;
 let createdCount = 0;
@@ -911,6 +1074,9 @@ function addAccount(data) {
                 onclick="submitCode('${escAttr(data.uid)}')">Submit</button>
       </div>
       <div id="${statusId}" class="confirm-status ${_isSecmail ? 'fetching' : ''}">${_isSecmail ? '⏳ Fetching code from inbox…' : ''}</div>
+      <button class="confirm-page-btn" onclick="openConfirmDrawer('${escAttr(data.uid)}')">
+        🌐 Open Facebook Confirm Page
+      </button>
     </div>
     <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
@@ -1146,6 +1312,52 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
+
+// ── FB Confirm Drawer ──────────────────────────────────────────────────────────
+let _drawerUid = null;
+
+function openConfirmDrawer(uid) {
+  _drawerUid = uid;
+  const overlay  = document.getElementById('fbDrawerOverlay');
+  const iframe   = document.getElementById('fbDrawerIframe');
+  const loading  = document.getElementById('fbDrawerLoading');
+  const uidLabel = document.getElementById('fbDrawerUid');
+
+  uidLabel.textContent = 'UID: ' + uid;
+  loading.classList.remove('hidden');
+  iframe.src = `/fb-confirm-proxy/${uid}`;
+  overlay.classList.add('open');
+}
+
+function closeConfirmDrawer(e) {
+  if (e && e.target !== document.getElementById('fbDrawerOverlay')) return;
+  const overlay = document.getElementById('fbDrawerOverlay');
+  const iframe  = document.getElementById('fbDrawerIframe');
+  overlay.classList.remove('open');
+  iframe.src = 'about:blank';
+  _drawerUid = null;
+}
+
+function onDrawerLoad() {
+  const loading = document.getElementById('fbDrawerLoading');
+  const iframe  = document.getElementById('fbDrawerIframe');
+  if (iframe.src !== 'about:blank') {
+    loading.classList.add('hidden');
+  }
+}
+
+function reloadDrawer() {
+  if (!_drawerUid) return;
+  const iframe  = document.getElementById('fbDrawerIframe');
+  const loading = document.getElementById('fbDrawerLoading');
+  loading.classList.remove('hidden');
+  iframe.src = `/fb-confirm-proxy/${_drawerUid}`;
+}
+
+function openDrawerNewTab() {
+  if (!_drawerUid) return;
+  window.open(`/fb-confirm-proxy/${_drawerUid}`, '_blank');
+}
 </script>
 </body>
 </html>
