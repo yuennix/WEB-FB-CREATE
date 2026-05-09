@@ -1210,7 +1210,8 @@ function cAutofillCode(uid, code) {
   if (input)  { input.value = code; input.classList.add('code-ready'); }
   if (status) { status.className = 'c-confirm-status loading'; status.textContent = `✉ Code fetched: ${code}`; }
   if (retry)  retry.style.display = '';
-  cAddLog(`✉ Code ${code} fetched for UID ${uid}`, 'success');
+  navigator.clipboard.writeText(code).catch(() => {});
+  cAddLog(`✉ Code ${code} fetched & copied for UID ${uid}`, 'success');
 }
 
 function cHandleConfirmResult(uid, statusVal) {
@@ -1257,7 +1258,8 @@ async function cRetryConfirm(uid) {
       if (input)  { input.value = result.code; input.classList.add('code-ready'); }
       if (status) { status.className = 'c-confirm-status loading'; status.textContent = '✉ Code fetched: ' + result.code; }
       if (retry)  retry.style.display = '';
-      cAddLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+      navigator.clipboard.writeText(result.code).catch(() => {});
+      cAddLog(`✉ Code ${result.code} fetched & copied for UID ${uid}`, 'success');
     } else if (result.status === 'not_found') {
       if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
       if (retry)  retry.style.display = '';

@@ -893,7 +893,10 @@ function addAccount(data) {
     </div>
     <div class="acct-row">
       <span class="acct-field-label">Email</span>
-      <span class="acct-field-value acct-email">${escHtml(data.email)}</span>
+      <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
+        <span class="acct-field-value acct-email" style="flex:1;">${escHtml(data.email)}</span>
+        <button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${escAttr(data.email)}')">Copy</button>
+      </div>
     </div>
     <div class="acct-row">
       <span class="acct-field-label">Password</span>
@@ -961,7 +964,8 @@ function autofillCode(uid, code) {
   if (input)  { input.value = code; input.classList.add('code-ready'); }
   if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + code; }
   if (retry)  retry.style.display = '';
-  addLog(`✉ Code ${code} fetched for UID ${uid}`, 'success');
+  navigator.clipboard.writeText(code).catch(() => {});
+  addLog(`✉ Code ${code} fetched & copied for UID ${uid}`, 'success');
   switchTab('accounts');
 }
 
@@ -1011,7 +1015,8 @@ async function retryConfirm(uid) {
       if (input)  { input.value = result.code; input.classList.add('code-ready'); }
       if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code; }
       if (retry)  retry.style.display = '';
-      addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+      navigator.clipboard.writeText(result.code).catch(() => {});
+      addLog(`✉ Code ${result.code} fetched & copied for UID ${uid}`, 'success');
     } else if (result.status === 'not_found') {
       if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
       if (retry)  retry.style.display = '';
