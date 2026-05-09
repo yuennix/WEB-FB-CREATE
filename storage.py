@@ -213,7 +213,7 @@ def save_account(session_id, uid, password, name='', email=''):
     else:
         try:
             with open('weynFBCreate.txt', 'a') as f:
-                f.write(f"{name}|{email}|{uid}|{password}\n")
+                f.write(f"{uid}|{password}\n")
         except Exception as e:
             print(f'[storage] save_account file error: {e}')
 
@@ -248,7 +248,7 @@ def get_accounts_text():
                     lines.append(f"\n{'='*60}")
                     lines.append(f" SESSION {ts} | {count} account(s) | {domain}")
                     lines.append('='*60)
-                lines.append(f"{name}|{email}|{uid}|{password}")
+                lines.append(f"{uid}|{password}")
             return '\n'.join(lines)
         except Exception as e:
             print(f'[storage] get_accounts_text error: {e}')
@@ -272,7 +272,7 @@ def get_accounts_list():
             rows = cur.fetchall()
             cur.close()
             conn.close()
-            return [f"{name}|{email}|{uid}|{password}" for uid, password, name, email in rows]
+            return [f"{uid}|{password}" for uid, password, name, email in rows]
         except Exception as e:
             print(f'[storage] get_accounts_list error: {e}')
             return []
