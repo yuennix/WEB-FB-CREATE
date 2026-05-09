@@ -2165,23 +2165,13 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             _clean = re.sub(r'\s+', ' ', _clean)
 
             def _try_code(_c):
-                """Submit/emit a candidate code. Returns True if we should stop."""
+                """Emit code to UI for display. Returns True if we should stop polling."""
                 _n = int(_c)
-                # Reject years and values that are almost certainly not FB codes
                 if 1900 <= _n <= 2100:
                     return False
-                print(f"{G}  [harakiri] Code → {_c}{W}")
-                _as = _auto_submit_code(_c)
-                print(f"{G}  [auto] Result: {_as}{W}")
+                print(f"{G}  [harakiri] Code fetched → {_c}{W}")
                 if result_queue:
-                    if _as == 'confirmed':
-                        result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                          'status': 'confirmed', 'method': 'code'})
-                    elif _as == 'checkpoint':
-                        result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                          'status': 'checkpoint'})
-                    else:
-                        result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                    result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                 _stop_poll.set()
                 return True
 
@@ -2270,7 +2260,7 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             except Exception as _pe:
                 print(f"{Y}  [harakiri] poll error: {_pe}{W}")
 
-            time.sleep(5)
+            time.sleep(3)
 
         if not _stop_poll.is_set():
             print(f"{Y}  [!] No harakiri code for {email} within 2.5 min{W}")
