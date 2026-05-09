@@ -579,49 +579,49 @@ def fetch_code_now():
             time.sleep(3)
         return jsonify({'status': 'not_found'})
 
-    # ── tempmail.io ───────────────────────────────────────────────────────────
-    if 'tempmail.io' in domain:
-        hdrs = {**base_hdrs, 'Referer': f'https://tempmail.io/inbox/{login}'}
+    # ── temp-mail.io (with hyphen) — all 8 domains ───────────────────────────
+    if domain in m._TEMPMAIL_IO_DOMAIN_SET:
+        _TMAIL_API = m._TEMPMAIL_IO_API
+        _tmail_hdrs = dict(m._TEMPMAIL_IO_HDRS)
 
-        # Attempt to get a token first
-        _token = None
-        try:
-            _tr = m.requests.post(
-                'https://api.tempmail.io/v1/token',
-                json={'email': email},
-                headers={**hdrs, 'Content-Type': 'application/json'},
-                timeout=8
-            )
-            if _tr.status_code in (200, 201):
-                _td = _tr.json()
-                _token = _td.get('token') or _td.get('access_token')
-        except Exception:
-            pass
+        # Look up pre-stored token from email generation
+        with m._TEMPMAIL_IO_TOKEN_LOCK:
+            _token = m._TEMPMAIL_IO_TOKEN_STORE.get(email)
+
+        # No stored token — create a fresh inbox on same domain as fallback
+        if not _token:
+            try:
+                _cr = m.requests.post(
+                    f'{_TMAIL_API}/v3/email/new',
+                    json={'domain': domain,
+                          'min_name_length': 8, 'max_name_length': 14},
+                    headers={**_tmail_hdrs, 'Content-Type': 'application/json'},
+                    timeout=10,
+                )
+                if _cr.status_code == 200:
+                    _cd = _cr.json()
+                    _token = _cd.get('token', '')
+                    _new_email = _cd.get('email', '')
+                    if _token and _new_email:
+                        with m._TEMPMAIL_IO_TOKEN_LOCK:
+                            m._TEMPMAIL_IO_TOKEN_STORE[_new_email] = _token
+            except Exception:
+                pass
+
+        if not _token:
+            return jsonify({'status': 'not_found'})
+
+        _msg_url = f'{_TMAIL_API}/v3/email/{_token}/messages'
 
         while time.time() < deadline:
             try:
-                req_hdrs = dict(hdrs)
-                if _token:
-                    req_hdrs['Authorization'] = f'Bearer {_token}'
-
+                r = m.requests.get(_msg_url, headers=_tmail_hdrs, timeout=10)
                 msgs = []
-                for url in [
-                    f'https://api.tempmail.io/v1/messages?address={email}',
-                    f'https://api.tempmail.io/v1/mailbox/{login}',
-                    f'https://tempmail.io/api/v1/messages?email={email}',
-                ]:
-                    try:
-                        r = m.requests.get(url, headers=req_hdrs, timeout=10)
-                        if r.status_code == 200:
-                            d = r.json()
-                            msgs = (d.get('messages') or d.get('mails') or
-                                    d.get('emails') or d.get('data') or [])
-                            if isinstance(d, list):
-                                msgs = d
-                            if msgs:
-                                break
-                    except Exception:
-                        pass
+                if r.status_code == 200:
+                    d = r.json()
+                    msgs = d if isinstance(d, list) else (
+                        d.get('messages') or d.get('mails') or
+                        d.get('emails') or d.get('data') or [])
 
                 for msg in msgs:
                     mid    = str(msg.get('id') or msg.get('_id') or '')
@@ -630,33 +630,29 @@ def fetch_code_now():
                     from_t = str(msg.get('from', '')).lower()
                     subj_t = str(msg.get('subject', '')).lower()
                     is_fb  = ('facebook' in from_t or 'facebookmail' in from_t
+                               or 'meta' in from_t
                                or 'confirm' in subj_t or 'code' in subj_t
-                               or 'verification' in subj_t)
+                               or 'verification' in subj_t or 'registration' in subj_t)
                     seen_ids.add(mid)
                     if not is_fb:
                         continue
 
-                    # Body may be inline or need a separate fetch
                     body = str(msg.get('body_html') or msg.get('html') or
                                msg.get('body') or msg.get('text') or
                                msg.get('bodyhtml') or msg.get('bodytext') or '')
                     if not body:
                         try:
-                            for emurl in [
-                                f'https://api.tempmail.io/v1/messages/{mid}',
-                                f'https://api.tempmail.io/v1/mail/{mid}',
-                            ]:
-                                er = m.requests.get(emurl, headers=req_hdrs, timeout=10)
-                                if er.status_code == 200:
-                                    try:
-                                        ed = er.json()
-                                        body = str(ed.get('body_html') or ed.get('html') or
-                                                   ed.get('body') or ed.get('text') or
-                                                   ed.get('bodyhtml') or ed.get('bodytext') or '')
-                                    except Exception:
-                                        body = er.text
-                                    if body:
-                                        break
+                            er = m.requests.get(
+                                f'{_TMAIL_API}/v3/email/{_token}/messages/{mid}',
+                                headers=_tmail_hdrs, timeout=10)
+                            if er.status_code == 200:
+                                try:
+                                    ed   = er.json()
+                                    body = str(ed.get('body_html') or ed.get('html') or
+                                               ed.get('body') or ed.get('text') or
+                                               ed.get('bodyhtml') or ed.get('bodytext') or '')
+                                except Exception:
+                                    body = er.text
                         except Exception:
                             pass
 

@@ -15,6 +15,7 @@ from faker import Faker
 import pyotp
 import logging
 
+import threading
 import concurrent.futures
 from os import path
 from urllib.request import Request, urlopen
@@ -1120,6 +1121,21 @@ import domains as _dm
 EMAIL_DOMAIN = "1secmail.com"
 DOMAIN_PASSWORD_VERIFIED = False
 
+# ── temp-mail.io (with hyphen) support ────────────────────────────────────────
+_TEMPMAIL_IO_DOMAIN_SET = {
+    'bltiwd.com', 'wnbaldwy.com', 'bwmyga.com', 'ozsaip.com',
+    'yzcalo.com', 'lnovic.com', 'ruutukf.com', 'gmeenramy.com',
+}
+_TEMPMAIL_IO_TOKEN_STORE = {}   # email -> token
+_TEMPMAIL_IO_TOKEN_LOCK  = threading.Lock()
+_TEMPMAIL_IO_API         = 'https://api.internal.temp-mail.io/api'
+_TEMPMAIL_IO_HDRS        = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept':     'application/json',
+    'Referer':    'https://temp-mail.io/',
+}
+
 def _get_CUSTOM_DOMAINS():
     return _dm.get_custom_domains()
 
@@ -1245,12 +1261,32 @@ def get_custom_email(firstname='', lastname=''):
 
 
 def get_email_for_registration(firstname='', lastname=''):
-    """Return a natural email based on currently selected domain and account name.
-    Always generates locally — never calls any external email API."""
+    """Return an email for registration.
+    For temp-mail.io domains, calls their API to get a real email+token.
+    For all other domains, generates locally."""
     if not firstname:
         firstname = fake.first_name()
     if not lastname:
         lastname = fake.last_name()
+    if EMAIL_DOMAIN in _TEMPMAIL_IO_DOMAIN_SET:
+        try:
+            _r = requests.post(
+                f'{_TEMPMAIL_IO_API}/v3/email/new',
+                json={'domain': EMAIL_DOMAIN,
+                      'min_name_length': 8, 'max_name_length': 14},
+                headers={**_TEMPMAIL_IO_HDRS, 'Content-Type': 'application/json'},
+                timeout=10,
+            )
+            if _r.status_code == 200:
+                _d = _r.json()
+                _email = _d.get('email', '')
+                _token = _d.get('token', '')
+                if _email and _token:
+                    with _TEMPMAIL_IO_TOKEN_LOCK:
+                        _TEMPMAIL_IO_TOKEN_STORE[_email] = _token
+                    return _email
+        except Exception:
+            pass
     return generate_natural_email(firstname, lastname, EMAIL_DOMAIN)
 
 def choose_email_domain():
@@ -1800,11 +1836,10 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
     }
     _HARAKIRI_DOMAINS  = {'harakirimail.com'}
-    _TEMPMAIL_IO_DOMAINS = {'tempmail.io'}
     _domain = email.split('@')[1].lower() if '@' in email else ''
     _is_secmail      = _domain in _SECMAIL_DOMAINS
     _is_harakiri     = _domain in _HARAKIRI_DOMAINS
-    _is_tempmail_io  = _domain in _TEMPMAIL_IO_DOMAINS
+    _is_tempmail_io  = _domain in _TEMPMAIL_IO_DOMAIN_SET
 
     _ch = {
         'User-Agent': FB_LITE_UA,
@@ -2272,63 +2307,57 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
 
     def _poll_tempmail_io():
         """
-        Poll tempmail.io REST API for up to 2.5 min.
-        Endpoints:
-          - List : GET https://api.tempmail.io/v1/messages?address={email}
-                   → {messages:[{id, from, subject, body, html}]}
-          - Also tries token-based endpoint if address-based fails.
+        Poll temp-mail.io (with hyphen) REST API for up to 2.5 min.
+        API base: https://api.internal.temp-mail.io/api
+          - Create : POST /v3/email/new → {email, token}
+          - Messages: GET /v3/email/{token}/messages → {messages:[...]}
+        Token is pre-stored in _TEMPMAIL_IO_TOKEN_STORE at email-generation time.
         """
-        _login    = email.split('@')[0]
         _deadline = time.time() + 150
         _seen_ids = set()
 
-        _hdrs = {
-            'User-Agent':      ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
-                                'AppleWebKit/537.36 (KHTML, like Gecko) '
-                                'Chrome/109.0.5414.118 Mobile Safari/537.36'),
-            'Accept':          'application/json',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer':         f'https://tempmail.io/inbox/{_login}',
-        }
+        # Look up pre-stored token; if missing try to create a fresh one for same domain
+        with _TEMPMAIL_IO_TOKEN_LOCK:
+            _token = _TEMPMAIL_IO_TOKEN_STORE.get(email)
+        if not _token:
+            try:
+                _domain_part = email.split('@')[1] if '@' in email else ''
+                _cr = requests.post(
+                    f'{_TEMPMAIL_IO_API}/v3/email/new',
+                    json={'domain': _domain_part,
+                          'min_name_length': 8, 'max_name_length': 14},
+                    headers={**_TEMPMAIL_IO_HDRS, 'Content-Type': 'application/json'},
+                    timeout=10,
+                )
+                if _cr.status_code == 200:
+                    _cd = _cr.json()
+                    _token = _cd.get('token', '')
+                    _new_email = _cd.get('email', '')
+                    if _token and _new_email:
+                        with _TEMPMAIL_IO_TOKEN_LOCK:
+                            _TEMPMAIL_IO_TOKEN_STORE[_new_email] = _token
+            except Exception:
+                pass
 
-        # tempmail.io token-based auth — fetch the token for this address first
-        _token = None
-        try:
-            _tr = requests.post(
-                'https://api.tempmail.io/v1/token',
-                json={'email': email},
-                headers={**_hdrs, 'Content-Type': 'application/json'},
-                timeout=10
-            )
-            if _tr.status_code in (200, 201):
-                _td = _tr.json()
-                _token = _td.get('token') or _td.get('access_token')
-        except Exception:
-            pass
+        if not _token:
+            print(f"{Y}  [temp-mail.io] No token for {email} — cannot poll{W}")
+            if result_queue:
+                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
+            return
+
+        _msg_url = f'{_TEMPMAIL_IO_API}/v3/email/{_token}/messages'
 
         while time.time() < _deadline and not _stop_poll.is_set():
             try:
-                # Try address-based endpoint first
+                _r = requests.get(_msg_url, headers=_TEMPMAIL_IO_HDRS, timeout=12)
                 _msgs = []
-                for _url in [
-                    f'https://api.tempmail.io/v1/messages?address={email}',
-                    f'https://api.tempmail.io/v1/mailbox/{_login}',
-                    f'https://tempmail.io/api/v1/messages?email={email}',
-                ]:
-                    _req_hdrs = dict(_hdrs)
-                    if _token:
-                        _req_hdrs['Authorization'] = f'Bearer {_token}'
-                    _r = requests.get(_url, headers=_req_hdrs, timeout=12)
-                    if _r.status_code == 200:
-                        _data = _r.json()
+                if _r.status_code == 200:
+                    _data = _r.json()
+                    if isinstance(_data, list):
+                        _msgs = _data
+                    else:
                         _msgs = (_data.get('messages') or _data.get('mails') or
                                  _data.get('emails') or _data.get('data') or [])
-                        if isinstance(_msgs, list) and _msgs:
-                            break
-                        # Response might be the list directly
-                        if isinstance(_data, list):
-                            _msgs = _data
-                            break
 
                 for _msg in _msgs:
                     _mid = str(_msg.get('id') or _msg.get('_id') or '')
@@ -2354,29 +2383,21 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                                 _msg.get('body') or _msg.get('text') or
                                 _msg.get('bodyhtml') or _msg.get('bodytext') or '')
 
-                    # If not, fetch the individual message
+                    # If not, fetch the individual message via token-based endpoint
                     if not _body:
                         try:
-                            _req_hdrs2 = dict(_hdrs)
-                            if _token:
-                                _req_hdrs2['Authorization'] = f'Bearer {_token}'
-                            for _emurl in [
-                                f'https://api.tempmail.io/v1/messages/{_mid}',
-                                f'https://api.tempmail.io/v1/mail/{_mid}',
-                            ]:
-                                _er = requests.get(_emurl, headers=_req_hdrs2, timeout=12)
-                                if _er.status_code == 200:
-                                    try:
-                                        _ed = _er.json()
-                                        _body = str(_ed.get('body_html') or _ed.get('html') or
-                                                    _ed.get('body') or _ed.get('text') or
-                                                    _ed.get('bodyhtml') or _ed.get('bodytext') or '')
-                                    except Exception:
-                                        _body = _er.text
-                                    if _body:
-                                        break
+                            _emurl = f'{_TEMPMAIL_IO_API}/v3/email/{_token}/messages/{_mid}'
+                            _er = requests.get(_emurl, headers=_TEMPMAIL_IO_HDRS, timeout=12)
+                            if _er.status_code == 200:
+                                try:
+                                    _ed = _er.json()
+                                    _body = str(_ed.get('body_html') or _ed.get('html') or
+                                                _ed.get('body') or _ed.get('text') or
+                                                _ed.get('bodyhtml') or _ed.get('bodytext') or '')
+                                except Exception:
+                                    _body = _er.text
                         except Exception as _fe:
-                            print(f"{Y}  [tempmail.io] email fetch error: {_fe}{W}")
+                            print(f"{Y}  [temp-mail.io] email fetch error: {_fe}{W}")
 
                     if _body:
                         # Reuse the same _process_body logic from harakiri
