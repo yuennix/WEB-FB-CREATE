@@ -2193,19 +2193,21 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
 
                         print(f"{G}  [harakiri] FB email found — id={_mid} subj={_msg.get('subject','')}{W}")
 
-                        # Fetch the full email body via /email/{_id}
+                        # Fetch the full email body via /api/v1/email/{_id}
+                        # Fields per main-ck.js: bodyhtml, bodytext
                         _body = ''
                         try:
                             _er = requests.get(
-                                f'https://harakirimail.com/email/{_mid}',
+                                f'https://harakirimail.com/api/v1/email/{_mid}',
                                 headers=_hdrs, timeout=15
                             )
                             if _er.status_code == 200:
                                 try:
                                     _ed   = _er.json()
-                                    _body = str(_ed.get('html') or _ed.get('body') or
-                                                _ed.get('content') or _ed.get('text') or '')
-                                    # If all specific fields empty, dump the whole JSON as text
+                                    # Prefer HTML body (has links/codes), fall back to plain text
+                                    _body = str(_ed.get('bodyhtml') or _ed.get('bodytext') or
+                                                _ed.get('html') or _ed.get('body') or
+                                                _ed.get('text') or '')
                                     if not _body:
                                         _body = _er.text
                                 except Exception:
