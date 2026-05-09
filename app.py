@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import queue
+import secrets as _secrets
 import threading
 import re as _re
 import random as _random
@@ -32,7 +33,17 @@ def _get_stable_secret():
     return key
 
 app.secret_key = _get_stable_secret()
-app.permanent_session_lifetime = _dt.timedelta(days=30)
+
+
+# ── Webhook secret ────────────────────────────────────────────────────────────
+
+def _get_webhook_secret():
+    rec = _sto.load('webhook_secret', None)
+    if rec and isinstance(rec, dict) and rec.get('token'):
+        return rec['token']
+    token = _secrets.token_urlsafe(32)
+    _sto.save('webhook_secret', {'token': token})
+    return token
 
 # ── Global job state ─────────────────────────────────────────────────────────
 task_queue   = queue.Queue()
@@ -792,12 +803,29 @@ def admin_add_custom():
     if not _require_admin():
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.json or {}
-    domain = (data.get('domain') or '').strip().lower()
-    imap_pass = (data.get('imap_pass') or '').strip()
+    domain      = (data.get('domain')      or '').strip().lower()
+    imap_pass   = (data.get('imap_pass')   or '').strip()
+    domain_type = (data.get('domain_type') or 'imap').strip()
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
-    ok = dm.add_custom_domain(domain, imap_pass)
+    ok = dm.add_custom_domain(domain, imap_pass, domain_type=domain_type)
     return jsonify({'status': 'added' if ok else 'exists'})
+
+
+@app.route('/admin/api/webhook-secret')
+def admin_webhook_secret():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify({'token': _get_webhook_secret()})
+
+
+@app.route('/admin/api/webhook-secret/regenerate', methods=['POST'])
+def admin_webhook_secret_regenerate():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    token = _secrets.token_urlsafe(32)
+    _sto.save('webhook_secret', {'token': token})
+    return jsonify({'token': token})
 
 @app.route('/admin/api/domains/remove', methods=['POST'])
 def admin_remove_domain():
@@ -816,6 +844,144 @@ def admin_set_dm_password():
         return jsonify({'error': 'Password is required'}), 400
     dm.set_domain_password(pw)
     return jsonify({'status': 'updated'})
+
+
+# ── Webhook email receiver ────────────────────────────────────────────────────
+
+@app.route('/webhook/email', methods=['POST'])
+def webhook_email():
+    """
+    Receive incoming emails via webhook from mail providers.
+    Expects ?secret=TOKEN plus a JSON or form-encoded body with:
+      to / recipient / To   — destination address
+      subject / Subject
+      html / body-html / HtmlBody / body / text / body-plain / TextBody  — email body
+    Supported providers: Mailgun, SendGrid, Postmark, and any generic JSON sender.
+    """
+    secret = request.args.get('secret', '')
+    if not secret or secret != _get_webhook_secret():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # ── Parse body (JSON or form) ──────────────────────────────────────────
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    else:
+        data = request.form.to_dict()
+
+    def _pick(*keys):
+        for k in keys:
+            v = data.get(k) or data.get(k.lower()) or data.get(k.upper())
+            if v:
+                return str(v).strip()
+        return ''
+
+    to_addr = _pick('to', 'recipient', 'To', 'Recipient', 'delivered-to')
+    subject = _pick('subject', 'Subject')
+    body    = _pick('html', 'body-html', 'HtmlBody', 'bodyHtml',
+                    'body', 'text', 'body-plain', 'TextBody', 'bodyText')
+
+    if not to_addr or not body:
+        return jsonify({'error': 'Missing to or body'}), 400
+
+    # Normalise — strip display name if present: "Name <addr>" → "addr"
+    m_addr = _re.search(r'<([^>]+)>', to_addr)
+    email  = m_addr.group(1).strip().lower() if m_addr else to_addr.strip().lower()
+
+    # ── Find the account session matching this email ───────────────────────
+    uid = None
+    with _session_lock:
+        for _uid, entry in _session_store.items():
+            if entry.get('email', '').lower() == email:
+                uid = _uid
+                break
+
+    code = _extract_code_from_body(body)
+
+    # ── Also check for a direct FB confirmation link ───────────────────────
+    link_match = _re.search(
+        r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
+        body, _re.IGNORECASE
+    )
+    fb_link = link_match.group(0).replace('&amp;', '&').rstrip('.') if link_match else None
+
+    if not code and not fb_link:
+        return jsonify({'status': 'no_code_found'}), 200
+
+    if uid:
+        ses_entry = None
+        with _session_lock:
+            ses_entry = _session_store.get(uid)
+
+        if code:
+            task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+            # Auto-submit the code using the stored session
+            if ses_entry:
+                def _submit(ses, c, u):
+                    try:
+                        _ch = {
+                            'User-Agent': m.FB_LITE_UA,
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Accept-Encoding': 'gzip, deflate, br',
+                            'x-requested-with': 'com.facebook.lite',
+                        }
+                        for _url in [
+                            'https://m.facebook.com/confirmemail.php',
+                            'https://m.facebook.com/confirmemail.php?soft=hjk',
+                        ]:
+                            try:
+                                from bs4 import BeautifulSoup as _BS
+                                _r = ses.get(_url, headers=_ch, timeout=12, allow_redirects=True)
+                                if _r.status_code != 200:
+                                    continue
+                                _soup = _BS(_r.text, 'html.parser')
+                                _form = _soup.find('form')
+                                if not _form:
+                                    continue
+                                _act = _form.get('action', _url)
+                                if _act and not _act.startswith('http'):
+                                    _act = 'https://m.facebook.com' + _act
+                                _fd = {i.get('name'): i.get('value', '')
+                                       for i in _form.find_all('input') if i.get('name')}
+                                _fd['code'] = c
+                                _pr = ses.post(_act, data=_fd, headers={
+                                    **_ch,
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                    'Origin': 'https://m.facebook.com',
+                                    'Referer': _url,
+                                }, timeout=12, allow_redirects=True)
+                                _final = str(_pr.url).lower()
+                                if 'checkpoint' in _final:
+                                    task_queue.put({'type': 'confirm_result', 'uid': u, 'status': 'checkpoint'})
+                                elif ('home.php' in _final or _final.rstrip('/').endswith('facebook.com')
+                                        or 'confirmed' in _pr.text.lower()):
+                                    task_queue.put({'type': 'confirm_result', 'uid': u,
+                                                    'status': 'confirmed', 'method': 'webhook'})
+                                return
+                            except Exception:
+                                continue
+                    except Exception:
+                        pass
+                threading.Thread(target=_submit, args=(ses_entry['ses'], code, uid), daemon=True).start()
+
+        elif fb_link:
+            if ses_entry:
+                def _follow_link(ses, link, u):
+                    try:
+                        _ih = {'User-Agent': m.FB_LITE_UA, 'Accept-Language': 'en-US,en;q=0.9'}
+                        r = ses.get(link, headers=_ih, timeout=12, allow_redirects=True)
+                        st = 'checkpoint' if 'checkpoint' in str(r.url) else 'confirmed'
+                    except Exception:
+                        st = 'link_error'
+                    task_queue.put({'type': 'confirm_result', 'uid': u, 'status': st})
+                threading.Thread(target=_follow_link, args=(ses_entry['ses'], fb_link, uid), daemon=True).start()
+
+    return jsonify({
+        'status': 'ok',
+        'email':  email,
+        'uid':    uid or 'not_found',
+        'code':   code or ('link' if fb_link else None),
+    })
 
 
 if __name__ == '__main__':

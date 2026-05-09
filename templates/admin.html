@@ -582,13 +582,42 @@
       <div id="tempDomainList" class="domain-section"></div>
     </div>
     <div>
-      <div class="section-label">Custom Domains — IMAP</div>
+      <div class="section-label">Custom Domains</div>
       <div class="custom-domain-form">
         <input type="text" id="newCustomDomain" placeholder="Domain  e.g. weyn.store">
-        <input type="password" id="newCustomPass" placeholder="IMAP password (optional — leave blank if none)">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label style="font-size:11px;color:#64748b;white-space:nowrap;font-weight:600;">Type:</label>
+          <select id="newCustomType" onchange="onCustomTypeChange()" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:9px;color:#e2e8f0;padding:8px 12px;font-size:13px;outline:none;">
+            <option value="imap">IMAP (poll mailbox)</option>
+            <option value="webhook">Webhook (receive push)</option>
+          </select>
+        </div>
+        <div id="imapPassRow">
+          <input type="password" id="newCustomPass" placeholder="IMAP password (optional)">
+        </div>
+        <div id="webhookInfoBox" style="display:none;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.18);border-radius:9px;padding:10px 12px;font-size:12px;color:#93c5fd;line-height:1.7;">
+          <div style="font-weight:700;margin-bottom:4px;color:#60a5fa;">📡 Webhook Setup</div>
+          <div>Point your mail server or forwarding rule to POST incoming emails to:</div>
+          <div id="webhookUrlPreview" style="font-family:monospace;font-size:11px;color:#bfdbfe;background:rgba(0,0,0,0.3);border-radius:6px;padding:6px 8px;margin-top:6px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</div>
+          <div style="margin-top:6px;font-size:11px;color:#64748b;">Tap the URL above to copy · Supports Mailgun, SendGrid, Postmark, or generic JSON</div>
+        </div>
         <button onclick="addCustomDomain()">+ Add Custom Domain</button>
       </div>
       <div id="customDomainList" class="domain-section" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- Webhook Secret Management -->
+  <div id="webhookSecretSection" style="margin-top:32px;display:none;">
+    <div class="section-label">Webhook Secret</div>
+    <div style="background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:12px;color:#64748b;">This secret is included in your webhook URL. Keep it private — anyone with this URL can push email data to your server.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <code id="webhookSecretDisplay" style="flex:1;font-family:monospace;font-size:12px;color:#93c5fd;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</code>
+        <button onclick="regenerateWebhookSecret()" class="save-btn" style="white-space:nowrap;">↺ Regenerate</button>
+      </div>
+      <div style="font-size:11px;color:#475569;">Full webhook endpoint:</div>
+      <code id="webhookFullUrl" style="font-family:monospace;font-size:11px;color:#bfdbfe;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</code>
     </div>
   </div>
 </div>
@@ -856,23 +885,68 @@ async function addUser() {
   else toast(d.error || 'Error', true);
 }
 
+let _webhookToken = '';
+
+function _webhookUrl(token) {
+  return `${location.origin}/webhook/email?secret=${token}`;
+}
+
+function onCustomTypeChange() {
+  const type = document.getElementById('newCustomType').value;
+  document.getElementById('imapPassRow').style.display    = type === 'imap'    ? '' : 'none';
+  document.getElementById('webhookInfoBox').style.display = type === 'webhook' ? '' : 'none';
+  if (type === 'webhook' && _webhookToken) {
+    document.getElementById('webhookUrlPreview').textContent = _webhookUrl(_webhookToken);
+  }
+}
+
+async function loadWebhookSecret() {
+  try {
+    const d = await api('/admin/api/webhook-secret');
+    _webhookToken = d.token || '';
+    document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
+    document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
+    document.getElementById('webhookUrlPreview').textContent = _webhookUrl(_webhookToken);
+  } catch(e) {}
+}
+
+async function regenerateWebhookSecret() {
+  if (!confirm('Regenerate webhook secret? Your existing webhook URLs will stop working.')) return;
+  const d = await api('/admin/api/webhook-secret/regenerate', 'POST');
+  _webhookToken = d.token || '';
+  document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
+  document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
+  document.getElementById('webhookUrlPreview').textContent = _webhookUrl(_webhookToken);
+  toast('✓ Webhook secret regenerated');
+}
+
 async function loadDomains() {
-  const d = await api('/admin/api/domains');
+  const [d] = await Promise.all([
+    api('/admin/api/domains'),
+    loadWebhookSecret(),
+  ]);
   document.getElementById('dmPass').value = d.domain_password || '';
+
   const tempList = document.getElementById('tempDomainList');
   tempList.innerHTML = '';
   (d.temp || []).forEach(dom => tempList.appendChild(domainPill(dom)));
+
   const customList = document.getElementById('customDomainList');
   customList.innerHTML = '';
-  (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain, true)));
+  const hasWebhook = (d.custom || []).some(e => e.type === 'webhook');
+  document.getElementById('webhookSecretSection').style.display = hasWebhook ? '' : 'none';
+  (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain, e.type || 'imap')));
 }
 
-function domainPill(domain, isCustom) {
+function domainPill(domain, customType) {
   const pill = document.createElement('div');
   pill.className = 'domain-pill';
+  let badge = '';
+  if (customType === 'imap')    badge = ' <span style="color:#64748b;font-size:10px;font-weight:600;">(IMAP)</span>';
+  if (customType === 'webhook') badge = ' <span style="color:#60a5fa;font-size:10px;font-weight:600;">📡 Webhook</span>';
   pill.innerHTML = `
-    <span>${esc(domain)}${isCustom ? ' <span style="color:#1e293b;font-size:10px;">(IMAP)</span>' : ''}</span>
-    <button class="rm" title="Remove domain" onclick="removeDomain('${domain}')">×</button>
+    <span>${esc(domain)}${badge}</span>
+    <button class="rm" title="Remove domain" onclick="removeDomain('${esc(domain)}')">×</button>
   `;
   return pill;
 }
@@ -887,12 +961,13 @@ async function addTempDomain() {
 }
 
 async function addCustomDomain() {
-  const domain    = document.getElementById('newCustomDomain').value.trim().toLowerCase();
-  const imap_pass = document.getElementById('newCustomPass').value.trim();
+  const domain      = document.getElementById('newCustomDomain').value.trim().toLowerCase();
+  const imap_pass   = document.getElementById('newCustomPass').value.trim();
+  const domain_type = document.getElementById('newCustomType').value;
   if (!domain) { toast('Enter a domain', true); return; }
-  const d = await api('/admin/api/domains/add-custom', 'POST', { domain, imap_pass });
+  const d = await api('/admin/api/domains/add-custom', 'POST', { domain, imap_pass, domain_type });
   if (d.status === 'added') {
-    toast(`✓ Added: ${domain}`);
+    toast(`✓ Added: ${domain} (${domain_type})`);
     document.getElementById('newCustomDomain').value = '';
     document.getElementById('newCustomPass').value = '';
     loadDomains();
