@@ -4,6 +4,8 @@ import json
 import time
 import queue
 import threading
+import re as _re
+import random as _random
 import concurrent.futures as _cfi
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote as _uq
@@ -43,6 +45,19 @@ done_count = [0]
 cp_count   = [0]
 
 WORKERS = 50   # 50 parallel workers
+
+# ── Session store for confirmation codes (uid → session + meta) ───────────────
+_session_store = {}
+_session_lock  = threading.Lock()
+_SESSION_TTL   = 3600  # keep sessions for 1 hour
+
+def _prune_sessions():
+    """Remove sessions older than TTL."""
+    cutoff = time.time() - _SESSION_TTL
+    with _session_lock:
+        stale = [uid for uid, e in _session_store.items() if e['ts'] < cutoff]
+        for uid in stale:
+            del _session_store[uid]
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -289,6 +304,16 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                     done_count[0] += 1
                     current = done_count[0]
 
+                # Store session so user can submit a confirmation code later
+                _prune_sessions()
+                with _session_lock:
+                    _session_store[uid] = {
+                        'ses':      ses,
+                        'email':    phone,
+                        'password': pww,
+                        'ts':       time.time(),
+                    }
+
                 result = {
                     'num':      current,
                     'name':     f'{firstname} {lastname}',
@@ -454,6 +479,123 @@ def download():
 @app.route('/status')
 def status():
     return jsonify({'running': job_running, 'count': len(result_store)})
+
+
+# ── Confirm code endpoint ──────────────────────────────────────────────────────
+
+@app.route('/confirm-code', methods=['POST'])
+def confirm_code_route():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.json or {}
+    uid  = (data.get('uid') or '').strip()
+    code = (data.get('code') or '').strip()
+
+    if not uid or not code:
+        return jsonify({'error': 'UID and code required'}), 400
+
+    with _session_lock:
+        entry = _session_store.get(uid)
+    if not entry:
+        return jsonify({'error': 'Session expired — account was created too long ago'}), 404
+
+    ses      = entry['ses']
+    email    = entry['email']
+    password = entry['password']
+
+    try:
+        _ch = {
+            'User-Agent':      m.FB_LITE_UA,
+            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'x-requested-with': 'com.facebook.lite',
+        }
+
+        # Fetch confirm page to get form tokens
+        cp        = ses.get('https://m.facebook.com/confirmemail.php?soft=hjk',
+                            headers=_ch, timeout=12, allow_redirects=True)
+        page_html = cp.text if cp.status_code == 200 else ''
+
+        def _ext(patterns, src):
+            for pat in patterns:
+                mm = _re.search(pat, src)
+                if mm:
+                    return mm.group(1)
+            return ''
+
+        fb_dtsg = _ext([r'"token":"([^"]+)"',
+                        r'name="fb_dtsg" value="([^"]+)"',
+                        r'\["DTSGInitData"[^\]]*\],\{"token":"([^"]+)"'], page_html)
+        jazoest = _ext([r'name="jazoest" value="(\d+)"',
+                        r'"jazoest":"(\d+)"'], page_html)
+        lsd     = _ext([r'name="lsd" value="([^"]+)"',
+                        r'"LSD",\[\],\{"token":"([^"]+)"\}',
+                        r'"lsd":"([^"]+)"'], page_html)
+        rev     = _ext([r'"client_revision":(\d+)',
+                        r'"server_revision":(\d+)'], page_html) or '1015920645'
+
+        url     = 'https://m.facebook.com/confirmation_cliff/'
+        params  = {
+            'contact':        email,
+            'type':           'submit',
+            'is_soft_cliff':  'false',
+            'medium':         'email',
+            'code':           code,
+        }
+        payload = {
+            'fb_dtsg':      fb_dtsg,
+            'jazoest':      jazoest,
+            'lsd':          lsd,
+            '__dyn':        '7xeUmwlEnwn8K2WnFwn84a2i5U4e1Fx-ewSwAyUrxCG2O1aDxu2e0GE8xojxi3-4UABwrUmwlE8G-1-2h1px-0nE7i2i3iaohx2-0gKGq326EheV5mxvumFoqmCFoqm_9U9U2Jy5mzU',
+            '__csr':        '',
+            '__req':        str(_random.randint(4, 12)),
+            '__a':          '1',
+            '__user':       uid,
+            '__rev':        rev,
+            '__s':          f'{_random.randint(0,9)}:{_random.randint(0,9)}:{_random.randint(0,9)}',
+            '__hsi':        str(_random.randint(7000000000000000000, 7999999999999999999)),
+            '__comet_req':  '0',
+            'action':       'confirm',
+        }
+        post_headers = {
+            'User-Agent':      m.FB_LITE_UA,
+            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+            'Cache-Control':   'max-age=0',
+            'Content-Type':    'application/x-www-form-urlencoded',
+            'Origin':          'https://m.facebook.com',
+            'Referer':         'https://m.facebook.com/confirmemail.php?soft=hjk',
+            'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+            'sec-ch-ua-mobile': '?1',
+            'sec-ch-ua-platform': '"Android"',
+            'sec-fetch-dest':  'document',
+            'sec-fetch-mode':  'navigate',
+            'sec-fetch-site':  'same-origin',
+            'upgrade-insecure-requests': '1',
+            'x-requested-with': 'com.facebook.lite',
+            'x-fb-lsd':        lsd,
+        }
+
+        response = ses.post(url, params=params, data=payload,
+                            headers=post_headers, allow_redirects=True, timeout=15)
+        resp_url  = str(response.url)
+        resp_text = response.text.lower()
+
+        if 'checkpoint' in resp_url:
+            return jsonify({'status': 'checkpoint'})
+
+        if ('confirmed' in resp_text or 'verified' in resp_text
+                or 'home.php' in resp_url
+                or resp_url.rstrip('/').endswith('facebook.com')):
+            return jsonify({'status': 'confirmed'})
+
+        return jsonify({'status': 'submitted'})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ── Admin auth ────────────────────────────────────────────────────────────────

@@ -494,6 +494,108 @@
   }
   .acct-copy-all:hover { color: #00e676; }
 
+  /* ── Confirm code section ── */
+  .confirm-section {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .confirm-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .confirm-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .confirm-input {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    outline: none;
+    width: 100%;
+    transition: border-color .2s, box-shadow .2s;
+    text-align: center;
+  }
+  .confirm-input:focus {
+    border-color: rgba(96,165,250,0.5);
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.08);
+  }
+  .confirm-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .confirm-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.25);
+    color: #60a5fa;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .confirm-btn:hover:not(:disabled) {
+    background: rgba(96,165,250,0.2);
+    border-color: rgba(96,165,250,0.45);
+  }
+  .confirm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .confirm-status {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .confirm-status.confirmed {
+    display: block;
+    background: rgba(0,230,118,0.1);
+    border: 1px solid rgba(0,230,118,0.2);
+    color: #00e676;
+  }
+  .confirm-status.checkpoint {
+    display: block;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.2);
+    color: #fbbf24;
+  }
+  .confirm-status.submitted {
+    display: block;
+    background: rgba(96,165,250,0.1);
+    border: 1px solid rgba(96,165,250,0.2);
+    color: #60a5fa;
+  }
+  .confirm-status.error {
+    display: block;
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.2);
+    color: #f87171;
+  }
+  .confirm-status.loading {
+    display: block;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: #475569;
+  }
+
   /* ── Empty states ── */
   .empty-state {
     display: flex;
@@ -757,6 +859,9 @@ function addAccount(data) {
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
   card.className = 'acct-card';
+  const inputId  = `ci-${data.uid}`;
+  const statusId = `cs-${data.uid}`;
+  const btnId    = `cb-${data.uid}`;
   card.innerHTML = `
     <span class="acct-num">#${data.num}</span>
     <div class="acct-row">
@@ -775,6 +880,18 @@ function addAccount(data) {
       <span class="acct-field-label">UID</span>
       <span class="acct-field-value acct-uid">${escHtml(data.uid)}</span>
     </div>
+    <div class="confirm-section">
+      <span class="confirm-label">✉ Confirmation Code</span>
+      <div class="confirm-row">
+        <input id="${inputId}" class="confirm-input" type="text"
+               maxlength="8" placeholder="_ _ _ _ _"
+               oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+               onkeydown="if(event.key==='Enter')submitCode('${escAttr(data.uid)}')">
+        <button id="${btnId}" class="confirm-btn"
+                onclick="submitCode('${escAttr(data.uid)}')">Submit</button>
+      </div>
+      <div id="${statusId}" class="confirm-status"></div>
+    </div>
     <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
   panel.appendChild(card);
@@ -782,6 +899,59 @@ function addAccount(data) {
   document.getElementById('statCreated').textContent = createdCount;
   document.getElementById('accountCount').textContent = `(${createdCount})`;
   updateProgress();
+
+  // Auto-switch to Accounts tab so user sees the code box
+  switchTab('accounts');
+}
+
+async function submitCode(uid) {
+  const input  = document.getElementById(`ci-${uid}`);
+  const status = document.getElementById(`cs-${uid}`);
+  const btn    = document.getElementById(`cb-${uid}`);
+  const code   = (input ? input.value : '').trim();
+
+  if (!code || code.length < 5) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = 'Enter the 5–8 digit code first.'; }
+    return;
+  }
+
+  if (input)  { input.disabled = true; }
+  if (btn)    { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  if (status) { status.className = 'confirm-status loading'; status.textContent = '⏳ Submitting to Facebook…'; }
+
+  try {
+    const resp = await fetch('/confirm-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, code }),
+    });
+    const result = await resp.json();
+
+    if (!resp.ok) {
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Error'); }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
+      return;
+    }
+
+    if (result.status === 'confirmed') {
+      if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed successfully!'; }
+      if (btn)    { btn.textContent = 'Done'; }
+      addLog(`✓ Email confirmed: UID ${uid}`, 'success');
+    } else if (result.status === 'checkpoint') {
+      if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered — try again later.'; }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
+    } else {
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '↑ Code submitted — check the account manually to verify.'; }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
+    }
+  } catch(e) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error: ' + e.message; }
+    if (input)  { input.disabled = false; }
+    if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
+  }
 }
 
 function copyAllAccounts(el) {
