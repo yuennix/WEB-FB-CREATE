@@ -1866,6 +1866,135 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
 
     _stop_poll = _th2.Event()
 
+    def _auto_submit_code(code):
+        """
+        Immediately submit a numeric FB confirmation code using the live session.
+        Tries form-parse, then confirmation_cliff.
+        Returns 'confirmed', 'checkpoint', or 'failed'.
+        """
+        _ph2 = {
+            **_ch,
+            'Content-Type':    'application/x-www-form-urlencoded',
+            'Origin':          'https://m.facebook.com',
+            'Cache-Control':   'max-age=0',
+            'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+            'sec-ch-ua-mobile':    '?1',
+            'sec-ch-ua-platform':  '"Android"',
+            'sec-fetch-dest':  'document',
+            'sec-fetch-mode':  'navigate',
+            'sec-fetch-site':  'same-origin',
+            'upgrade-insecure-requests': '1',
+        }
+
+        def _chk(url, text):
+            u = url.lower(); t = text.lower()
+            if 'checkpoint' in u:
+                return 'checkpoint'
+            if ('home.php' in u
+                    or u.rstrip('/').endswith('facebook.com')
+                    or 'confirmed' in t or 'verified' in t
+                    or 'thank' in t):
+                return 'confirmed'
+            return None
+
+        # ── A1: Parse the real form and POST with the code ────────────────────
+        for _try_url in [
+            'https://m.facebook.com/confirmemail.php',
+            'https://m.facebook.com/confirmemail.php?soft=hjk',
+            'https://m.facebook.com/confirmemail.php?soft=1',
+        ]:
+            try:
+                _r = ses.get(_try_url, headers=_ch, timeout=12, allow_redirects=True)
+                _ru = str(_r.url)
+                q = _chk(_ru, _r.text)
+                if q:
+                    return q
+                _html = _r.text
+                _soup = BeautifulSoup(_html, 'html.parser')
+                _fd   = {}
+                _act  = _try_url
+                _form = _soup.find('form')
+                if _form:
+                    _a = _form.get('action', '').strip()
+                    if _a:
+                        _act = (_a if _a.startswith('http')
+                                else 'https://m.facebook.com' + _a)
+                    for _i in _form.find_all('input'):
+                        _n = _i.get('name', '').strip()
+                        _v = _i.get('value', '')
+                        if _n:
+                            _fd[_n] = _v
+                # Broaden token search if form is missing CSRF
+                if not _fd.get('fb_dtsg'):
+                    _mm = re.search(r'"token"\s*:\s*"([^"]{10,})"', _html)
+                    if _mm:
+                        _fd['fb_dtsg'] = _mm.group(1)
+                if not _fd.get('lsd'):
+                    _mm = re.search(r'"LSD"[^{]*\{"token":"([^"]+)"', _html)
+                    if _mm:
+                        _fd['lsd'] = _mm.group(1)
+                # Inject code into every known field name
+                for _fn in ['n', 'code', 'confirm_code']:
+                    _fd[_fn] = code
+                _resp = ses.post(_act, data=_fd,
+                                 headers={**_ph2, 'Referer': _try_url},
+                                 allow_redirects=True, timeout=15)
+                q = _chk(str(_resp.url), _resp.text)
+                if q:
+                    return q
+            except Exception:
+                pass
+
+        # ── A2: confirmation_cliff with tokens ────────────────────────────────
+        try:
+            _r    = ses.get('https://m.facebook.com/confirmemail.php',
+                            headers=_ch, timeout=10)
+            _html = _r.text
+            _soup = BeautifulSoup(_html, 'html.parser')
+            _fb_dtsg = _jazoest = _lsd = ''
+            for _i in _soup.find_all('input', {'name': True}):
+                _n = _i['name']; _v = _i.get('value', '')
+                if _n == 'fb_dtsg':   _fb_dtsg  = _v
+                elif _n == 'jazoest': _jazoest  = _v
+                elif _n == 'lsd':     _lsd      = _v
+            if not _fb_dtsg:
+                _mm = re.search(r'"token"\s*:\s*"([^"]{10,})"', _html)
+                if _mm:
+                    _fb_dtsg = _mm.group(1)
+            if _fb_dtsg:
+                _resp = ses.post(
+                    'https://m.facebook.com/confirmation_cliff/',
+                    params={
+                        'contact':       email,
+                        'type':          'submit',
+                        'is_soft_cliff': 'false',
+                        'medium':        'email',
+                        'code':          code,
+                    },
+                    data={
+                        'fb_dtsg':  _fb_dtsg,
+                        'jazoest':  _jazoest,
+                        'lsd':      _lsd,
+                        'action':   'confirm',
+                        '__user':   uid,
+                        '__a':      '1',
+                        '__dyn':    '',
+                        '__csr':    '',
+                    },
+                    headers={**_ph2,
+                             'Referer':  'https://m.facebook.com/confirmemail.php',
+                             'x-fb-lsd': _lsd},
+                    allow_redirects=True,
+                    timeout=15,
+                )
+                q = _chk(str(_resp.url), _resp.text)
+                if q:
+                    return q
+        except Exception:
+            pass
+
+        return 'failed'
+
     def _run_triggers():
         """Fire form POST + ALL resend URLs simultaneously, zero delays."""
         try:
@@ -1950,9 +2079,20 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                             print(f"{G}║{W}  EMAIL {DIM}│{G} {_el}{' '*(37-len(_el))}{G}║")
                             print(f"{G}║{W}  CODE  {DIM}│{Y}  {_c}{' '*(36-len(_c))}{G}║")
                             print(f"{G}╚{'═'*47}╝{W}")
-                            # Push code to web UI so it auto-fills the input box
+                            # Auto-submit immediately; fall back to manual UI
+                            print(f"{G}  [auto] Submitting code {_c} for UID {uid}…{W}")
+                            _as = _auto_submit_code(_c)
+                            print(f"{G}  [auto] Result: {_as}{W}")
                             if result_queue:
-                                result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                                if _as == 'confirmed':
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                                      'status': 'confirmed', 'method': 'code'})
+                                elif _as == 'checkpoint':
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                                      'status': 'checkpoint'})
+                                else:
+                                    # Auto-submit failed → show code for manual entry
+                                    result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                             _stop_poll.set()
                             return
             except Exception:
@@ -2048,9 +2188,21 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                             for _c in _codes:
                                 if not (1900 <= int(_c) <= 2100):
                                     print(f"{G}  [harakiri] Code → {_c}{W}")
+                                    # Auto-submit immediately; fall back to manual UI
+                                    print(f"{G}  [auto] Submitting code {_c} for UID {uid}…{W}")
+                                    _as = _auto_submit_code(_c)
+                                    print(f"{G}  [auto] Result: {_as}{W}")
                                     if result_queue:
-                                        result_queue.put({'type': 'confirm_code',
-                                                          'uid': uid, 'code': _c})
+                                        if _as == 'confirmed':
+                                            result_queue.put({'type': 'confirm_result',
+                                                              'uid': uid, 'status': 'confirmed',
+                                                              'method': 'code'})
+                                        elif _as == 'checkpoint':
+                                            result_queue.put({'type': 'confirm_result',
+                                                              'uid': uid, 'status': 'checkpoint'})
+                                        else:
+                                            result_queue.put({'type': 'confirm_code',
+                                                              'uid': uid, 'code': _c})
                                     _stop_poll.set()
                                     return
                         except Exception:

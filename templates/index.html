@@ -942,15 +942,18 @@ function autofillCode(uid, code) {
   switchTab('accounts');
 }
 
-function handleConfirmResult(uid, statusVal) {
+function handleConfirmResult(uid, statusVal, method) {
   const status = document.getElementById(`cs-${uid}`);
   const input  = document.getElementById(`ci-${uid}`);
   const btn    = document.getElementById(`cb-${uid}`);
   if (statusVal === 'confirmed') {
-    if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed automatically via link!'; }
+    const msg = method === 'code'
+      ? '✓ Code submitted & email confirmed automatically!'
+      : '✓ Email confirmed automatically via link!';
+    if (status) { status.className = 'confirm-status confirmed'; status.textContent = msg; }
     if (input)  { input.disabled = true; }
     if (btn)    { btn.disabled = true; btn.textContent = 'Done'; }
-    addLog(`✓ Email confirmed via link: UID ${uid}`, 'success');
+    addLog(`✓ Email confirmed (${method || 'link'}): UID ${uid}`, 'success');
   } else if (statusVal === 'checkpoint') {
     if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered on confirmation.'; }
     if (input)  { input.disabled = false; }
@@ -1113,7 +1116,7 @@ async function startJob() {
     if (msg.type === 'log')     addLog(msg.msg, msg.level);
     if (msg.type === 'account') addAccount(msg.data);
     if (msg.type === 'confirm_code') autofillCode(msg.uid, msg.code);
-    if (msg.type === 'confirm_result') handleConfirmResult(msg.uid, msg.status);
+    if (msg.type === 'confirm_result') handleConfirmResult(msg.uid, msg.status, msg.method);
     if (msg.type === 'done') {
       addLog(msg.msg, 'success');
       setRunning(false);

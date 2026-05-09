@@ -668,6 +668,155 @@ def _submit_cliff(ses, page_html, email, uid, code):
     return str(resp.url), resp.text
 
 
+def _manual_submit_code(ses, email, uid, code):
+    """
+    Used by /confirm-code for manual submission.
+    Works on a fresh session copy to avoid race conditions with the background thread.
+    Returns 'confirmed', 'checkpoint', or 'failed'.
+    """
+    import requests as _rq
+    # Fresh session with same cookies — avoids interference from background thread
+    fresh = _rq.Session()
+    fresh.cookies.update(ses.cookies.get_dict())
+
+    _ch = {
+        'User-Agent':      m.FB_LITE_UA,
+        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'x-requested-with': 'com.facebook.lite',
+    }
+    _ph = {
+        **_ch,
+        'Content-Type':    'application/x-www-form-urlencoded',
+        'Origin':          'https://m.facebook.com',
+        'Cache-Control':   'max-age=0',
+        'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile':    '?1',
+        'sec-ch-ua-platform':  '"Android"',
+        'sec-fetch-dest':  'document',
+        'sec-fetch-mode':  'navigate',
+        'sec-fetch-site':  'same-origin',
+        'upgrade-insecure-requests': '1',
+    }
+
+    def _chk(url, text):
+        u = url.lower(); t = text.lower()
+        if 'checkpoint' in u:
+            return 'checkpoint'
+        if ('home.php' in u or u.rstrip('/').endswith('facebook.com')
+                or 'confirmed' in t or 'verified' in t or 'thank' in t):
+            return 'confirmed'
+        return None
+
+    # ── A1: Parse form from confirmemail.php, inject code, POST ──────────────
+    for _url in [
+        'https://m.facebook.com/confirmemail.php',
+        'https://m.facebook.com/confirmemail.php?soft=hjk',
+        'https://m.facebook.com/confirmemail.php?soft=1',
+    ]:
+        try:
+            _r = fresh.get(_url, headers=_ch, timeout=12, allow_redirects=True)
+            _ru = str(_r.url)
+            q = _chk(_ru, _r.text)
+            if q:
+                return q
+            html = _r.text
+            soup = _BS4(html, 'html.parser')
+            fd   = {}
+            act  = _url
+            form = soup.find('form')
+            if form:
+                _a = form.get('action', '').strip()
+                if _a:
+                    act = _a if _a.startswith('http') else 'https://m.facebook.com' + _a
+                for inp in form.find_all('input'):
+                    n = inp.get('name', '').strip()
+                    v = inp.get('value', '')
+                    if n:
+                        fd[n] = v
+            # Broaden CSRF token extraction
+            if not fd.get('fb_dtsg'):
+                mm = _re.search(r'"token"\s*:\s*"([^"]{10,})"', html)
+                if mm:
+                    fd['fb_dtsg'] = mm.group(1)
+            if not fd.get('lsd'):
+                mm = _re.search(r'"LSD"[^{]*\{"token":"([^"]+)"', html)
+                if mm:
+                    fd['lsd'] = mm.group(1)
+            # Inject code into every known field name
+            for fn in ['n', 'code', 'confirm_code']:
+                fd[fn] = code
+            resp = fresh.post(act, data=fd,
+                              headers={**_ph, 'Referer': _url},
+                              allow_redirects=True, timeout=15)
+            q = _chk(str(resp.url), resp.text)
+            if q:
+                return q
+        except Exception:
+            pass
+
+    # ── A2: confirmation_cliff with CSRF tokens ───────────────────────────────
+    try:
+        _r   = fresh.get('https://m.facebook.com/confirmemail.php',
+                         headers=_ch, timeout=10)
+        html = _r.text
+        soup = _BS4(html, 'html.parser')
+        fb_dtsg = jazoest = lsd = ''
+        for inp in soup.find_all('input', {'name': True}):
+            n = inp['name']; v = inp.get('value', '')
+            if n == 'fb_dtsg':   fb_dtsg  = v
+            elif n == 'jazoest': jazoest  = v
+            elif n == 'lsd':     lsd      = v
+        if not fb_dtsg:
+            mm = _re.search(r'"token"\s*:\s*"([^"]{10,})"', html)
+            if mm:
+                fb_dtsg = mm.group(1)
+        if fb_dtsg:
+            resp = fresh.post(
+                'https://m.facebook.com/confirmation_cliff/',
+                params={
+                    'contact':       email,
+                    'type':          'submit',
+                    'is_soft_cliff': 'false',
+                    'medium':        'email',
+                    'code':          code,
+                },
+                data={
+                    'fb_dtsg':  fb_dtsg,
+                    'jazoest':  jazoest,
+                    'lsd':      lsd,
+                    'action':   'confirm',
+                    '__user':   uid,
+                    '__a':      '1',
+                    '__dyn':    '',
+                    '__csr':    '',
+                },
+                headers={**_ph,
+                         'Referer':  'https://m.facebook.com/confirmemail.php',
+                         'x-fb-lsd': lsd},
+                allow_redirects=True,
+                timeout=15,
+            )
+            q = _chk(str(resp.url), resp.text)
+            if q:
+                return q
+    except Exception:
+        pass
+
+    # ── A3: Final state check ─────────────────────────────────────────────────
+    try:
+        _ck = fresh.get('https://m.facebook.com/', headers=_ch,
+                        timeout=10, allow_redirects=True)
+        q = _chk(str(_ck.url), _ck.text)
+        if q:
+            return q
+    except Exception:
+        pass
+
+    return 'failed'
+
+
 @app.route('/confirm-code', methods=['POST'])
 def confirm_code_route():
     if not _require_auth():
@@ -689,74 +838,13 @@ def confirm_code_route():
     email = entry['email']
 
     try:
-        _ch = {
-            'User-Agent':      m.FB_LITE_UA,
-            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'x-requested-with': 'com.facebook.lite',
-        }
-
-        # ── Step 1: Load the confirmation page (try several URLs) ────────────
-        page_html = ''
-        page_url  = ''
-        for _try in [
-            'https://m.facebook.com/confirmemail.php',
-            'https://m.facebook.com/confirmemail.php?soft=hjk',
-            'https://m.facebook.com/confirmemail.php?soft=1',
-        ]:
-            try:
-                _r = ses.get(_try, headers=_ch, timeout=12, allow_redirects=True)
-                _ru = str(_r.url)
-                # Already on home → already confirmed
-                if ('home.php' in _ru
-                        or _ru.rstrip('/').lower().endswith('facebook.com')):
-                    return jsonify({'status': 'confirmed'})
-                if 'checkpoint' in _ru:
-                    return jsonify({'status': 'checkpoint'})
-                if _r.status_code == 200 and len(_r.text) > 200:
-                    page_html = _r.text
-                    page_url  = _try
-                    break
-            except Exception:
-                continue
-
-        if not page_html:
-            return jsonify({'error': 'Could not load Facebook confirmation page'}), 500
-
-        # ── Step 2: Try form-parse-and-submit (most reliable) ────────────────
-        ru, rt = _submit_confirm_form(ses, page_html, page_url, code, email, uid)
-        if ru is not None:
-            chk = _check_confirmed(ru, rt)
-            if chk is True:
-                return jsonify({'status': 'confirmed'})
-            if chk is None:
-                return jsonify({'status': 'checkpoint'})
-
-        # ── Step 3: Fallback — confirmation_cliff/ with CSRF tokens ──────────
-        ru2, rt2 = _submit_cliff(ses, page_html, email, uid, code)
-        if ru2 is not None:
-            chk2 = _check_confirmed(ru2, rt2)
-            if chk2 is True:
-                return jsonify({'status': 'confirmed'})
-            if chk2 is None:
-                return jsonify({'status': 'checkpoint'})
-
-        # ── Step 4: Check current account state (maybe it was already done) ──
-        try:
-            _ck = ses.get('https://m.facebook.com/', headers=_ch,
-                          timeout=10, allow_redirects=True)
-            _cku = str(_ck.url)
-            if ('home.php' in _cku
-                    or _cku.rstrip('/').lower().endswith('facebook.com')):
-                return jsonify({'status': 'confirmed'})
-            if 'checkpoint' in _cku:
-                return jsonify({'status': 'checkpoint'})
-        except Exception:
-            pass
-
-        return jsonify({'status': 'submitted'})
-
+        result = _manual_submit_code(ses, email, uid, code)
+        if result == 'confirmed':
+            return jsonify({'status': 'confirmed'})
+        if result == 'checkpoint':
+            return jsonify({'status': 'checkpoint'})
+        return jsonify({'status': 'submitted',
+                        'note': 'Code sent to Facebook — check if email is confirmed.'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
