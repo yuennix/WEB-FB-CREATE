@@ -2124,8 +2124,18 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         }
 
         def _process_body(_body_str):
-            """Try to extract FB confirm link or numeric code. Returns True if handled."""
-            # 1) Confirmation link
+            """
+            Extract FB confirmation link or numeric code from email body.
+            Returns True if handled (code found and acted on).
+
+            Strategy:
+              1) Follow FB confirmation link if present (most reliable).
+              2) Strip HTML → strip URLs → search for code near context keywords.
+              3) Last-resort: any isolated 5–6 digit number not inside a URL.
+            Searching raw HTML is intentionally avoided — it causes false positives
+            from CSS pixel values, image dimensions, URL parameters, etc.
+            """
+            # ── 1) FB confirmation link ────────────────────────────────────────
             _lm = re.search(
                 r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
                 _body_str, re.IGNORECASE
@@ -2143,23 +2153,59 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                 _stop_poll.set()
                 return True
 
-            # 2) Numeric code (5–8 digits, not a year)
-            for _c in re.findall(r'\b([0-9]{5,8})\b', _body_str):
-                if not (1900 <= int(_c) <= 2100):
-                    print(f"{G}  [harakiri] Code → {_c}{W}")
-                    _as = _auto_submit_code(_c)
-                    print(f"{G}  [auto] Result: {_as}{W}")
-                    if result_queue:
-                        if _as == 'confirmed':
-                            result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                              'status': 'confirmed', 'method': 'code'})
-                        elif _as == 'checkpoint':
-                            result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                              'status': 'checkpoint'})
-                        else:
-                            result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
-                    _stop_poll.set()
+            # ── 2) Convert HTML → plain text ───────────────────────────────────
+            try:
+                _plain = BeautifulSoup(_body_str, 'html.parser').get_text(separator=' ')
+            except Exception:
+                _plain = _body_str
+
+            # Remove URLs entirely before digit hunting — they contain many
+            # fake numbers (tracking IDs, timestamps, pixel sizes, etc.)
+            _clean = re.sub(r'https?://\S+', ' ', _plain)
+            _clean = re.sub(r'\s+', ' ', _clean)
+
+            def _try_code(_c):
+                """Submit/emit a candidate code. Returns True if we should stop."""
+                _n = int(_c)
+                # Reject years and values that are almost certainly not FB codes
+                if 1900 <= _n <= 2100:
+                    return False
+                print(f"{G}  [harakiri] Code → {_c}{W}")
+                _as = _auto_submit_code(_c)
+                print(f"{G}  [auto] Result: {_as}{W}")
+                if result_queue:
+                    if _as == 'confirmed':
+                        result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                          'status': 'confirmed', 'method': 'code'})
+                    elif _as == 'checkpoint':
+                        result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                          'status': 'checkpoint'})
+                    else:
+                        result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                _stop_poll.set()
+                return True
+
+            # ── 3) Contextual patterns — number right next to confirm keywords ─
+            # Facebook confirmation codes are always 5–6 digits.
+            _ctx_pats = [
+                r'(?:confirmation|verification|confirm(?:ation)?)\s*code[:\s\-]+(\d{5,6})',
+                r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
+                r'code[:\s\-]+(\d{5,6})\b',
+                r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm|to\s+verify)',
+                r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
+                r'(?:^|\s)(\d{5,6})(?:\s|$)',   # isolated 5–6 digit token on its own
+            ]
+            for _pat in _ctx_pats:
+                for _c in re.findall(_pat, _clean, re.IGNORECASE | re.MULTILINE):
+                    if _try_code(_c):
+                        return True
+
+            # ── 4) Last-resort: any standalone 5–6 digit number ───────────────
+            # (URLs already stripped, so this won't match tracking IDs)
+            for _c in re.findall(r'\b(\d{5,6})\b', _clean):
+                if _try_code(_c):
                     return True
+
             return False
 
         while time.time() < _deadline and not _stop_poll.is_set():
