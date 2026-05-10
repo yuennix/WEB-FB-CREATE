@@ -840,11 +840,10 @@ def admin_add_custom():
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.json or {}
     domain      = (data.get('domain')      or '').strip().lower()
-    imap_pass   = (data.get('imap_pass')   or '').strip()
-    domain_type = (data.get('domain_type') or 'imap').strip()
+    domain_type = 'webhook'
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
-    ok = dm.add_custom_domain(domain, imap_pass, domain_type=domain_type)
+    ok = dm.add_custom_domain(domain)
     return jsonify({'status': 'added' if ok else 'exists'})
 
 

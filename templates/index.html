@@ -883,10 +883,7 @@ function addAccount(data) {
   const inputId    = `ci-${data.uid}`;
   const statusId   = `cs-${data.uid}`;
   const btnId      = `cb-${data.uid}`;
-  const _emailDom     = (data.email || '').split('@')[1] || '';
-  const _isSecmail    = _SECMAIL_DOMAINS.has(_emailDom);
-  const _isTmailIo    = _TEMPMAIL_IO_DOMAINS.has(_emailDom);
-  const _isAutoFetch  = _isSecmail || _isTmailIo;
+  const _isAutoFetch  = true;
   card.innerHTML = `
     <span class="acct-num">#${data.num}</span>
     <div class="acct-row">
@@ -935,17 +932,6 @@ function addAccount(data) {
   // Auto-switch to Accounts tab so user sees the code box
   switchTab('accounts');
 }
-
-const _SECMAIL_DOMAINS = new Set([
-  '1secmail.com','1secmail.net','1secmail.org',
-  'wwjmp.com','esiix.com','xojxe.com','yoggm.com',
-  'harakirimail.com'
-]);
-
-const _TEMPMAIL_IO_DOMAINS = new Set([
-  'bltiwd.com','wnbaldwy.com','bwmyga.com','ozsaip.com',
-  'yzcalo.com','lnovic.com','ruutukf.com','gmeenramy.com'
-]);
 
 const _fetchTimers = {};
 const _acctEmails  = {};   // uid -> email, populated in addAccount

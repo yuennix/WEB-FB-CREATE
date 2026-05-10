@@ -1540,25 +1540,11 @@ def get_temp_code(email, timeout_secs=90):
     login  = email.split('@')[0].lower()
     domain = email.split('@')[1].lower() if '@' in email else ''
 
-    # Use IMAP for known custom domains — most reliable method
+    # Custom domains are webhook-only — code arrives via HTTP POST, not polling
     _imap_map = _dm.get_all_info()
     _imap_map = {e['domain']: e for e in _imap_map.get('custom', [])}
     if domain in _imap_map:
-        cfg  = _imap_map[domain]
-        body = _poll_imap_inbox(
-            to_addr=email,
-            imap_host=cfg['imap_host'],
-            imap_user=cfg['imap_user'],
-            imap_pass=cfg['imap_pass'],
-            timeout_secs=timeout_secs,
-        )
-        if body:
-            link = _extract_fb_confirm_link(body)
-            if link:
-                return link  # caller can handle links too
-            code = _extract_fb_confirm_code(body)
-            if code:
-                return code
+        # Webhook domain: code will be pushed via webhook, nothing to poll here
         return None
 
     # Fallback: HTTP webmail endpoints for unknown/generic domains

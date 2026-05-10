@@ -85,23 +85,14 @@ def add_temp_domain(domain):
     return False
 
 
-def add_custom_domain(domain, imap_pass='', imap_host=None, imap_user=None, domain_type='imap'):
+def add_custom_domain(domain, imap_pass='', imap_host=None, imap_user=None, domain_type='webhook'):
     domain = domain.strip().lower()
-    domain_type = domain_type if domain_type in ('imap', 'webhook') else 'imap'
-    if not imap_host:
-        imap_host = f"mail.{domain}"
-    if not imap_user:
-        imap_user = f"admin@{domain}"
     with _lock:
         data = _load()
         existing = [e['domain'] for e in data.get('custom', [])]
         if domain in existing:
             return False
-        entry = {"domain": domain, "type": domain_type}
-        if domain_type == 'imap':
-            entry["imap_host"] = imap_host
-            entry["imap_user"] = imap_user
-            entry["imap_pass"] = imap_pass
+        entry = {"domain": domain, "type": "webhook"}
         data.setdefault('custom', []).append(entry)
         _save(data)
     return True
