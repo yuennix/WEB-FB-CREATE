@@ -927,29 +927,44 @@ function addAccount(data) {
   document.getElementById('accountCount').textContent = `(${createdCount})`;
   updateProgress();
 
-  if (_isAutoFetch) _startFetchTimer(data.uid);
+  if (_isAutoFetch) _scheduleAutoRetry(data.uid);
 
   // Auto-switch to Accounts tab so user sees the code box
   switchTab('accounts');
 }
 
-const _fetchTimers = {};
-const _acctEmails  = {};   // uid -> email, populated in addAccount
-
-function _startFetchTimer(uid) {
-  if (_fetchTimers[uid]) clearTimeout(_fetchTimers[uid]);
-  _fetchTimers[uid] = setTimeout(() => {
-    const status = document.getElementById(`cs-${uid}`);
-    const retry  = document.getElementById(`retry-row-${uid}`);
-    if (status && status.classList.contains('fetching')) {
-      retry.style.display = '';
-    }
-    delete _fetchTimers[uid];
-  }, 5000);
-}
+const _fetchTimers    = {};
+const _countdownTimers = {};
+const _acctEmails     = {};   // uid -> email, populated in addAccount
 
 function _clearFetchTimer(uid) {
-  if (_fetchTimers[uid]) { clearTimeout(_fetchTimers[uid]); delete _fetchTimers[uid]; }
+  if (_fetchTimers[uid])     { clearTimeout(_fetchTimers[uid]);  delete _fetchTimers[uid]; }
+  if (_countdownTimers[uid]) { clearInterval(_countdownTimers[uid]); delete _countdownTimers[uid]; }
+}
+
+// Schedule an auto-retry in 5 seconds, showing a live countdown in the status bar
+function _scheduleAutoRetry(uid) {
+  _clearFetchTimer(uid);
+  const status = document.getElementById(`cs-${uid}`);
+  const retry  = document.getElementById(`retry-row-${uid}`);
+
+  // Show retry button immediately so user can also click manually
+  if (retry) retry.style.display = '';
+
+  let secs = 5;
+  function _tick() {
+    if (status && (status.classList.contains('fetching') || status.classList.contains('error'))) {
+      status.className = 'confirm-status fetching';
+      status.textContent = `⏳ No code yet — retrying in ${secs}s…`;
+    }
+    if (secs <= 0) {
+      if (_countdownTimers[uid]) { clearInterval(_countdownTimers[uid]); delete _countdownTimers[uid]; }
+      retryConfirm(uid);
+    }
+    secs--;
+  }
+  _tick();
+  _countdownTimers[uid] = setInterval(_tick, 1000);
 }
 
 function autofillCode(uid, code) {
@@ -957,8 +972,9 @@ function autofillCode(uid, code) {
   const input  = document.getElementById(`ci-${uid}`);
   const status = document.getElementById(`cs-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
+  // Fill the code box — do NOT auto-submit
   if (input)  { input.value = code; input.classList.add('code-ready'); }
-  if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + code; }
+  if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + code + ' (tap to copy)'; }
   if (retry)  retry.style.display = '';
   addLog(`✉ Code ${code} fetched for UID ${uid}`, 'success');
   switchTab('accounts');
@@ -967,7 +983,6 @@ function autofillCode(uid, code) {
 function handleConfirmResult(uid, statusVal) {
   _clearFetchTimer(uid);
   const status = document.getElementById(`cs-${uid}`);
-  const input  = document.getElementById(`ci-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
   if (statusVal === 'confirmed') {
     if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed via link!'; }
@@ -977,8 +992,8 @@ function handleConfirmResult(uid, statusVal) {
     if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint — try again.'; }
     if (retry)  retry.style.display = '';
   } else if (statusVal === 'timeout') {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code found — click Retry.'; }
-    if (retry)  retry.style.display = '';
+    // Auto-retry after 5 seconds
+    _scheduleAutoRetry(uid);
   } else if (statusVal === 'link_error') {
     if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Confirm link failed — click Retry.'; }
     if (retry)  retry.style.display = '';
@@ -986,16 +1001,14 @@ function handleConfirmResult(uid, statusVal) {
 }
 
 async function retryConfirm(uid) {
+  _clearFetchTimer(uid);
   const status = document.getElementById(`cs-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
   const input  = document.getElementById(`ci-${uid}`);
-  const email = _acctEmails[uid] || '';
+  const email  = _acctEmails[uid] || '';
 
   if (retry)  retry.style.display = 'none';
-  if (input)  { input.value = ''; input.classList.remove('code-ready'); }
   if (status) { status.className = 'confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
-
-  addLog(`🔄 Retrying inbox fetch for UID ${uid}`, 'info');
 
   try {
     const resp = await fetch('/fetch-code-now', {
@@ -1006,26 +1019,24 @@ async function retryConfirm(uid) {
     const result = await resp.json();
 
     if (result.code) {
-      _clearFetchTimer(uid);
+      // Code found — fill box, do NOT submit
       if (input)  { input.value = result.code; input.classList.add('code-ready'); }
-      if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code; }
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code + ' (tap to copy)'; }
       if (retry)  retry.style.display = '';
       addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
-    } else if (result.status === 'not_found') {
-      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
-      if (retry)  retry.style.display = '';
-    } else if (result.status === 'waiting_webhook') {
-      if (status) { status.className = 'confirm-status fetching'; status.textContent = '📡 Waiting for webhook push — check your mail server.'; }
-      if (retry)  retry.style.display = '';
+    } else if (result.status === 'not_found' || result.status === 'waiting_webhook') {
+      // Auto-retry in 5 seconds
+      _scheduleAutoRetry(uid);
     } else if (result.status === 'unsupported_domain') {
       if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.msg || result.error || 'Domain not configured'); }
       if (retry)  retry.style.display = '';
     } else {
-      _startFetchTimer(uid);
+      // Unknown — auto-retry
+      _scheduleAutoRetry(uid);
     }
   } catch(e) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error — try again.'; }
-    if (retry)  retry.style.display = '';
+    // Network error — auto-retry after 5 seconds
+    _scheduleAutoRetry(uid);
   }
 }
 

@@ -685,11 +685,15 @@ def fetch_code_now():
         dtype = cfg.get('type', 'imap')
         if dtype == 'webhook':
             # Webhook domains receive email via HTTP POST — nothing to poll.
-            # If a code was already stored by the webhook handler, return it.
+            # Check by uid first, then fall back to email (handles session-restart case).
             stored = _sto.load(f'webhook_code_{uid}', None)
+            if not (stored and isinstance(stored, dict) and stored.get('code')):
+                stored = _sto.load(f'webhook_code_email_{email}', None)
             if stored and isinstance(stored, dict) and stored.get('code'):
                 code = stored['code']
                 task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                # Persist by uid too for future fast lookups
+                _sto.save(f'webhook_code_{uid}', {'code': code})
                 return jsonify({'code': code})
             return jsonify({'status': 'waiting_webhook',
                             'msg': 'Waiting for email via webhook — check your mail server is forwarding correctly.'})
@@ -1013,66 +1017,22 @@ def webhook_email():
     if not code and not fb_link:
         return jsonify({'status': 'no_code_found'}), 200
 
-    if uid:
-        ses_entry = None
-        with _session_lock:
-            ses_entry = _session_store.get(uid)
+    if code:
+        # Always store by email so retry can find it even if uid is not in memory
+        _sto.save(f'webhook_code_email_{email}', {'code': code, 'uid': uid or ''})
+        print(f'[webhook] stored code {code!r} for email {email!r} uid={uid!r}')
 
+    if uid:
         if code:
+            # Push to SSE stream so the UI autofills immediately — do NOT auto-submit
             task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-            # Store so the Retry Fetch button can retrieve it too
+            # Also store by uid for fast lookup
             _sto.save(f'webhook_code_{uid}', {'code': code})
-            # Auto-submit the code using the stored session
-            if ses_entry:
-                def _submit(ses, c, u):
-                    try:
-                        _ch = {
-                            'User-Agent': m.FB_LITE_UA,
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                            'Accept-Language': 'en-US,en;q=0.9',
-                            'Accept-Encoding': 'gzip, deflate, br',
-                            'x-requested-with': 'com.facebook.lite',
-                        }
-                        for _url in [
-                            'https://m.facebook.com/confirmemail.php',
-                            'https://m.facebook.com/confirmemail.php?soft=hjk',
-                        ]:
-                            try:
-                                from bs4 import BeautifulSoup as _BS
-                                _r = ses.get(_url, headers=_ch, timeout=12, allow_redirects=True)
-                                if _r.status_code != 200:
-                                    continue
-                                _soup = _BS(_r.text, 'html.parser')
-                                _form = _soup.find('form')
-                                if not _form:
-                                    continue
-                                _act = _form.get('action', _url)
-                                if _act and not _act.startswith('http'):
-                                    _act = 'https://m.facebook.com' + _act
-                                _fd = {i.get('name'): i.get('value', '')
-                                       for i in _form.find_all('input') if i.get('name')}
-                                _fd['code'] = c
-                                _pr = ses.post(_act, data=_fd, headers={
-                                    **_ch,
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                    'Origin': 'https://m.facebook.com',
-                                    'Referer': _url,
-                                }, timeout=12, allow_redirects=True)
-                                _final = str(_pr.url).lower()
-                                if 'checkpoint' in _final:
-                                    task_queue.put({'type': 'confirm_result', 'uid': u, 'status': 'checkpoint'})
-                                elif ('home.php' in _final or _final.rstrip('/').endswith('facebook.com')
-                                        or 'confirmed' in _pr.text.lower()):
-                                    task_queue.put({'type': 'confirm_result', 'uid': u,
-                                                    'status': 'confirmed', 'method': 'webhook'})
-                                return
-                            except Exception:
-                                continue
-                    except Exception:
-                        pass
-                threading.Thread(target=_submit, args=(ses_entry['ses'], code, uid), daemon=True).start()
 
         elif fb_link:
+            ses_entry = None
+            with _session_lock:
+                ses_entry = _session_store.get(uid)
             if ses_entry:
                 def _follow_link(ses, link, u):
                     try:
