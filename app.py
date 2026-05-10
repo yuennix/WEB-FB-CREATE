@@ -509,12 +509,20 @@ def _extract_code_from_body(body):
     plain = _BS(body, 'html.parser').get_text(separator=' ') if body else ''
     clean = _re.sub(r'https?://\S+', ' ', plain)
     pats  = [
-        r'(?:confirmation|verification)\s*code[:\s\-]+(\d{5,6})',
-        r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
-        r'code[:\s\-]+(\d{5,6})\b',
+        # "confirmation code is 847291" / "confirmation code: 847291"
+        r'(?:confirmation|verification)\s*code[\s\w]*?[:\s\-]+(\d{5,6})',
+        # "your confirmation code is 847291" / "your code is 847291"
+        r'(?:your|the)\s+(?:\w+\s+)*?(?:confirmation\s+)?code[\s\w]*?[:\-]?\s*(\d{5,6})',
+        # "code: 847291" or "code — 847291"
+        r'code[:\s\-]+(\d{5,6})',
+        # "847291 is your code" / "847291 to confirm"
         r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm)',
+        # "enter code: 847291"
         r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
-        r'(?:^|\s)(\d{5,6})(?:\s|$)',
+        # standalone 6-digit number (most permissive — number followed by non-digit or end)
+        r'(?<!\d)(\d{6})(?!\d)',
+        # standalone 5-digit number
+        r'(?<!\d)(\d{5})(?!\d)',
     ]
     for pat in pats:
         match = _re.search(pat, clean, _re.IGNORECASE | _re.MULTILINE)
@@ -890,19 +898,22 @@ def admin_webhook_test():
         return jsonify({'error': 'Unauthorized'}), 401
     import requests as _req
     token = _get_webhook_secret()
-    base  = _get_base_url()
-    url   = f'{base}/webhook/email?secret={token}'
-    fake_body = (
-        'Your Facebook confirmation code is <b>123456</b>. '
-        'Do not share this code with anyone.'
-    )
+    # Use localhost to avoid SSL certificate issues with the Replit proxy
+    port  = int(os.environ.get('PORT', 5000))
+    url   = f'http://localhost:{port}/webhook/email?secret={token}'
+    # Simulate exactly what mailwip/hanami.run sends: multipart/form-data
+    # with an "email" field containing the email data as a JSON string
+    import json as _json
+    fake_email_json = _json.dumps({
+        'from':    'security@facebookmail.com',
+        'to':      'test@exceweyn.run.place',
+        'subject': 'Your Facebook confirmation code',
+        'body':    'Your confirmation code is 123456. Enter this code to confirm your account.',
+    })
     try:
-        r = _req.post(url, json={
-            'to':      'test@exceweyn.run.place',
-            'subject': 'Facebook confirmation',
-            'html':    fake_body,
-        }, timeout=8)
-        return jsonify({'status': 'sent', 'response_code': r.status_code, 'response': r.json()})
+        r = _req.post(url, data={'email': fake_email_json}, timeout=8)
+        return jsonify({'status': 'sent', 'response_code': r.status_code,
+                        'response': r.json(), 'webhook_url': _get_base_url() + f'/webhook/email?secret={token}'})
     except Exception as e:
         return jsonify({'status': 'error', 'msg': str(e)}), 500
 
@@ -941,11 +952,22 @@ def webhook_email():
     if not secret or secret != _get_webhook_secret():
         return jsonify({'error': 'Unauthorized'}), 401
 
-    # ── Parse body (JSON or form) ──────────────────────────────────────────
+    # ── Parse body (JSON, form, or mailwip multipart) ─────────────────────
     if request.is_json:
         data = request.get_json(silent=True) or {}
     else:
         data = request.form.to_dict()
+
+    # ── Mailwip/hanami.run: sends multipart/form-data with an "email" field
+    # that contains the actual email as a JSON string. Unpack it first.
+    if 'email' in data and isinstance(data.get('email'), str):
+        try:
+            _inner = json.loads(data['email'])
+            if isinstance(_inner, dict):
+                # Merge inner fields, letting them override the outer form fields
+                data = {**data, **_inner}
+        except Exception:
+            pass
 
     def _pick(*keys):
         for k in keys:
@@ -959,8 +981,13 @@ def webhook_email():
     body    = _pick('html', 'body-html', 'HtmlBody', 'bodyHtml',
                     'body', 'text', 'body-plain', 'TextBody', 'bodyText')
 
+    # Log what arrived for debugging
+    print(f'[webhook] to={to_addr!r} subj={subject!r} body_len={len(body)} keys={list(data.keys())}')
+
     if not to_addr or not body:
-        return jsonify({'error': 'Missing to or body'}), 400
+        # Return 200 so mailwip doesn't retry forever, but log what we got
+        print(f'[webhook] missing field — raw data keys: {list(data.keys())}')
+        return jsonify({'error': 'Missing to or body', 'received_keys': list(data.keys())}), 200
 
     # Normalise — strip display name if present: "Name <addr>" → "addr"
     m_addr = _re.search(r'<([^>]+)>', to_addr)
