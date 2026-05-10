@@ -1028,8 +1028,11 @@ async function retryConfirm(uid) {
     } else if (result.status === 'not_found') {
       if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
       if (retry)  retry.style.display = '';
+    } else if (result.status === 'waiting_webhook') {
+      if (status) { status.className = 'confirm-status fetching'; status.textContent = '📡 Waiting for webhook push — check your mail server.'; }
+      if (retry)  retry.style.display = '';
     } else if (result.status === 'unsupported_domain') {
-      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.msg || result.error || 'Domain not configured'); }
       if (retry)  retry.style.display = '';
     } else {
       _startFetchTimer(uid);

@@ -527,9 +527,9 @@ def _extract_code_from_body(body):
 
 @app.route('/fetch-code-now', methods=['POST'])
 def fetch_code_now():
-    """Directly poll supported temp-mail inboxes and return the FB confirmation code.
-    Called by the Retry Fetch button — no SSE dependency.
-    Supports: harakirimail.com, tempmail.io"""
+    """Poll any supported inbox and return the FB confirmation code.
+    Supports: harakirimail.com, 1secmail.com, all tempmail.io domains,
+    any custom IMAP domain, and webhook domains (checks stored payload)."""
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
     data  = request.json or {}
@@ -671,7 +671,43 @@ def fetch_code_now():
             time.sleep(3)
         return jsonify({'status': 'not_found'})
 
-    return jsonify({'status': 'unsupported_domain'}), 400
+    # ── Custom IMAP / Webhook domains ────────────────────────────────────────
+    cfg = dm.get_imap_config(domain)
+    if cfg:
+        dtype = cfg.get('type', 'imap')
+        if dtype == 'webhook':
+            # Webhook domains receive email via HTTP POST — nothing to poll.
+            # If a code was already stored by the webhook handler, return it.
+            stored = _sto.load(f'webhook_code_{uid}', None)
+            if stored and isinstance(stored, dict) and stored.get('code'):
+                code = stored['code']
+                task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                return jsonify({'code': code})
+            return jsonify({'status': 'waiting_webhook',
+                            'msg': 'Waiting for email via webhook — check your mail server is forwarding correctly.'})
+        # IMAP domain
+        imap_host = cfg.get('imap_host', f'mail.{domain}')
+        imap_user = cfg.get('imap_user', f'admin@{domain}')
+        imap_pass = cfg.get('imap_pass', '')
+        try:
+            body = m._poll_imap_inbox(
+                to_addr=email,
+                imap_host=imap_host,
+                imap_user=imap_user,
+                imap_pass=imap_pass,
+                timeout_secs=28,
+            )
+            if body:
+                code = _extract_code_from_body(body)
+                if code:
+                    task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                    return jsonify({'code': code})
+        except Exception:
+            pass
+        return jsonify({'status': 'not_found'})
+
+    return jsonify({'status': 'unsupported_domain',
+                    'msg': f'No inbox handler configured for {domain}'}), 400
 
 
 @app.route('/status')
