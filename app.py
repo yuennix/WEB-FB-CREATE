@@ -848,13 +848,15 @@ def admin_add_custom():
 
 
 def _get_base_url():
-    """Return the public base URL, preferring Railway/custom env vars over request host."""
-    public = os.environ.get('PUBLIC_URL', '').rstrip('/')
-    if public:
-        return public
-    railway = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
-    if railway:
-        return f'https://{railway.rstrip("/")}'
+    """Return the public base URL, preferring Replit domain, then request host."""
+    replit_domains = os.environ.get('REPLIT_DOMAINS', '').strip()
+    if replit_domains:
+        first = replit_domains.split(',')[0].strip()
+        if first:
+            return f'https://{first}'
+    replit_dev = os.environ.get('REPLIT_DEV_DOMAIN', '').strip()
+    if replit_dev:
+        return f'https://{replit_dev}'
     return request.host_url.rstrip('/')
 
 
@@ -879,6 +881,30 @@ def admin_webhook_secret_regenerate():
     token = _secrets.token_urlsafe(32)
     _sto.save('webhook_secret', {'token': token})
     return jsonify({'token': token})
+
+
+@app.route('/admin/api/webhook-test', methods=['POST'])
+def admin_webhook_test():
+    """Send a simulated webhook POST to ourselves to verify the endpoint works."""
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    import requests as _req
+    token = _get_webhook_secret()
+    base  = _get_base_url()
+    url   = f'{base}/webhook/email?secret={token}'
+    fake_body = (
+        'Your Facebook confirmation code is <b>123456</b>. '
+        'Do not share this code with anyone.'
+    )
+    try:
+        r = _req.post(url, json={
+            'to':      'test@exceweyn.run.place',
+            'subject': 'Facebook confirmation',
+            'html':    fake_body,
+        }, timeout=8)
+        return jsonify({'status': 'sent', 'response_code': r.status_code, 'response': r.json()})
+    except Exception as e:
+        return jsonify({'status': 'error', 'msg': str(e)}), 500
 
 @app.route('/admin/api/domains/remove', methods=['POST'])
 def admin_remove_domain():

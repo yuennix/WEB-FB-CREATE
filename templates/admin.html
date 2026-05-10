@@ -599,15 +599,58 @@
 
   <!-- Webhook Secret Management -->
   <div id="webhookSecretSection" style="margin-top:32px;">
-    <div class="section-label">Webhook Secret</div>
-    <div style="background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
-      <div style="font-size:12px;color:#64748b;">This secret is included in your webhook URL. Keep it private — anyone with this URL can push email data to your server.</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <code id="webhookSecretDisplay" style="flex:1;font-family:monospace;font-size:12px;color:#93c5fd;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</code>
-        <button onclick="regenerateWebhookSecret()" class="save-btn" style="white-space:nowrap;">↺ Regenerate</button>
+    <div class="section-label">Webhook Setup</div>
+    <div style="background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
+
+      <div style="font-size:12px;color:#64748b;">Your mail server must forward incoming emails to this webhook URL. Copy it and paste it in your mail provider's forwarding/routing settings.</div>
+
+      <!-- Full webhook URL -->
+      <div>
+        <div style="font-size:11px;color:#475569;margin-bottom:4px;">📡 Webhook Endpoint (copy this into your mail server):</div>
+        <div style="display:flex;gap:6px;align-items:stretch;flex-wrap:wrap;">
+          <code id="webhookFullUrl" style="flex:1;font-family:monospace;font-size:11px;color:#bfdbfe;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;min-width:0;" onclick="copyText(this.textContent)">loading…</code>
+          <button onclick="copyText(document.getElementById('webhookFullUrl').textContent)" class="save-btn" style="white-space:nowrap;padding:0 14px;">📋 Copy</button>
+        </div>
       </div>
-      <div style="font-size:11px;color:#475569;">Full webhook endpoint:</div>
-      <code id="webhookFullUrl" style="font-family:monospace;font-size:11px;color:#bfdbfe;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</code>
+
+      <!-- Setup guide -->
+      <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:9px;padding:12px 14px;font-size:12px;color:#fcd34d;line-height:1.8;">
+        <div style="font-weight:700;margin-bottom:6px;color:#f59e0b;">⚙️ How to configure your mail server</div>
+        <div style="color:#e2e8f0;">For <b>exceweyn.run.place</b> (or any custom domain), you need to set up email routing so that every email arriving at <code style="color:#93c5fd;">*@yourdomain.com</code> is forwarded as an HTTP POST to the webhook URL above.</div>
+        <br>
+        <div style="color:#94a3b8;font-size:11px;line-height:1.9;">
+          <b style="color:#fcd34d;">Option A — Cloudflare Email Routing (free &amp; easy):</b><br>
+          1. Go to Cloudflare → your domain → <b>Email → Email Routing</b><br>
+          2. Enable Email Routing, add a <b>catch-all</b> rule<br>
+          3. Set action = <b>Send to a Worker</b><br>
+          4. Create a Worker that does <code>fetch(webhookUrl, {method:'POST', body: emailJson})</code><br>
+          <br>
+          <b style="color:#fcd34d;">Option B — Mailgun (easiest webhook support):</b><br>
+          1. Add your domain in Mailgun → <b>Receiving → Routes</b><br>
+          2. Create route: match all → <b>Forward → paste your webhook URL above</b><br>
+          3. Set MX records on your domain to Mailgun's servers<br>
+          <br>
+          <b style="color:#fcd34d;">Option C — Forwardemail.net (free):</b><br>
+          1. Add domain → create <b>catch-all webhook</b><br>
+          2. Paste the webhook URL above as the destination<br>
+          3. Set their MX records on your domain DNS<br>
+        </div>
+      </div>
+
+      <!-- Secret key row -->
+      <div>
+        <div style="font-size:11px;color:#475569;margin-bottom:4px;">🔑 Secret Token (embedded in the URL above — keep private):</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <code id="webhookSecretDisplay" style="flex:1;font-family:monospace;font-size:12px;color:#93c5fd;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</code>
+          <button onclick="regenerateWebhookSecret()" class="save-btn" style="white-space:nowrap;">↺ Regenerate</button>
+        </div>
+      </div>
+
+      <!-- Test button -->
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button onclick="testWebhook()" class="save-btn" style="background:linear-gradient(135deg,#059669,#047857);">🧪 Send Test Webhook</button>
+        <span id="webhookTestResult" style="font-size:12px;color:#64748b;"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -892,7 +935,8 @@ async function loadWebhookSecret() {
     _webhookToken = sd.token || '';
     document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
     document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
-    document.getElementById('webhookUrlPreview').textContent = _webhookUrl(_webhookToken);
+    const prev = document.getElementById('webhookUrlPreview');
+    if (prev) prev.textContent = _webhookUrl(_webhookToken);
   } catch(e) {}
 }
 
@@ -902,8 +946,28 @@ async function regenerateWebhookSecret() {
   _webhookToken = d.token || '';
   document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
   document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
-  document.getElementById('webhookUrlPreview').textContent = _webhookUrl(_webhookToken);
+  const prev = document.getElementById('webhookUrlPreview');
+  if (prev) prev.textContent = _webhookUrl(_webhookToken);
   toast('✓ Webhook secret regenerated');
+}
+
+async function testWebhook() {
+  const el = document.getElementById('webhookTestResult');
+  el.textContent = '⏳ Sending test…';
+  el.style.color = '#64748b';
+  try {
+    const d = await api('/admin/api/webhook-test', 'POST');
+    if (d.status === 'sent' && d.response_code === 200) {
+      el.textContent = '✅ Webhook reachable! Endpoint is working correctly.';
+      el.style.color = '#4ade80';
+    } else {
+      el.textContent = `⚠️ Got ${d.response_code}: ${JSON.stringify(d.response)}`;
+      el.style.color = '#fbbf24';
+    }
+  } catch(e) {
+    el.textContent = '❌ Error: ' + e.message;
+    el.style.color = '#f87171';
+  }
 }
 
 async function loadDomains() {
