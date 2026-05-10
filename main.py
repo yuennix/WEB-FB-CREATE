@@ -2467,6 +2467,46 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             if result_queue:
                 result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
 
+    def _poll_webhook():
+        """
+        Poll storage every 3s for up to 2.5 min waiting for the webhook
+        endpoint to store a confirmation code for this uid.
+        When found, push confirm_code event and attempt auto-submit.
+        """
+        import storage as _storage
+        _wh_key  = f'webhook_code_{uid}'
+        _deadline = time.time() + 150
+        print(f"{C}  [webhook] Waiting for code via webhook for {email} (uid={uid})…{W}")
+        while time.time() < _deadline and not _stop_poll.is_set():
+            try:
+                _stored = _storage.load(_wh_key, None)
+                if _stored and isinstance(_stored, dict) and _stored.get('code'):
+                    _c = str(_stored['code'])
+                    # Clear so retries don't re-use a stale code
+                    _storage.save(_wh_key, {})
+                    print(f"{G}  [webhook] Code received → {_c}{W}")
+                    if result_queue:
+                        result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                    _stop_poll.set()
+                    # Attempt auto-submit; report result
+                    _as = _auto_submit_code(_c)
+                    print(f"{G}  [webhook] Auto-submit result: {_as}{W}")
+                    if result_queue:
+                        if _as == 'confirmed':
+                            result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                              'status': 'confirmed', 'method': 'code'})
+                        elif _as == 'checkpoint':
+                            result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                              'status': 'checkpoint'})
+                    return
+            except Exception as _we:
+                print(f"{Y}  [webhook] poll error: {_we}{W}")
+            time.sleep(3)
+        if not _stop_poll.is_set():
+            print(f"{Y}  [!] No webhook code for {email} within 2.5 min{W}")
+            if result_queue:
+                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
+
     try:
         if _is_secmail:
             # Start polling immediately, triggers run in parallel
@@ -2487,8 +2527,12 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             _run_triggers()
             _pt.join(timeout=150)
         else:
-            # Custom domain — just fire triggers, no polling
+            # Webhook domain — fire FB resend triggers, then poll storage
+            # for the code that the webhook endpoint will store when it arrives.
+            _pt = _th2.Thread(target=_poll_webhook, daemon=True)
+            _pt.start()
             _run_triggers()
+            _pt.join(timeout=150)
     except Exception:
         pass
 
