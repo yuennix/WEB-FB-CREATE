@@ -968,6 +968,8 @@ def webhook_email():
 
         if code:
             task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+            # Store so the Retry Fetch button can retrieve it too
+            _sto.save(f'webhook_code_{uid}', {'code': code})
             # Auto-submit the code using the stored session
             if ses_entry:
                 def _submit(ses, c, u):

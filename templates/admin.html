@@ -646,7 +646,7 @@
         <div class="cr-fg">
           <label>Email Domain</label>
           <select id="c-emailDomain" onchange="cOnDomainChange()">
-            <option value="1secmail.com">1secmail.com (Auto API)</option>
+            <option value="1secmail.com">1secmail.com</option>
           </select>
         </div>
         <div class="cr-fg" id="c-domainPassRow" style="display:none;">
@@ -1036,12 +1036,12 @@ async function cLoadDomains() {
     sel.innerHTML = '';
     (d.temp || []).forEach(dom => {
       const o = document.createElement('option');
-      o.value = dom; o.textContent = dom + ' (Auto API)';
+      o.value = dom; o.textContent = dom;
       sel.appendChild(o);
     });
     _cCustomDomains.forEach(dom => {
       const o = document.createElement('option');
-      o.value = dom; o.textContent = dom + ' (Custom)';
+      o.value = dom; o.textContent = dom;
       sel.appendChild(o);
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;

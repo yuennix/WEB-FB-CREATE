@@ -684,7 +684,7 @@
         <div class="form-group">
           <label class="field-label">Email Domain</label>
           <select id="emailDomain" onchange="onDomainChange()">
-            <option value="1secmail.com">1secmail (Auto API)</option>
+            <option value="1secmail.com">1secmail.com</option>
           </select>
         </div>
 
@@ -819,13 +819,13 @@ async function loadDomains() {
     (d.temp || []).forEach(dom => {
       const o = document.createElement('option');
       o.value = dom;
-      o.textContent = dom + ' (Auto API)';
+      o.textContent = dom;
       sel.appendChild(o);
     });
     _customDomains.forEach(dom => {
       const o = document.createElement('option');
       o.value = dom;
-      o.textContent = dom + ' (Custom)';
+      o.textContent = dom;
       sel.appendChild(o);
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
