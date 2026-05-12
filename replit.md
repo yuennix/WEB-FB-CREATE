@@ -13,9 +13,9 @@ A Flask web application for automating the creation of Facebook accounts. Featur
 - `static/` - Static assets
 
 ## Running the App
-The app starts with gunicorn on port 5000:
+The app starts with gunicorn on port 5000 using gevent workers for concurrent SSE streams:
 ```
-gunicorn --bind 0.0.0.0:5000 --reuse-port --reload app:app
+gunicorn --bind 0.0.0.0:5000 --reuse-port --reload --worker-class gevent --workers 4 --worker-connections 1000 --timeout 300 app:app
 ```
 
 ## Dependencies
