@@ -47,35 +47,8 @@ def _get_webhook_secret():
     _sto.save('webhook_secret', {'token': token})
     return token
 
-# ── SSE broadcaster — fan-out every event to all connected clients ────────────
-class _Broadcaster:
-    def __init__(self):
-        self._lock    = threading.Lock()
-        self._clients = set()
-
-    def subscribe(self):
-        q = queue.Queue()
-        with self._lock:
-            self._clients.add(q)
-        return q
-
-    def unsubscribe(self, q):
-        with self._lock:
-            self._clients.discard(q)
-
-    def put(self, item):
-        with self._lock:
-            dead = []
-            for q in self._clients:
-                try:
-                    q.put_nowait(item)
-                except queue.Full:
-                    dead.append(q)
-            for q in dead:
-                self._clients.discard(q)
-
 # ── Global job state ─────────────────────────────────────────────────────────
-task_queue   = _Broadcaster()
+task_queue   = queue.Queue()
 result_store = []
 job_running  = False
 job_lock     = threading.Lock()
@@ -476,20 +449,16 @@ def stream():
         return jsonify({'error': 'Unauthorized'}), 401
 
     def generate():
-        client_q = task_queue.subscribe()
-        try:
-            yield 'retry: 3000\n\n'
-            empty = 0
-            while empty < 38:   # close after ~5 min of silence (38 × 8 s)
-                try:
-                    item = client_q.get(timeout=8)
-                    empty = 0
-                    yield f'data: {json.dumps(item)}\n\n'
-                except queue.Empty:
-                    empty += 1
-                    yield f'data: {json.dumps({"type": "ping"})}\n\n'
-        finally:
-            task_queue.unsubscribe(client_q)
+        yield 'retry: 3000\n\n'   # tell browser to wait 3 s before native reconnect
+        empty = 0
+        while empty < 38:   # close after ~5 min of silence (38 × 8 s)
+            try:
+                item = task_queue.get(timeout=8)
+                empty = 0
+                yield f'data: {json.dumps(item)}\n\n'
+            except queue.Empty:
+                empty += 1
+                yield f'data: {json.dumps({"type": "ping"})}\n\n'
 
     return Response(
         generate(),

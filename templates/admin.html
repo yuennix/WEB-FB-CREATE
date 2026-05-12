@@ -747,7 +747,7 @@
 
     <div class="copy-all-bar" id="c-copyAllBar" onclick="cCopyAllAccounts()">
       <span class="copy-all-bar-icon">⎘</span>
-      <span class="copy-all-bar-text" id="c-copyAllText">Copy All Accounts &nbsp;<span>(email|password|code)</span></span>
+      <span class="copy-all-bar-text" id="c-copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
     </div>
 
     <div class="cr-tab-content active" id="c-tc-log">
@@ -1114,7 +1114,6 @@ let cStartTime     = null;
 let _cCustomDomains = [];
 let _cTimerTick = null;
 let cAllAccounts   = [];
-let _cAcctData     = {};
 const _cAcqtEmails = {};  // uid -> email for retry fetch
 
 function _cStartTicker() {
@@ -1206,27 +1205,21 @@ function cCopyAllAccounts() {
     setTimeout(() => { label.innerHTML = orig; }, 2000);
     return;
   }
-  const lines = cAllAccounts.map(uid => {
-    const d    = _cAcctData[uid] || {};
-    const code = (document.getElementById(`cci-${uid}`) || {}).value || '';
-    return `${d.email || ''}|${d.password || ''}|${code}`;
-  });
-  const text = lines.join('\n');
+  const text = cAllAccounts.join('\n');
   navigator.clipboard.writeText(text).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
   });
   bar.classList.add('copied');
-  label.innerHTML = `✓ Copied ${cAllAccounts.length} account${cAllAccounts.length !== 1 ? 's' : ''} (email|password|code)!`;
+  label.innerHTML = `✓ Copied ${cAllAccounts.length} account${cAllAccounts.length !== 1 ? 's' : ''} (uid|password)!`;
   setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
 }
 
 function cAddAccount(data) {
   const empty = document.getElementById('c-acctEmpty');
   if (empty) empty.remove();
-  cAllAccounts.push(data.uid);
-  _cAcctData[data.uid] = { email: data.email || '', password: data.password || '' };
+  cAllAccounts.push(`${data.uid}|${data.password}`);
   if (data.uid && data.email) _cAcqtEmails[data.uid] = data.email;
   const panel = document.getElementById('c-accts-panel');
   const copyAll = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
