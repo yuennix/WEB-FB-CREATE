@@ -1180,6 +1180,11 @@ async function startJob() {
   _startTicker();
   addLog(`Job started — creating ${count} account(s) on ${emailDomain}`, 'info');
   if (eventSource) eventSource.close();
+  _connectStream();
+}
+
+function _connectStream() {
+  if (eventSource) { eventSource.close(); eventSource = null; }
   eventSource = new EventSource('/stream');
   eventSource.onmessage = (e) => {
     const msg = JSON.parse(e.data);
@@ -1193,13 +1198,27 @@ async function startJob() {
       setRunning(false);
       _stopTicker();
       eventSource.close();
+      eventSource = null;
       document.getElementById('progressLabel').textContent = 'Completed';
     }
   };
   eventSource.onerror = () => {
-    setRunning(false);
-    addLog('Connection lost.', 'warn');
-    eventSource.close();
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    // Check if the job is still running on the server before giving up
+    fetch('/status').then(r => r.json()).then(s => {
+      if (s.running) {
+        addLog('Connection dropped — reconnecting…', 'warn');
+        setTimeout(_connectStream, 3000);
+      } else {
+        setRunning(false);
+        _stopTicker();
+        addLog('Connection lost. Job finished or was stopped.', 'warn');
+      }
+    }).catch(() => {
+      // Server unreachable — retry anyway
+      addLog('Connection dropped — retrying…', 'warn');
+      setTimeout(_connectStream, 5000);
+    });
   };
 }
 

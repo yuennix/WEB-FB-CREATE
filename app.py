@@ -441,10 +441,11 @@ def stream():
         return jsonify({'error': 'Unauthorized'}), 401
 
     def generate():
+        yield 'retry: 3000\n\n'   # tell browser to wait 3 s before native reconnect
         empty = 0
-        while empty < 15:   # close after ~5 min of silence
+        while empty < 38:   # close after ~5 min of silence (38 × 8 s)
             try:
-                item = task_queue.get(timeout=20)
+                item = task_queue.get(timeout=8)
                 empty = 0
                 yield f'data: {json.dumps(item)}\n\n'
             except queue.Empty:
