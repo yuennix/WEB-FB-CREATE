@@ -2475,7 +2475,7 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         _login   = email.split('@')[0]
         _seen    = set()
         _deadline = time.time() + 150
-        print(f"{C}  [weyn-emails] Polling inbox for {email}…{W}")
+        print(f"{G}  [weyn-emails] Polling inbox for {email}…{W}")
         while time.time() < _deadline and not _stop_poll.is_set():
             try:
                 _r = requests.get(f'{_WEYN_EMAILS_API}/api/emails', timeout=10)
@@ -2515,7 +2515,7 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                                                       'status': 'checkpoint'})
                             return
             except Exception as _we:
-                print(f"{Y}  [weyn-emails] poll error: {_we}{W}")
+                print(f"{Y}  [weyn-emails] error: {_we}{W}")
             time.sleep(3)
         if not _stop_poll.is_set():
             print(f"{Y}  [!] No weyn-emails code for {email} within 2.5 min{W}")
