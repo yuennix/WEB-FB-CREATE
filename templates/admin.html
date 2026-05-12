@@ -994,14 +994,14 @@ async function loadDomains() {
 
   const customList = document.getElementById('customDomainList');
   customList.innerHTML = '';
-  (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain)));
+  (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain, true)));
 }
 
-function domainPill(domain, customType) {
+function domainPill(domain, isCustom) {
   const pill = document.createElement('div');
   pill.className = 'domain-pill';
   pill.innerHTML = `
-    <span>${esc(domain)}</span>
+    <span>${isCustom ? '🔒 ' : ''}${esc(domain)}</span>
     <button class="rm" title="Remove domain" onclick="removeDomain('${esc(domain)}')">×</button>
   `;
   return pill;
