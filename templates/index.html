@@ -825,7 +825,7 @@ async function loadDomains() {
     _customDomains.forEach(dom => {
       const o = document.createElement('option');
       o.value = dom;
-      o.textContent = dom;
+      o.textContent = '🔒 ' + dom;
       sel.appendChild(o);
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
