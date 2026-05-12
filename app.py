@@ -322,6 +322,8 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                         return
                     done_count[0] += 1
                     current = done_count[0]
+                    if done_count[0] >= num:
+                        job_running = False  # target reached — stop all other workers immediately
 
                 result = {
                     'num':      current,
