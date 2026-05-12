@@ -90,12 +90,37 @@ def request_access(name, reason=''):
     return key, user_id
 
 
-def check_key(key):
+def check_key(key, ip=None):
     with _lock:
         data = _load()
         if key not in data:
             return 'invalid', None
-        return data[key]['status'], data[key]
+        entry = data[key]
+        if ip and entry.get('status') == 'approved':
+            locked_ip = entry.get('locked_ip')
+            if locked_ip and locked_ip != ip:
+                return 'ip_mismatch', entry
+        return entry['status'], entry
+
+
+def lock_key_to_ip(key, ip):
+    """Lock a key to the given IP on first successful login."""
+    with _lock:
+        data = _load()
+        if key in data and not data[key].get('locked_ip'):
+            data[key]['locked_ip'] = ip
+            _save(data)
+
+
+def unlock_key_ip(key):
+    """Remove the IP lock from a key (admin reset)."""
+    with _lock:
+        data = _load()
+        if key in data and data[key].get('locked_ip'):
+            data[key]['locked_ip'] = None
+            _save(data)
+            return True
+    return False
 
 
 def touch_key(key):

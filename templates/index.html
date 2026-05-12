@@ -914,7 +914,7 @@ function addAccount(data) {
                onclick="if(this.value){navigator.clipboard.writeText(this.value).catch(()=>{});this.select();const s=document.getElementById('cs-${data.uid}');const o=s&&s.textContent;if(s){s.textContent='✓ Copied!';setTimeout(()=>{if(s)s.textContent=o;},1000);}}"
                style="cursor:pointer;">
       </div>
-      <div id="retry-row-${data.uid}" style="display:none;margin-top:4px;">
+      <div id="retry-row-${data.uid}" style="display:block;margin-top:4px;">
         <button class="confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="retryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
       </div>
       <div id="${statusId}" class="confirm-status ${_isAutoFetch ? 'fetching' : ''}">${_isAutoFetch ? '⏳ Fetching code from inbox…' : ''}</div>
@@ -948,7 +948,7 @@ function _scheduleAutoRetry(uid) {
   const status = document.getElementById(`cs-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
 
-  // Show retry button immediately so user can also click manually
+  // Show retry button immediately when account is created
   if (retry) retry.style.display = '';
 
   let secs = 5;
@@ -986,7 +986,6 @@ function handleConfirmResult(uid, statusVal) {
   const retry  = document.getElementById(`retry-row-${uid}`);
   if (statusVal === 'confirmed') {
     if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed via link!'; }
-    if (retry)  retry.style.display = 'none';
     addLog(`✓ Confirmed via link: UID ${uid}`, 'success');
   } else if (statusVal === 'checkpoint') {
     if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint — try again.'; }
@@ -1007,7 +1006,6 @@ async function retryConfirm(uid) {
   const input  = document.getElementById(`ci-${uid}`);
   const email  = _acctEmails[uid] || '';
 
-  if (retry)  retry.style.display = 'none';
   if (status) { status.className = 'confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
 
   try {

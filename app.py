@@ -109,12 +109,21 @@ def request_access():
     return jsonify({'key': key, 'user_id': user_id})
 
 
+def _get_client_ip():
+    xff = request.headers.get('X-Forwarded-For', '')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.remote_addr
+
+
 @app.route('/verify-key', methods=['POST'])
 def verify_key():
     data   = request.json or {}
     key    = (data.get('key') or '').strip().upper()
-    status, entry = auth.check_key(key)
+    ip     = _get_client_ip()
+    status, entry = auth.check_key(key, ip=ip)
     if status == 'approved':
+        auth.lock_key_to_ip(key, ip)
         auth.touch_key(key)
         resp = jsonify({
             'status': 'approved',
@@ -123,6 +132,8 @@ def verify_key():
         })
         resp.set_cookie('access_key', key, max_age=60*60*24*30, httponly=True, samesite='Lax', path='/')
         return resp
+    if status == 'ip_mismatch':
+        return jsonify({'status': 'ip_mismatch'})
     return jsonify({'status': status})
 
 
@@ -149,7 +160,8 @@ def _require_auth():
     key = request.cookies.get('access_key', '')
     if not key:
         return False
-    status, _ = auth.check_key(key)
+    ip = _get_client_ip()
+    status, _ = auth.check_key(key, ip=ip)
     return status == 'approved'
 
 
@@ -679,6 +691,41 @@ def fetch_code_now():
             time.sleep(3)
         return jsonify({'status': 'not_found'})
 
+    # ── weyn-emails (cunt.abrdns.com, jinbilowg.cloud-ip.cc, yuennix.work.gd) ─
+    _WEYN_EMAILS_API     = 'https://weyn-emails-production.up.railway.app'
+    _WEYN_EMAILS_DOMAINS = {'cunt.abrdns.com', 'jinbilowg.cloud-ip.cc', 'yuennix.work.gd'}
+    if domain in _WEYN_EMAILS_DOMAINS:
+        while time.time() < deadline:
+            try:
+                r = m.requests.get(f'{_WEYN_EMAILS_API}/api/emails', timeout=10)
+                if r.status_code == 200:
+                    msgs = r.json() if isinstance(r.json(), list) else []
+                    for msg in msgs:
+                        if str(msg.get('toAddress', '')).lower() != email.lower():
+                            continue
+                        mid = str(msg.get('id', ''))
+                        if mid in seen_ids:
+                            continue
+                        from_t = str(msg.get('fromAddress', '')).lower()
+                        subj_t = str(msg.get('subject', '')).lower()
+                        is_fb  = ('facebook' in from_t or 'facebookmail' in from_t
+                                   or 'meta' in from_t
+                                   or 'confirm' in subj_t or 'code' in subj_t
+                                   or 'verification' in subj_t or 'registration' in subj_t)
+                        seen_ids.add(mid)
+                        if not is_fb:
+                            continue
+                        body     = str(msg.get('bodyHtml') or msg.get('bodyText') or '')
+                        combined = str(msg.get('subject', '')) + ' ' + body
+                        code = _extract_code_from_body(combined)
+                        if code:
+                            task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                            return jsonify({'code': code})
+            except Exception:
+                pass
+            time.sleep(3)
+        return jsonify({'status': 'not_found'})
+
     # ── Custom IMAP / Webhook domains ────────────────────────────────────────
     cfg = dm.get_imap_config(domain)
     if cfg:
@@ -779,6 +826,7 @@ def admin_users():
             'created_at':  v.get('created_at'),
             'approved_at': v.get('approved_at'),
             'last_seen':   v.get('last_seen'),
+            'locked_ip':   v.get('locked_ip'),
         })
     result.sort(key=lambda x: x.get('created_at') or 0, reverse=True)
     return jsonify(result)
@@ -809,6 +857,15 @@ def admin_revoke(uid):
     if ok:
         return jsonify({'status': 'revoked'})
     return jsonify({'error': 'User not found'}), 404
+
+@app.route('/admin/api/reset-ip/<uid>', methods=['POST'])
+def admin_reset_ip(uid):
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    ok = auth.unlock_key_ip(uid.upper())
+    if ok:
+        return jsonify({'status': 'reset'})
+    return jsonify({'error': 'User not found or no IP lock set'}), 404
 
 @app.route('/admin/api/remove/<uid>', methods=['POST'])
 def admin_remove(uid):

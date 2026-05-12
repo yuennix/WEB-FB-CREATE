@@ -644,6 +644,10 @@ async function _tryAutoLogin() {
     const d = await r.json();
     if (d.status === 'approved') {
       window.location.href = '/';
+    } else if (d.status === 'ip_mismatch') {
+      localStorage.removeItem('weyn_key');
+      switchTab('login');
+      showMsg('loginMsg', '🔒 This key is locked to another device/IP. Contact admin to reset it.', 'error');
     } else if (d.status === 'rejected' || d.status === 'revoked' || d.status === 'invalid') {
       localStorage.removeItem('weyn_key');
     }
@@ -681,6 +685,8 @@ async function verifyKey() {
     } else if (d.status === 'revoked') {
       localStorage.removeItem('weyn_key');
       showMsg('loginMsg', '🚫 This key has been revoked. Contact admin.', 'error');
+    } else if (d.status === 'ip_mismatch') {
+      showMsg('loginMsg', '🔒 This key is already locked to another device/IP. Contact admin to reset it.', 'error');
     } else {
       showMsg('loginMsg', 'Invalid key. Check and try again.', 'error');
     }

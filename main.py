@@ -1821,11 +1821,14 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         '1secmail.com', '1secmail.net', '1secmail.org',
         'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
     }
-    _HARAKIRI_DOMAINS  = {'harakirimail.com'}
+    _HARAKIRI_DOMAINS    = {'harakirimail.com'}
+    _WEYN_EMAILS_DOMAINS = {'cunt.abrdns.com', 'jinbilowg.cloud-ip.cc', 'yuennix.work.gd'}
+    _WEYN_EMAILS_API     = 'https://weyn-emails-production.up.railway.app'
     _domain = email.split('@')[1].lower() if '@' in email else ''
-    _is_secmail      = _domain in _SECMAIL_DOMAINS
-    _is_harakiri     = _domain in _HARAKIRI_DOMAINS
-    _is_tempmail_io  = _domain in _TEMPMAIL_IO_DOMAIN_SET
+    _is_secmail       = _domain in _SECMAIL_DOMAINS
+    _is_harakiri      = _domain in _HARAKIRI_DOMAINS
+    _is_tempmail_io   = _domain in _TEMPMAIL_IO_DOMAIN_SET
+    _is_weyn_emails   = _domain in _WEYN_EMAILS_DOMAINS
 
     _ch = {
         'User-Agent': FB_LITE_UA,
@@ -2467,6 +2470,58 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
             if result_queue:
                 result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
 
+    def _poll_weyn_emails():
+        """Poll weyn-emails API every 3s for up to 2.5 min."""
+        _login   = email.split('@')[0]
+        _seen    = set()
+        _deadline = time.time() + 150
+        print(f"{C}  [weyn-emails] Polling inbox for {email}…{W}")
+        while time.time() < _deadline and not _stop_poll.is_set():
+            try:
+                _r = requests.get(f'{_WEYN_EMAILS_API}/api/emails', timeout=10)
+                if _r.status_code == 200:
+                    _msgs = _r.json() if isinstance(_r.json(), list) else []
+                    for _msg in _msgs:
+                        if str(_msg.get('toAddress', '')).lower() != email.lower():
+                            continue
+                        _mid = str(_msg.get('id', ''))
+                        if _mid in _seen:
+                            continue
+                        _from_t = str(_msg.get('fromAddress', '')).lower()
+                        _subj_t = str(_msg.get('subject', '')).lower()
+                        _is_fb  = ('facebook' in _from_t or 'facebookmail' in _from_t
+                                    or 'meta' in _from_t
+                                    or 'confirm' in _subj_t or 'code' in _subj_t
+                                    or 'verification' in _subj_t or 'registration' in _subj_t)
+                        _seen.add(_mid)
+                        if not _is_fb:
+                            continue
+                        _body     = str(_msg.get('bodyHtml') or _msg.get('bodyText') or '')
+                        _combined = str(_msg.get('subject', '')) + ' ' + _body
+                        _c = _process_body(_combined)
+                        if _c:
+                            print(f"{G}  [weyn-emails] Code found → {_c}{W}")
+                            if result_queue:
+                                result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                            _stop_poll.set()
+                            _as = _auto_submit_code(_c)
+                            print(f"{G}  [weyn-emails] Auto-submit result: {_as}{W}")
+                            if result_queue:
+                                if _as == 'confirmed':
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                                      'status': 'confirmed', 'method': 'code'})
+                                elif _as == 'checkpoint':
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                                      'status': 'checkpoint'})
+                            return
+            except Exception as _we:
+                print(f"{Y}  [weyn-emails] poll error: {_we}{W}")
+            time.sleep(3)
+        if not _stop_poll.is_set():
+            print(f"{Y}  [!] No weyn-emails code for {email} within 2.5 min{W}")
+            if result_queue:
+                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
+
     def _poll_webhook():
         """
         Poll storage every 3s for up to 2.5 min waiting for the webhook
@@ -2523,6 +2578,12 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         elif _is_tempmail_io:
             # tempmail.io: poll REST API + fire FB resend triggers
             _pt = _th2.Thread(target=_poll_tempmail_io, daemon=True)
+            _pt.start()
+            _run_triggers()
+            _pt.join(timeout=150)
+        elif _is_weyn_emails:
+            # weyn-emails: poll REST API + fire FB resend triggers
+            _pt = _th2.Thread(target=_poll_weyn_emails, daemon=True)
             _pt.start()
             _run_triggers()
             _pt.join(timeout=150)

@@ -217,6 +217,8 @@
   .act-revoke:hover  { background: rgba(251,191,36,0.18); }
   .act-remove  { background: transparent; color: #334155; border: 1px solid rgba(255,255,255,0.07); }
   .act-remove:hover  { color: #f87171; border-color: rgba(248,113,113,0.3); }
+  .act-reset-ip { background: rgba(96,165,250,0.08); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
+  .act-reset-ip:hover { background: rgba(96,165,250,0.16); }
 
   .empty-users { text-align: center; color: #1e293b; padding: 40px; font-size: 13px; font-weight: 500; }
 
@@ -860,6 +862,9 @@ function buildCard(u) {
                <button class="act-btn act-reject"  onclick="rejectUser('${u.key}','${u.user_id}')">✗ Reject</button>`;
   } else if (u.status === 'approved') {
     actions = `<button class="act-btn act-revoke" onclick="revokeUser('${u.user_id}')">⊘ Revoke</button>`;
+    if (u.locked_ip) {
+      actions += ` <button class="act-btn act-reset-ip" onclick="resetIp('${u.user_id}')" title="Locked to: ${esc(u.locked_ip)}">🔓 Reset IP</button>`;
+    }
   }
   actions += `<button class="act-btn act-remove" onclick="removeUser('${u.user_id}')">🗑</button>`;
 
@@ -891,6 +896,12 @@ async function rejectUser(key, uid) {
 async function revokeUser(uid) {
   const d = await api(`/admin/api/revoke/${uid}`, 'POST');
   if (d.status === 'revoked') { toast('Access revoked.'); refreshCard(uid, 'revoked'); }
+  else toast(d.error || 'Error', true);
+}
+
+async function resetIp(uid) {
+  const d = await api(`/admin/api/reset-ip/${uid}`, 'POST');
+  if (d.status === 'reset') { toast('🔓 IP lock removed — user can log in from any device.'); loadUsers(); }
   else toast(d.error || 'Error', true);
 }
 
@@ -1199,7 +1210,7 @@ function cAddAccount(data) {
                onclick="if(this.value){navigator.clipboard.writeText(this.value).catch(()=>{});this.select();const s=document.getElementById('ccs-${data.uid}');const o=s&&s.textContent;if(s){s.textContent='✓ Copied!';setTimeout(()=>{if(s)s.textContent=o;},1000);}}"
                style="cursor:pointer;">
       </div>
-      <div id="c-retry-row-${data.uid}" style="display:none;margin-top:4px;">
+      <div id="c-retry-row-${data.uid}" style="display:block;margin-top:4px;">
         <button class="c-confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="cRetryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
       </div>
       <div id="ccs-${data.uid}" class="c-confirm-status ${_isAuto ? 'fetching' : ''}">${_isAuto ? '⏳ Fetching code from inbox…' : ''}</div>
@@ -1326,7 +1337,6 @@ function cHandleConfirmResult(uid, statusVal) {
   const retry  = document.getElementById(`c-retry-row-${uid}`);
   if (statusVal === 'confirmed') {
     if (status) { status.className = 'c-confirm-status confirmed'; status.textContent = '✓ Email confirmed via link!'; }
-    if (retry)  retry.style.display = 'none';
     cAddLog(`✓ Confirmed via link: UID ${uid}`, 'success');
   } else if (statusVal === 'checkpoint') {
     if (status) { status.className = 'c-confirm-status checkpoint'; status.textContent = '⚠ Checkpoint — try again.'; }
@@ -1346,7 +1356,6 @@ async function cRetryConfirm(uid) {
   const input  = document.getElementById(`cci-${uid}`);
   const email  = _cAcqtEmails[uid] || '';
 
-  if (retry)  retry.style.display = 'none';
   if (input)  { input.value = ''; input.classList.remove('code-ready'); }
   if (status) { status.className = 'c-confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
 
