@@ -759,7 +759,7 @@
 
     <div class="copy-all-bar" id="copyAllBar" onclick="copyAllAccounts(this)">
       <span class="copy-all-bar-icon">⎘</span>
-      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
+      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(email|password|code)</span></span>
     </div>
 
     <div class="tab-content active" id="tab-log">
@@ -792,6 +792,7 @@ let startTime = null;
 let _customDomains = [];
 let _timerTick = null;
 let allAccounts = [];
+let _acctData   = {};
 
 function _startTicker() {
   if (_timerTick) clearInterval(_timerTick);
@@ -876,8 +877,8 @@ function addLog(msg, level) {
 
 function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
-  const uidPass = `${data.uid}|${data.password}`;
-  allAccounts.push(uidPass);
+  allAccounts.push(data.uid);
+  _acctData[data.uid] = { email: data.email || '', password: data.password || '' };
   if (data.uid && data.email) _acctEmails[data.uid] = data.email;
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
@@ -1099,14 +1100,19 @@ function copyAllAccounts(el) {
     setTimeout(() => { label.innerHTML = orig; }, 2000);
     return;
   }
-  const text = allAccounts.join('\n');
+  const lines = allAccounts.map(uid => {
+    const d    = _acctData[uid] || {};
+    const code = (document.getElementById(`ci-${uid}`) || {}).value || '';
+    return `${d.email || ''}|${d.password || ''}|${code}`;
+  });
+  const text = lines.join('\n');
   navigator.clipboard.writeText(text).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
   });
   bar.classList.add('copied');
-  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (uid|password)!`;
+  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (email|password|code)!`;
   setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
 }
 
