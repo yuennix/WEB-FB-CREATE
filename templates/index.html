@@ -203,6 +203,7 @@
     background: rgba(0,230,118,0.02);
   }
   select option { background: #0e1420; }
+  #emailDomain { font-size: 12px; }
   input::placeholder { color: #1e293b; }
 
   .domain-pass-row { display: none; flex-direction: column; gap: 5px; }
@@ -819,13 +820,14 @@ async function loadDomains() {
     (d.temp || []).forEach(dom => {
       const o = document.createElement('option');
       o.value = dom;
-      o.textContent = dom;
+      const tag = dom.includes('1secmail') ? ' (no code)' : ' (w/code)';
+      o.textContent = dom + tag;
       sel.appendChild(o);
     });
     _customDomains.forEach(dom => {
       const o = document.createElement('option');
       o.value = dom;
-      o.textContent = '🔒 ' + dom;
+      o.textContent = '🔒 ' + dom + ' (w/code)';
       sel.appendChild(o);
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
