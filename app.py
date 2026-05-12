@@ -71,7 +71,7 @@ def index():
     key = request.cookies.get('access_key', '')
     if key:
         status, entry = auth.check_key(key)
-        if status == 'approved':
+        if status in ('approved', 'consumed'):
             auth.touch_key(key)
             return render_template('index.html', user_name=entry.get('name', ''))
     return render_template('login.html')
@@ -124,9 +124,12 @@ def verify_key():
     key    = (data.get('key') or '').strip().upper()
     ip     = _get_client_ip()
     status, entry = auth.check_key(key, ip=ip)
+    if status == 'consumed':
+        return jsonify({'status': 'already_used'})
     if status == 'approved':
         auth.lock_key_to_ip(key, ip)
         auth.touch_key(key)
+        auth.mark_consumed(key)
         resp = jsonify({
             'status': 'approved',
             'name':    entry['name'],
@@ -164,7 +167,7 @@ def _require_auth():
         return False
     ip = _get_client_ip()
     status, _ = auth.check_key(key, ip=ip)
-    return status == 'approved'
+    return status in ('approved', 'consumed')
 
 
 # ── Main routes ───────────────────────────────────────────────────────────────

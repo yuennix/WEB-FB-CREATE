@@ -580,13 +580,19 @@ function startPolling(key) {
         wm.className = 'msg msg-success show';
         wm.textContent = '✅ Approved! Logging you in…';
         setTimeout(async () => {
-          await fetch('/verify-key', {
+          const vr = await fetch('/verify-key', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key }),
           });
-          localStorage.setItem('weyn_key', key);
-          window.location.href = '/';
+          const vd = await vr.json();
+          if (vd.status === 'approved') {
+            localStorage.setItem('weyn_key', key);
+            window.location.href = '/';
+          } else {
+            wm.className = 'msg msg-error show';
+            wm.textContent = '⚠️ Login failed unexpectedly. Please contact admin.';
+          }
         }, 1200);
       } else if (d.status === 'rejected') {
         clearInterval(pollInterval);
@@ -644,6 +650,8 @@ async function _tryAutoLogin() {
     const d = await r.json();
     if (d.status === 'approved') {
       window.location.href = '/';
+    } else if (d.status === 'already_used') {
+      localStorage.removeItem('weyn_key');
     } else if (d.status === 'ip_mismatch') {
       localStorage.removeItem('weyn_key');
       switchTab('login');
@@ -677,6 +685,9 @@ async function verifyKey() {
       localStorage.setItem('weyn_key', key);
       showMsg('loginMsg', `✓ Welcome, ${d.name}!`, 'success');
       setTimeout(() => window.location.href = '/', 800);
+    } else if (d.status === 'already_used') {
+      localStorage.removeItem('weyn_key');
+      showMsg('loginMsg', '🔒 This key has already been used on another device and cannot be reused. Contact admin for a new key.', 'error');
     } else if (d.status === 'pending') {
       showMsg('loginMsg', '⏳ Your key is still pending admin approval.', 'warn');
     } else if (d.status === 'rejected') {

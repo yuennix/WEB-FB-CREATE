@@ -96,11 +96,22 @@ def check_key(key, ip=None):
         if key not in data:
             return 'invalid', None
         entry = data[key]
+        if entry.get('consumed') and entry.get('status') == 'approved':
+            return 'consumed', entry
         if ip and entry.get('status') == 'approved':
             locked_ip = entry.get('locked_ip')
             if locked_ip and locked_ip != ip:
                 return 'ip_mismatch', entry
         return entry['status'], entry
+
+
+def mark_consumed(key):
+    """Mark a key as consumed — no further logins allowed with it."""
+    with _lock:
+        data = _load()
+        if key in data:
+            data[key]['consumed'] = True
+            _save(data)
 
 
 def lock_key_to_ip(key, ip):
