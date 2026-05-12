@@ -195,10 +195,11 @@ def start():
             if domain_password != dm.get_domain_password():
                 return jsonify({'error': 'Wrong domain password'}), 403
 
-        result_store  = []
-        done_count[0] = 0
-        cp_count[0]   = 0
-        job_running   = True
+        result_store      = []
+        done_count[0]     = 0
+        cp_count[0]       = 0
+        _net_fail_count[0] = 0
+        job_running       = True
 
         while not task_queue.empty():
             try:
@@ -217,8 +218,17 @@ def start():
 
 # ── Exact _create_one from main.py ────────────────────────────────────────────
 
+# Shared counter for consecutive network failures across all workers
+_net_fail_count = [0]
+_NET_FAIL_LIMIT  = 5   # stop the whole job after this many consecutive network errors
+
 def _create_one(name_type, gender, password_type, custom_password, num, session_id):
     global job_running
+
+    import requests as _req_mod
+    from requests.exceptions import ConnectionError as _ConnErr, Timeout as _TimeoutErr
+
+    _consecutive_net_errors = 0   # per-worker consecutive network error counter
 
     while True:
         with lock:
@@ -229,6 +239,11 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             ses      = m.requests.Session()
             response = ses.get("https://m.facebook.com/reg/", timeout=15)
             form     = m.extractor(response.text)
+
+            # Reset network-error counters on a successful connection
+            _consecutive_net_errors = 0
+            with lock:
+                _net_fail_count[0] = 0
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
                 task_queue.put({'type': 'log', 'level': 'warn',
@@ -390,6 +405,30 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                     cp_count[0] += 1
                 task_queue.put({'type': 'log', 'level': 'warn',
                                 'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
+
+        except (_ConnErr, _TimeoutErr) as e:
+            _consecutive_net_errors += 1
+            with lock:
+                _net_fail_count[0] += 1
+                current_net_fails = _net_fail_count[0]
+
+            # Only log the first occurrence per worker to avoid flooding
+            if _consecutive_net_errors == 1:
+                task_queue.put({'type': 'log', 'level': 'error',
+                                'msg': f'Network error: {e}'})
+
+            # If enough workers have reported network failures, kill the job
+            if current_net_fails >= _NET_FAIL_LIMIT:
+                with lock:
+                    if job_running:
+                        job_running = False
+                        task_queue.put({'type': 'log', 'level': 'error',
+                                        'msg': '⛔ Network unreachable — Facebook cannot be reached from this server. Job stopped.'})
+                return
+
+            # Exponential-ish backoff: 2s, 4s, 8s, cap at 15s
+            backoff = min(2 ** _consecutive_net_errors, 15)
+            time.sleep(backoff)
 
         except Exception as e:
             task_queue.put({'type': 'log', 'level': 'error', 'msg': str(e)})
