@@ -62,7 +62,7 @@ done_count = [0]
 cp_count   = [0]
 
 
-WORKERS = 50   # 50 parallel workers
+WORKERS = 100   # 100 parallel workers
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
