@@ -455,12 +455,6 @@ def stream():
             try:
                 item = task_queue.get(timeout=8)
                 empty = 0
-                # Persist the confirmation code to the DB as soon as it arrives
-                if item.get('type') == 'confirm_code' and item.get('uid') and item.get('code'):
-                    try:
-                        _sto.update_account_code(item['uid'], item['code'])
-                    except Exception:
-                        pass
                 yield f'data: {json.dumps(item)}\n\n'
             except queue.Empty:
                 empty += 1

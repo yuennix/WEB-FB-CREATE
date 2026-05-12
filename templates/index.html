@@ -757,15 +757,9 @@
       <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#1e293b;">(0)</span></div>
     </div>
 
-    <div style="display:flex;gap:8px;flex-shrink:0;">
-      <div class="copy-all-bar" id="copyAllBar" onclick="copyAllUID(this)" style="flex:1;">
-        <span class="copy-all-bar-icon">⎘</span>
-        <span class="copy-all-bar-text" id="copyAllText">Copy All &nbsp;<span>(uid|password)</span></span>
-      </div>
-      <div class="copy-all-bar" id="copyAllBarEmail" onclick="copyAllEmail(this)" style="flex:1;">
-        <span class="copy-all-bar-icon">⎘</span>
-        <span class="copy-all-bar-text" id="copyAllEmailText">Copy All &nbsp;<span>(email|password|code)</span></span>
-      </div>
+    <div class="copy-all-bar" id="copyAllBar" onclick="copyAllAccounts(this)">
+      <span class="copy-all-bar-icon">⎘</span>
+      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
     </div>
 
     <div class="tab-content active" id="tab-log">
@@ -798,8 +792,6 @@ let startTime = null;
 let _customDomains = [];
 let _timerTick = null;
 let allAccounts = [];
-let allAccountsEmail = [];   // [{uid, email, password, code}] — index mirrors allAccounts
-const _acctCodeMap = {};     // uid -> index in allAccountsEmail
 
 function _startTicker() {
   if (_timerTick) clearInterval(_timerTick);
@@ -886,9 +878,6 @@ function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
   const uidPass = `${data.uid}|${data.password}`;
   allAccounts.push(uidPass);
-  const emailEntry = { uid: data.uid, email: data.email || '', password: data.password || '', code: '' };
-  _acctCodeMap[data.uid] = allAccountsEmail.length;
-  allAccountsEmail.push(emailEntry);
   if (data.uid && data.email) _acctEmails[data.uid] = data.email;
   const panel = document.getElementById('accounts-panel');
   const card = document.createElement('div');
@@ -932,10 +921,7 @@ function addAccount(data) {
       </div>
       <div id="${statusId}" class="confirm-status ${_isAutoFetch ? 'fetching' : ''}">${_isAutoFetch ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
-    <div style="display:flex;gap:6px;position:absolute;top:10px;right:10px;">
-      <button class="acct-copy-all" title="Copy uid|password" onclick="copyField(this, '${escAttr(uidPass)}')">uid|pass</button>
-      <button class="acct-copy-all" id="epbtn-${data.uid}" title="Copy email|password|code" onclick="copyField(this, getEmailPassCode('${escAttr(data.uid)}'))">email|pass|code</button>
-    </div>
+    <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
   panel.appendChild(card);
   createdCount++;
@@ -983,21 +969,11 @@ function _scheduleAutoRetry(uid) {
   _countdownTimers[uid] = setInterval(_tick, 1000);
 }
 
-function getEmailPassCode(uid) {
-  const idx = _acctCodeMap[uid];
-  if (idx === undefined) return '';
-  const e = allAccountsEmail[idx];
-  return `${e.email}|${e.password}|${e.code}`;
-}
-
 function autofillCode(uid, code) {
   _clearFetchTimer(uid);
   const input  = document.getElementById(`ci-${uid}`);
   const status = document.getElementById(`cs-${uid}`);
   const retry  = document.getElementById(`retry-row-${uid}`);
-  // Update in-memory entry so copy-all and per-card button pick up the code
-  const idx = _acctCodeMap[uid];
-  if (idx !== undefined) allAccountsEmail[idx].code = code;
   // Fill the code box — do NOT auto-submit
   if (input)  { input.value = code; input.classList.add('code-ready'); }
   if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + code + ' (tap to copy)'; }
@@ -1114,34 +1090,24 @@ async function submitCode(uid) {
   }
 }
 
-function _doCopyBar(barId, labelId, text, countLabel) {
-  const bar   = document.getElementById(barId);
-  const label = document.getElementById(labelId);
+function copyAllAccounts(el) {
+  const bar   = document.getElementById('copyAllBar');
+  const label = document.getElementById('copyAllText');
   const orig  = label.innerHTML;
-  if (!text) {
+  if (!allAccounts.length) {
     label.innerHTML = 'No accounts this session yet';
     setTimeout(() => { label.innerHTML = orig; }, 2000);
     return;
   }
+  const text = allAccounts.join('\n');
   navigator.clipboard.writeText(text).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
   });
   bar.classList.add('copied');
-  label.innerHTML = `✓ Copied ${countLabel}!`;
+  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (uid|password)!`;
   setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
-}
-
-function copyAllUID() {
-  const n = allAccounts.length;
-  _doCopyBar('copyAllBar', 'copyAllText', allAccounts.join('\n'), `${n} account${n !== 1 ? 's' : ''} (uid|password)`);
-}
-
-function copyAllEmail() {
-  const lines = allAccountsEmail.map(e => `${e.email}|${e.password}|${e.code}`);
-  const n = lines.length;
-  _doCopyBar('copyAllBarEmail', 'copyAllEmailText', lines.join('\n'), `${n} account${n !== 1 ? 's' : ''} (email|password|code)`);
 }
 
 function copyField(btn, text) {
@@ -1189,8 +1155,6 @@ async function startJob() {
 
   createdCount = 0; targetCount = count; startTime = Date.now();
   allAccounts = [];
-  allAccountsEmail = [];
-  Object.keys(_acctCodeMap).forEach(k => delete _acctCodeMap[k]);
   document.getElementById('statCreated').textContent = '0';
   document.getElementById('statTotal').textContent   = count;
   document.getElementById('statTime').textContent    = '0s';

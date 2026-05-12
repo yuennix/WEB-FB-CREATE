@@ -36,21 +36,19 @@ def _ensure_table():
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
-                id            SERIAL PRIMARY KEY,
-                session_id    TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
-                uid           TEXT NOT NULL,
-                password      TEXT NOT NULL,
-                name          TEXT DEFAULT '',
-                email         TEXT DEFAULT '',
-                confirm_code  TEXT DEFAULT '',
-                created_at    TIMESTAMP DEFAULT NOW()
+                id         SERIAL PRIMARY KEY,
+                session_id TEXT REFERENCES sessions(session_id) ON DELETE CASCADE,
+                uid        TEXT NOT NULL,
+                password   TEXT NOT NULL,
+                name       TEXT DEFAULT '',
+                email      TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
             )
         """)
         cur.execute("""
             ALTER TABLE accounts
-                ADD COLUMN IF NOT EXISTS name         TEXT DEFAULT '',
-                ADD COLUMN IF NOT EXISTS email        TEXT DEFAULT '',
-                ADD COLUMN IF NOT EXISTS confirm_code TEXT DEFAULT ''
+                ADD COLUMN IF NOT EXISTS name  TEXT DEFAULT '',
+                ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''
         """)
         conn.commit()
         cur.close()
@@ -204,8 +202,8 @@ def save_account(session_id, uid, password, name='', email=''):
             conn = _get_conn()
             cur  = conn.cursor()
             cur.execute(
-                "INSERT INTO accounts (session_id, uid, password, name, email, confirm_code) VALUES (%s, %s, %s, %s, %s, %s)",
-                (session_id, uid, password, name, email, '')
+                "INSERT INTO accounts (session_id, uid, password, name, email) VALUES (%s, %s, %s, %s, %s)",
+                (session_id, uid, password, name, email)
             )
             conn.commit()
             cur.close()
@@ -215,39 +213,9 @@ def save_account(session_id, uid, password, name='', email=''):
     else:
         try:
             with open('weynFBCreate.txt', 'a') as f:
-                f.write(f"{email}|{password}|\n")
+                f.write(f"{uid}|{password}\n")
         except Exception as e:
             print(f'[storage] save_account file error: {e}')
-
-
-def update_account_code(uid, code):
-    """Store the confirmation code for an account after it is received."""
-    if _DB_URL:
-        _init_db()
-        try:
-            conn = _get_conn()
-            cur  = conn.cursor()
-            cur.execute(
-                "UPDATE accounts SET confirm_code = %s WHERE uid = %s",
-                (code, uid)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-        except Exception as e:
-            print(f'[storage] update_account_code error: {e}')
-    else:
-        # Rewrite the file replacing the line for this uid with the code filled in
-        try:
-            with open('weynFBCreate.txt', 'r') as f:
-                lines = f.readlines()
-            with open('weynFBCreate.txt', 'w') as f:
-                for line in lines:
-                    parts = line.rstrip('\n').split('|')
-                    # Format is email|password|code — uid not stored in file, skip rewrite
-                    f.write(line)
-        except Exception as e:
-            print(f'[storage] update_account_code file error: {e}')
 
 
 def get_accounts_text():
@@ -259,7 +227,7 @@ def get_accounts_text():
             cur  = conn.cursor()
             cur.execute("""
                 SELECT s.session_id, s.started_at, s.count, s.domain,
-                       a.uid, a.password, a.name, a.email, a.confirm_code
+                       a.uid, a.password, a.name, a.email
                 FROM   sessions s
                 JOIN   accounts a ON a.session_id = s.session_id
                 ORDER  BY s.started_at ASC, a.id ASC
@@ -273,14 +241,14 @@ def get_accounts_text():
 
             lines         = []
             current_sid   = None
-            for sid, started_at, count, domain, uid, password, name, email, confirm_code in rows:
+            for sid, started_at, count, domain, uid, password, name, email in rows:
                 if sid != current_sid:
                     current_sid = sid
                     ts = started_at.strftime('%Y-%m-%d %H:%M:%S') if started_at else '—'
                     lines.append(f"\n{'='*60}")
                     lines.append(f" SESSION {ts} | {count} account(s) | {domain}")
                     lines.append('='*60)
-                lines.append(f"{email}|{password}|{confirm_code or ''}")
+                lines.append(f"{uid}|{password}")
             return '\n'.join(lines)
         except Exception as e:
             print(f'[storage] get_accounts_text error: {e}')
@@ -294,17 +262,17 @@ def get_accounts_text():
 
 
 def get_accounts_list():
-    """Return all accounts as a list of 'email|password|code' strings (no session headers)."""
+    """Return all accounts as a list of 'uid|password' strings (no session headers)."""
     if _DB_URL:
         _init_db()
         try:
             conn = _get_conn()
             cur  = conn.cursor()
-            cur.execute("SELECT uid, password, name, email, confirm_code FROM accounts ORDER BY id ASC")
+            cur.execute("SELECT uid, password, name, email FROM accounts ORDER BY id ASC")
             rows = cur.fetchall()
             cur.close()
             conn.close()
-            return [f"{email}|{password}|{confirm_code or ''}" for uid, password, name, email, confirm_code in rows]
+            return [f"{uid}|{password}" for uid, password, name, email in rows]
         except Exception as e:
             print(f'[storage] get_accounts_list error: {e}')
             return []
