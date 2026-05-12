@@ -786,6 +786,7 @@
 
 <script>
 let eventSource = null;
+let currentJobId = null;
 let createdCount = 0;
 let targetCount = 0;
 let startTime = null;
@@ -1176,16 +1177,19 @@ async function startJob() {
   });
   if (!resp.ok) { const err = await resp.json(); alert('Error: ' + (err.error || 'Unknown')); return; }
 
+  const result = await resp.json();
+  currentJobId = result.job_id;
+
   setRunning(true);
   _startTicker();
   addLog(`Job started — creating ${count} account(s) on ${emailDomain}`, 'info');
   if (eventSource) eventSource.close();
-  _connectStream();
+  _connectStream(currentJobId);
 }
 
-function _connectStream() {
+function _connectStream(jobId) {
   if (eventSource) { eventSource.close(); eventSource = null; }
-  eventSource = new EventSource('/stream');
+  eventSource = new EventSource('/stream?job_id=' + jobId);
   eventSource.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'ping') return;
@@ -1204,26 +1208,28 @@ function _connectStream() {
   };
   eventSource.onerror = () => {
     if (eventSource) { eventSource.close(); eventSource = null; }
-    // Check if the job is still running on the server before giving up
-    fetch('/status').then(r => r.json()).then(s => {
+    fetch('/status?job_id=' + jobId).then(r => r.json()).then(s => {
       if (s.running) {
         addLog('Connection dropped — reconnecting…', 'warn');
-        setTimeout(_connectStream, 3000);
+        setTimeout(() => _connectStream(jobId), 3000);
       } else {
         setRunning(false);
         _stopTicker();
         addLog('Connection lost. Job finished or was stopped.', 'warn');
       }
     }).catch(() => {
-      // Server unreachable — retry anyway
       addLog('Connection dropped — retrying…', 'warn');
-      setTimeout(_connectStream, 5000);
+      setTimeout(() => _connectStream(jobId), 5000);
     });
   };
 }
 
 async function stopJob() {
-  await fetch('/stop', { method: 'POST' });
+  await fetch('/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: currentJobId }),
+  });
   setRunning(false);
   _stopTicker();
   addLog('Stop requested.', 'warn');

@@ -47,20 +47,23 @@ def _get_webhook_secret():
     _sto.save('webhook_secret', {'token': token})
     return token
 
-# ── Global job state ─────────────────────────────────────────────────────────
-task_queue   = queue.Queue()
-result_store = []
-job_running  = False
-job_lock     = threading.Lock()
+# ── Per-job state registry ────────────────────────────────────────────────────
+_jobs      = {}          # job_id -> job state dict
+_jobs_lock = threading.Lock()
+
+def _new_job_state():
+    return {
+        'task_queue':   queue.Queue(),
+        'result_store': [],
+        'running':      True,
+        'lock':         threading.Lock(),
+        'done_count':   [0],
+        'cp_count':     [0],
+    }
 
 # ── Session store for retry-confirm ──────────────────────────────────────────
-_session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str}
+_session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
-
-lock       = threading.Lock()
-done_count = [0]
-cp_count   = [0]
-
 
 WORKERS = 50   # 50 parallel workers
 
@@ -185,52 +188,46 @@ def start():
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
 
-    global job_running, result_store, done_count, cp_count
-    with job_lock:
-        if job_running:
-            return jsonify({'error': 'A job is already running'}), 400
+    import uuid as _uuid
+    data            = request.json
+    name_type       = data.get('name_type', '1')
+    email_domain    = data.get('email_domain', '1secmail.com')
+    domain_password = data.get('domain_password', '')
+    count           = max(1, min(int(data.get('count', 1)), 200))
+    password_type   = data.get('password_type', 'auto')
+    custom_password = data.get('custom_password', '')
+    gender          = data.get('gender', '3')
 
-        data            = request.json
-        name_type       = data.get('name_type', '1')
-        email_domain    = data.get('email_domain', '1secmail.com')
-        domain_password = data.get('domain_password', '')
-        count           = max(1, min(int(data.get('count', 1)), 200))
-        password_type   = data.get('password_type', 'auto')
-        custom_password = data.get('custom_password', '')
-        gender          = data.get('gender', '3')
+    if email_domain in dm.get_custom_domains():
+        if domain_password != dm.get_domain_password():
+            return jsonify({'error': 'Wrong domain password'}), 403
 
-        if email_domain in dm.get_custom_domains():
-            if domain_password != dm.get_domain_password():
-                return jsonify({'error': 'Wrong domain password'}), 403
+    job_id = _uuid.uuid4().hex
+    job    = _new_job_state()
+    with _jobs_lock:
+        _jobs[job_id] = job
 
-        result_store  = []
-        done_count[0] = 0
-        cp_count[0]   = 0
-        job_running   = True
+    threading.Thread(
+        target=run_creation,
+        args=(name_type, email_domain, count, password_type, custom_password, gender, job_id, job),
+        daemon=True,
+    ).start()
 
-        while not task_queue.empty():
-            try:
-                task_queue.get_nowait()
-            except queue.Empty:
-                break
-
-        threading.Thread(
-            target=run_creation,
-            args=(name_type, email_domain, count, password_type, custom_password, gender),
-            daemon=True,
-        ).start()
-
-    return jsonify({'status': 'started'})
+    return jsonify({'status': 'started', 'job_id': job_id})
 
 
-# ── Exact _create_one from main.py ────────────────────────────────────────────
+# ── Worker ────────────────────────────────────────────────────────────────────
 
-def _create_one(name_type, gender, password_type, custom_password, num, session_id):
-    global job_running
+def _create_one(name_type, gender, password_type, custom_password, num, session_id, email_domain, job):
+    jq   = job['task_queue']
+    jlk  = job['lock']
+    jdc  = job['done_count']
+    jcp  = job['cp_count']
+    jrs  = job['result_store']
 
     while True:
-        with lock:
-            if done_count[0] >= num or not job_running:
+        with jlk:
+            if jdc[0] >= num or not job['running']:
                 return
 
         try:
@@ -239,8 +236,8 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
-                task_queue.put({'type': 'log', 'level': 'warn',
-                                'msg': 'Could not load reg page, retrying…'})
+                jq.put({'type': 'log', 'level': 'warn',
+                        'msg': 'Could not load reg page, retrying…'})
                 continue
 
             if name_type == '2':
@@ -262,6 +259,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             else:
                 fb_sex = m.random.choice(["1", "2"])
 
+            m.EMAIL_DOMAIN = email_domain
             phone = m.get_email_for_registration(firstname, lastname)
             pww   = m.get_pass() if password_type == 'auto' else custom_password
 
@@ -325,13 +323,13 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             if "c_user" in login_coki:
                 uid = login_coki["c_user"]
 
-                with lock:
-                    if done_count[0] >= num or not job_running:
+                with jlk:
+                    if jdc[0] >= num or not job['running']:
                         return
-                    done_count[0] += 1
-                    current = done_count[0]
-                    if done_count[0] >= num:
-                        job_running = False  # target reached — stop all other workers immediately
+                    jdc[0] += 1
+                    current = jdc[0]
+                    if jdc[0] >= num:
+                        job['running'] = False
 
                 result = {
                     'num':      current,
@@ -341,7 +339,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                     'uid':      uid,
                     'status':   'success',
                 }
-                result_store.append(result)
+                jrs.append(result)
 
                 _tmail_tok = ''
                 _phone_dom = phone.split('@')[1].lower() if '@' in phone else ''
@@ -352,17 +350,17 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                     _session_store[uid] = {
                         'ses': ses, 'email': phone, 'password': pww,
                         'tmail_token': _tmail_tok,
+                        'job_id': job.get('job_id', ''),
                     }
 
                 _sto.save_account(session_id, uid, pww,
                                   name=f'{firstname} {lastname}', email=phone)
 
-
-                task_queue.put({'type': 'account', 'data': result,
-                                'created': current, 'target': num})
-                task_queue.put({'type': 'log', 'level': 'success',
-                                'msg': (f'[{current}/{num}] ✓ '
-                                        f'{firstname} {lastname} | {phone} | UID:{uid}')})
+                jq.put({'type': 'account', 'data': result,
+                        'created': current, 'target': num})
+                jq.put({'type': 'log', 'level': 'success',
+                        'msg': (f'[{current}/{num}] ✓ '
+                                f'{firstname} {lastname} | {phone} | UID:{uid}')})
 
                 _instant_urls = [
                     'https://m.facebook.com/confirmemail.php?send=1',
@@ -389,56 +387,57 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
                 threading.Thread(
                     target=m._full_email_confirm,
-                    args=(ses, phone, uid, pww, task_queue),
+                    args=(ses, phone, uid, pww, jq),
                     daemon=False,
                 ).start()
 
             elif "checkpoint" in login_coki:
-                with lock:
-                    cp_count[0] += 1
-                task_queue.put({'type': 'log', 'level': 'warn',
-                                'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
+                with jlk:
+                    jcp[0] += 1
+                jq.put({'type': 'log', 'level': 'warn',
+                        'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
 
         except Exception as e:
-            task_queue.put({'type': 'log', 'level': 'error', 'msg': str(e)})
+            jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
-def run_creation(name_type, email_domain, count, password_type, custom_password, gender):
-    global job_running
-
+def run_creation(name_type, email_domain, count, password_type, custom_password, gender, job_id, job):
     import uuid
     session_id = str(uuid.uuid4())
 
-    m.EMAIL_DOMAIN = email_domain
+    job['job_id'] = job_id
+    jq = job['task_queue']
 
     _sto.save_session(session_id, count, email_domain)
 
-    task_queue.put({'type': 'log', 'level': 'info',
-                    'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
+    jq.put({'type': 'log', 'level': 'info',
+            'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
 
     try:
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             futures = [
-                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id)
+                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
                 for _ in range(WORKERS)
             ]
             for f in as_completed(futures):
                 try:
                     f.result()
                 except Exception as e:
-                    task_queue.put({'type': 'log', 'level': 'error', 'msg': str(e)})
+                    jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
     finally:
-        job_running = False
-        task_queue.put({
+        job['running'] = False
+        jq.put({
             'type':       'done',
             'total':      count,
-            'created':    done_count[0],
-            'checkpoint': cp_count[0],
-            'msg':        (f'Done — {done_count[0]}/{count} created'
-                           + (f', {cp_count[0]} checkpointed' if cp_count[0] else '') + '.'),
+            'created':    job['done_count'][0],
+            'checkpoint': job['cp_count'][0],
+            'msg':        (f'Done — {job["done_count"][0]}/{count} created'
+                           + (f', {job["cp_count"][0]} checkpointed' if job['cp_count'][0] else '') + '.'),
         })
+        with _jobs_lock:
+            _jobs.pop(job_id, None)
 
 
 # ── SSE stream ────────────────────────────────────────────────────────────────
@@ -448,12 +447,20 @@ def stream():
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
 
+    job_id = request.args.get('job_id', '')
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if not job:
+        return jsonify({'error': 'Invalid job_id'}), 404
+
+    jq = job['task_queue']
+
     def generate():
-        yield 'retry: 3000\n\n'   # tell browser to wait 3 s before native reconnect
+        yield 'retry: 3000\n\n'
         empty = 0
-        while empty < 38:   # close after ~5 min of silence (38 × 8 s)
+        while empty < 38:
             try:
-                item = task_queue.get(timeout=8)
+                item = jq.get(timeout=8)
                 empty = 0
                 yield f'data: {json.dumps(item)}\n\n'
             except queue.Empty:
@@ -471,8 +478,11 @@ def stream():
 def stop():
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
-    global job_running
-    job_running = False
+    job_id = (request.json or {}).get('job_id', '')
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job:
+        job['running'] = False
     return jsonify({'status': 'stopped'})
 
 
@@ -523,9 +533,13 @@ def retry_confirm():
     ses      = entry['ses']
     email    = entry['email']
     password = entry['password']
+    job_id   = entry.get('job_id', '')
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    jq = job['task_queue'] if job else queue.Queue()
     threading.Thread(
         target=m._full_email_confirm,
-        args=(ses, email, uid, password, task_queue),
+        args=(ses, email, uid, password, jq),
         daemon=False,
     ).start()
     return jsonify({'status': 'retrying'})
@@ -577,6 +591,13 @@ def fetch_code_now():
     domain = email.split('@')[1].lower() if '@' in email else ''
     login  = email.split('@')[0]
 
+    with _session_lock:
+        _fcn_ses_entry = _session_store.get(uid, {})
+    _fcn_job_id = _fcn_ses_entry.get('job_id', '')
+    with _jobs_lock:
+        _fcn_job = _jobs.get(_fcn_job_id)
+    _fcn_jq = _fcn_job['task_queue'] if _fcn_job else None
+
     base_hdrs = {
         'User-Agent':     ('Mozilla/5.0 (Linux; Android 11; Redmi Note 8) '
                            'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -625,7 +646,7 @@ def fetch_code_now():
                                     body = er.text
                                 code = _extract_code_from_body(body)
                                 if code:
-                                    task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                    if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
                                     return jsonify({'code': code})
                         except Exception:
                             pass
@@ -700,7 +721,7 @@ def fetch_code_now():
 
                     code = _extract_code_from_body(body)
                     if code:
-                        task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                        if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
                         return jsonify({'code': code})
             except Exception:
                 pass
@@ -735,7 +756,7 @@ def fetch_code_now():
                         combined = str(msg.get('subject', '')) + ' ' + body
                         code = _extract_code_from_body(combined)
                         if code:
-                            task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                            if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
                             return jsonify({'code': code})
             except Exception:
                 pass
@@ -754,7 +775,7 @@ def fetch_code_now():
                 stored = _sto.load(f'webhook_code_email_{email}', None)
             if stored and isinstance(stored, dict) and stored.get('code'):
                 code = stored['code']
-                task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
                 # Persist by uid too for future fast lookups
                 _sto.save(f'webhook_code_{uid}', {'code': code})
                 return jsonify({'code': code})
@@ -775,7 +796,7 @@ def fetch_code_now():
             if body:
                 code = _extract_code_from_body(body)
                 if code:
-                    task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                    if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
                     return jsonify({'code': code})
         except Exception:
             pass
@@ -787,7 +808,12 @@ def fetch_code_now():
 
 @app.route('/status')
 def status():
-    return jsonify({'running': job_running, 'count': len(result_store)})
+    job_id = request.args.get('job_id', '')
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if not job:
+        return jsonify({'running': False, 'count': 0})
+    return jsonify({'running': job['running'], 'count': len(job['result_store'])})
 
 
 # ── Admin auth ────────────────────────────────────────────────────────────────
@@ -1112,10 +1138,17 @@ def webhook_email():
         print(f'[webhook] stored code {code!r} for email {email!r} uid={uid!r}')
 
     if uid:
+        # Find the job queue for this uid
+        with _session_lock:
+            _uid_entry = _session_store.get(uid, {})
+        _wh_job_id = _uid_entry.get('job_id', '')
+        with _jobs_lock:
+            _wh_job = _jobs.get(_wh_job_id)
+        _wh_jq = _wh_job['task_queue'] if _wh_job else None
+
         if code:
-            # Push to SSE stream so the UI autofills immediately — do NOT auto-submit
-            task_queue.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-            # Also store by uid for fast lookup
+            if _wh_jq:
+                _wh_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
             _sto.save(f'webhook_code_{uid}', {'code': code})
 
         elif fb_link:
@@ -1123,15 +1156,16 @@ def webhook_email():
             with _session_lock:
                 ses_entry = _session_store.get(uid)
             if ses_entry:
-                def _follow_link(ses, link, u):
+                def _follow_link(ses, link, u, jq):
                     try:
                         _ih = {'User-Agent': m.FB_LITE_UA, 'Accept-Language': 'en-US,en;q=0.9'}
                         r = ses.get(link, headers=_ih, timeout=12, allow_redirects=True)
                         st = 'checkpoint' if 'checkpoint' in str(r.url) else 'confirmed'
                     except Exception:
                         st = 'link_error'
-                    task_queue.put({'type': 'confirm_result', 'uid': u, 'status': st})
-                threading.Thread(target=_follow_link, args=(ses_entry['ses'], fb_link, uid), daemon=True).start()
+                    if jq:
+                        jq.put({'type': 'confirm_result', 'uid': u, 'status': st})
+                threading.Thread(target=_follow_link, args=(ses_entry['ses'], fb_link, uid, _wh_jq), daemon=True).start()
 
     return jsonify({
         'status': 'ok',
