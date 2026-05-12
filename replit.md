@@ -15,7 +15,7 @@ A Flask web application for automating the creation of Facebook accounts. Featur
 ## Running the App
 The app starts with gunicorn on port 5000:
 ```
-python -m gunicorn --bind 0.0.0.0:5000 --reuse-port --reload app:app
+gunicorn --bind 0.0.0.0:5000 --reuse-port --reload app:app
 ```
 
 ## Dependencies
