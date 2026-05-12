@@ -45,16 +45,20 @@ def _ensure_table():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
-        cur.execute("""
-            ALTER TABLE accounts
-                ADD COLUMN IF NOT EXISTS name  TEXT DEFAULT '',
-                ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''
-        """)
+        try:
+            cur.execute("""
+                ALTER TABLE accounts
+                    ADD COLUMN IF NOT EXISTS name  TEXT DEFAULT '',
+                    ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''
+            """)
+        except Exception:
+            pass
         conn.commit()
         cur.close()
         conn.close()
     except Exception as e:
-        print(f'[storage] DB init error: {e}')
+        if 'already exists' not in str(e):
+            print(f'[storage] DB init error: {e}')
 
 
 _db_ready = False
