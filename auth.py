@@ -105,6 +105,45 @@ def check_key(key, ip=None):
         return entry['status'], entry
 
 
+def verify_and_consume(key, ip):
+    """Atomically verify a key and consume it in one lock acquisition.
+
+    Returns (status, entry) where status is one of:
+      'approved'   — key was approved and is now consumed (first and only login)
+      'already_used' — key was already consumed by a prior login
+      'ip_mismatch'  — key is locked to a different IP
+      'invalid'      — key not found
+      <other>        — key status (e.g. 'pending', 'rejected')
+    """
+    with _lock:
+        data = _load()
+        if key not in data:
+            return 'invalid', None
+        entry = data[key]
+
+        # Already consumed — deny immediately
+        if entry.get('consumed') and entry.get('status') == 'approved':
+            return 'already_used', entry
+
+        if entry.get('status') != 'approved':
+            return entry['status'], entry
+
+        # IP lock check
+        locked_ip = entry.get('locked_ip')
+        if locked_ip and locked_ip != ip:
+            return 'ip_mismatch', entry
+
+        # All good — consume atomically in the same lock
+        if not locked_ip:
+            entry['locked_ip'] = ip
+        entry['consumed']   = True
+        entry['last_seen']  = time.time()
+        data[key] = entry
+        _save(data)
+
+        return 'approved', entry
+
+
 def mark_consumed(key):
     """Mark a key as consumed — no further logins allowed with it."""
     with _lock:

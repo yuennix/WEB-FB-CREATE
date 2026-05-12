@@ -123,13 +123,9 @@ def verify_key():
     data   = request.json or {}
     key    = (data.get('key') or '').strip().upper()
     ip     = _get_client_ip()
-    status, entry = auth.check_key(key, ip=ip)
-    if status == 'consumed':
-        return jsonify({'status': 'already_used'})
+    # Atomic check + consume — prevents two simultaneous logins with the same key
+    status, entry = auth.verify_and_consume(key, ip)
     if status == 'approved':
-        auth.lock_key_to_ip(key, ip)
-        auth.touch_key(key)
-        auth.mark_consumed(key)
         resp = jsonify({
             'status': 'approved',
             'name':    entry['name'],
@@ -137,6 +133,8 @@ def verify_key():
         })
         resp.set_cookie('access_key', key, max_age=60*60*24*30, httponly=True, samesite='Lax', path='/')
         return resp
+    if status == 'already_used':
+        return jsonify({'status': 'already_used'})
     if status == 'ip_mismatch':
         return jsonify({'status': 'ip_mismatch'})
     return jsonify({'status': status})
