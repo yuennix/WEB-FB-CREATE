@@ -34,6 +34,8 @@ def _get_stable_secret():
 
 app.secret_key = _get_stable_secret()
 
+# ── Start Telegram bot when running under gunicorn ────────────────────────────
+auth.start_bot()
 
 # ── Webhook secret ────────────────────────────────────────────────────────────
 

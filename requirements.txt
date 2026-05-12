@@ -8,3 +8,8 @@ psycopg2-binary>=2.9.9
 email_validator
 flask-sqlalchemy
 gunicorn
+email_validator
+flask
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
