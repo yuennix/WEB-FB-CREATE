@@ -97,11 +97,19 @@ def check_key(key, ip=None):
             return 'invalid', None
         entry = data[key]
         if entry.get('consumed') and entry.get('status') == 'approved':
+            # Check expiry even for consumed keys (ongoing session access)
+            expires_at = entry.get('expires_at')
+            if expires_at and time.time() > expires_at:
+                return 'expired', entry
             return 'consumed', entry
-        if ip and entry.get('status') == 'approved':
-            locked_ip = entry.get('locked_ip')
-            if locked_ip and locked_ip != ip:
-                return 'ip_mismatch', entry
+        if entry.get('status') == 'approved':
+            expires_at = entry.get('expires_at')
+            if expires_at and time.time() > expires_at:
+                return 'expired', entry
+            if ip:
+                locked_ip = entry.get('locked_ip')
+                if locked_ip and locked_ip != ip:
+                    return 'ip_mismatch', entry
         return entry['status'], entry
 
 
@@ -109,8 +117,9 @@ def verify_and_consume(key, ip):
     """Atomically verify a key and consume it in one lock acquisition.
 
     Returns (status, entry) where status is one of:
-      'approved'   — key was approved and is now consumed (first and only login)
+      'approved'     — key was approved and is now consumed (first and only login)
       'already_used' — key was already consumed by a prior login
+      'expired'      — key access duration has passed
       'ip_mismatch'  — key is locked to a different IP
       'invalid'      — key not found
       <other>        — key status (e.g. 'pending', 'rejected')
@@ -127,6 +136,11 @@ def verify_and_consume(key, ip):
 
         if entry.get('status') != 'approved':
             return entry['status'], entry
+
+        # Expiry check
+        expires_at = entry.get('expires_at')
+        if expires_at and time.time() > expires_at:
+            return 'expired', entry
 
         # IP lock check
         locked_ip = entry.get('locked_ip')
@@ -181,13 +195,14 @@ def touch_key(key):
             _save(data)
 
 
-def approve_key(key):
+def approve_key(key, duration_secs=None):
     with _lock:
         data = _load()
         if key not in data:
             return False, 'Key not found'
         data[key]['status']      = 'approved'
         data[key]['approved_at'] = time.time()
+        data[key]['expires_at']  = (time.time() + duration_secs) if duration_secs else None
         _save(data)
     return True, data[key]
 
@@ -224,7 +239,7 @@ def remove_by_id(user_id):
     return False, None
 
 
-def add_user(name):
+def add_user(name, duration_secs=None):
     with _lock:
         data    = _load()
         user_id = _gen_user_id(data)
@@ -237,6 +252,7 @@ def add_user(name):
             'status':      'approved',
             'created_at':  time.time(),
             'approved_at': time.time(),
+            'expires_at':  (time.time() + duration_secs) if duration_secs else None,
             'last_seen':   None,
         }
         _save(data)

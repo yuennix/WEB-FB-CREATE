@@ -553,6 +553,12 @@
   <div class="section-label">Add User Directly</div>
   <div class="add-row">
     <input type="text" id="newUserName" placeholder="Full name">
+    <input type="number" id="newUserDurVal" placeholder="Duration" min="1" style="max-width:90px;">
+    <select id="newUserDurUnit" style="max-width:90px;">
+      <option value="mins">Mins</option>
+      <option value="hours" selected>Hours</option>
+      <option value="days">Days</option>
+    </select>
     <button onclick="addUser()">+ Add & Approve</button>
   </div>
   <div class="section-label">All Users</div>
@@ -856,10 +862,35 @@ function buildCard(u) {
 
   const badgeClass = { approved:'badge-approved', pending:'badge-pending', rejected:'badge-rejected', revoked:'badge-revoked' }[u.status] || 'badge-pending';
 
+  // Expiry label
+  let expiryHtml = '';
+  if (u.expires_at) {
+    const now = Date.now() / 1000;
+    const diff = u.expires_at - now;
+    if (diff <= 0) {
+      expiryHtml = `<span style="font-size:10px;color:#f87171;font-weight:600;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:2px 8px;">⏱ Expired</span>`;
+    } else {
+      const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), d = Math.floor(diff/86400);
+      const label = d >= 1 ? `${d}d ${h%24}h left` : h >= 1 ? `${h}h ${m}m left` : `${m}m left`;
+      expiryHtml = `<span style="font-size:10px;color:#fbbf24;font-weight:600;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:6px;padding:2px 8px;">⏱ ${label}</span>`;
+    }
+  }
+
   let actions = '';
   if (u.status === 'pending') {
-    actions = `<button class="act-btn act-approve" onclick="approveUser('${u.key}','${u.user_id}')">✓ Approve</button>
-               <button class="act-btn act-reject"  onclick="rejectUser('${u.key}','${u.user_id}')">✗ Reject</button>`;
+    actions = `
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="number" id="dur-val-${u.user_id}" placeholder="Duration" min="1"
+          style="width:72px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:#e2e8f0;padding:4px 8px;font-size:12px;outline:none;">
+        <select id="dur-unit-${u.user_id}"
+          style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:#e2e8f0;padding:4px 7px;font-size:12px;outline:none;">
+          <option value="mins">Mins</option>
+          <option value="hours" selected>Hours</option>
+          <option value="days">Days</option>
+        </select>
+        <button class="act-btn act-approve" onclick="approveUser('${u.key}','${u.user_id}')">✓ Approve</button>
+        <button class="act-btn act-reject"  onclick="rejectUser('${u.key}','${u.user_id}')">✗ Reject</button>
+      </div>`;
   } else if (u.status === 'approved') {
     actions = `<button class="act-btn act-revoke" onclick="revokeUser('${u.user_id}')">⊘ Revoke</button>`;
     if (u.locked_ip) {
@@ -873,6 +904,7 @@ function buildCard(u) {
       <div class="user-name">${esc(u.name)}</div>
       <div class="user-meta">${esc(u.user_id)} · ${ago}</div>
       ${u.reason ? `<div class="user-reason">"${esc(u.reason)}"</div>` : ''}
+      ${expiryHtml}
     </div>
     <span class="user-key" title="Click to copy" onclick="copyText('${u.key}')">${u.key}</span>
     <span class="status-badge ${badgeClass}">${u.status}</span>
@@ -882,9 +914,18 @@ function buildCard(u) {
 }
 
 async function approveUser(key, uid) {
-  const d = await api(`/admin/api/approve/${key}`, 'POST');
-  if (d.status === 'approved') { toast(`✓ Approved: ${d.name}`); refreshCard(uid, 'approved'); loadOverview(); }
-  else toast(d.error || 'Error', true);
+  const durVal  = parseInt(document.getElementById(`dur-val-${uid}`)?.value) || 0;
+  const durUnit = document.getElementById(`dur-unit-${uid}`)?.value || 'hours';
+  const body = durVal > 0 ? { duration_value: durVal, duration_unit: durUnit } : {};
+  const d = await api(`/admin/api/approve/${key}`, 'POST', body);
+  if (d.status === 'approved') {
+    const label = durVal > 0 ? ` (${durVal} ${durUnit})` : ' (no limit)';
+    toast(`✓ Approved: ${d.name}${label}`);
+    const u = allUsers.find(x => x.user_id === uid);
+    if (u) { u.status = 'approved'; u.expires_at = d.expires_at || null; }
+    refreshCard(uid, 'approved');
+    loadOverview();
+  } else toast(d.error || 'Error', true);
 }
 
 async function rejectUser(key, uid) {
@@ -922,11 +963,19 @@ function refreshCard(uid, newStatus) {
 }
 
 async function addUser() {
-  const name = document.getElementById('newUserName').value.trim();
+  const name    = document.getElementById('newUserName').value.trim();
+  const durVal  = parseInt(document.getElementById('newUserDurVal').value) || 0;
+  const durUnit = document.getElementById('newUserDurUnit').value || 'hours';
   if (!name) { toast('Enter a name', true); return; }
-  const d = await api('/admin/api/add-user', 'POST', { name });
-  if (d.key) { toast(`✓ Added: ${d.name} — Key: ${d.key}`); document.getElementById('newUserName').value = ''; loadUsers(); loadOverview(); }
-  else toast(d.error || 'Error', true);
+  const body = { name, ...(durVal > 0 ? { duration_value: durVal, duration_unit: durUnit } : {}) };
+  const d = await api('/admin/api/add-user', 'POST', body);
+  if (d.key) {
+    const label = durVal > 0 ? ` · ${durVal} ${durUnit}` : ' · no limit';
+    toast(`✓ Added: ${d.name} — Key: ${d.key}${label}`);
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserDurVal').value = '';
+    loadUsers(); loadOverview();
+  } else toast(d.error || 'Error', true);
 }
 
 let _webhookToken = '';

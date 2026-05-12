@@ -74,6 +74,12 @@ def index():
         if status in ('approved', 'consumed'):
             auth.touch_key(key)
             return render_template('index.html', user_name=entry.get('name', ''))
+        if status == 'expired':
+            resp = render_template('login.html')
+            from flask import make_response
+            r = make_response(resp)
+            r.delete_cookie('access_key')
+            return r
     return render_template('login.html')
 
 
@@ -135,6 +141,8 @@ def verify_key():
         return resp
     if status == 'already_used':
         return jsonify({'status': 'already_used'})
+    if status == 'expired':
+        return jsonify({'status': 'expired'})
     if status == 'ip_mismatch':
         return jsonify({'status': 'ip_mismatch'})
     return jsonify({'status': status})
@@ -165,6 +173,8 @@ def _require_auth():
         return False
     ip = _get_client_ip()
     status, _ = auth.check_key(key, ip=ip)
+    if status == 'expired':
+        return False
     return status in ('approved', 'consumed')
 
 
@@ -833,17 +843,32 @@ def admin_users():
             'approved_at': v.get('approved_at'),
             'last_seen':   v.get('last_seen'),
             'locked_ip':   v.get('locked_ip'),
+            'expires_at':  v.get('expires_at'),
         })
     result.sort(key=lambda x: x.get('created_at') or 0, reverse=True)
     return jsonify(result)
+
+def _parse_duration(data):
+    """Parse duration_value + duration_unit from request body → seconds or None."""
+    try:
+        val = int(data.get('duration_value') or 0)
+    except (ValueError, TypeError):
+        val = 0
+    if val <= 0:
+        return None
+    unit = (data.get('duration_unit') or 'hours').lower()
+    multipliers = {'mins': 60, 'hours': 3600, 'days': 86400}
+    return val * multipliers.get(unit, 3600)
 
 @app.route('/admin/api/approve/<key>', methods=['POST'])
 def admin_approve(key):
     if not _require_admin():
         return jsonify({'error': 'Unauthorized'}), 401
-    ok, entry = auth.approve_key(key.upper())
+    data = request.json or {}
+    duration_secs = _parse_duration(data)
+    ok, entry = auth.approve_key(key.upper(), duration_secs=duration_secs)
     if ok:
-        return jsonify({'status': 'approved', 'name': entry['name']})
+        return jsonify({'status': 'approved', 'name': entry['name'], 'expires_at': entry.get('expires_at')})
     return jsonify({'error': 'Key not found'}), 404
 
 @app.route('/admin/api/reject/<key>', methods=['POST'])
@@ -890,7 +915,8 @@ def admin_add_user():
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify({'error': 'Name is required'}), 400
-    key, uid = auth.add_user(name)
+    duration_secs = _parse_duration(data)
+    key, uid = auth.add_user(name, duration_secs=duration_secs)
     return jsonify({'key': key, 'user_id': uid, 'name': name})
 
 @app.route('/admin/api/domains')
