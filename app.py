@@ -246,6 +246,9 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
     jcp  = job['cp_count']
     jrs  = job['result_store']
 
+    _consecutive_errors = 0
+    _MAX_CONSECUTIVE    = 8   # worker exits after this many back-to-back failures
+
     while True:
         with jlk:
             if jdc[0] >= num or not job['running']:
@@ -253,20 +256,20 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
         try:
             ses = m.requests.Session()
-            # Tune adapter for high-concurrency: larger pool, fast retry on connect errors
             _adapter = m.requests.adapters.HTTPAdapter(
-                pool_connections=4,
-                pool_maxsize=8,
-                max_retries=1,
+                pool_connections=2,
+                pool_maxsize=4,
+                max_retries=0,   # we handle retries ourselves with backoff
             )
             ses.mount('https://', _adapter)
             ses.mount('http://',  _adapter)
-            response = ses.get("https://m.facebook.com/reg/", timeout=10)
+            response = ses.get("https://m.facebook.com/reg/", timeout=15)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
                 jq.put({'type': 'log', 'level': 'warn',
                         'msg': 'Could not load reg page, retrying…'})
+                time.sleep(_random.uniform(1.5, 3.0))
                 continue
 
             if name_type == '2':
@@ -425,8 +428,22 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 jq.put({'type': 'log', 'level': 'warn',
                         'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
 
+            # Got a real HTTP response — connection is working, reset error streak
+            _consecutive_errors = 0
+
         except Exception as e:
-            jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
+            _consecutive_errors += 1
+            err_msg = str(e)
+            # Only log every few errors to avoid flooding the console
+            if _consecutive_errors <= 2 or _consecutive_errors % 5 == 0:
+                jq.put({'type': 'log', 'level': 'error',
+                        'msg': f'[attempt {_consecutive_errors}] {err_msg}'})
+            # Exit worker if it keeps failing — other workers will cover it
+            if _consecutive_errors >= _MAX_CONSECUTIVE:
+                return
+            # Exponential backoff: 2s, 4s, 8s … capped at 20s
+            _sleep = min(2 ** _consecutive_errors, 20) + _random.uniform(0, 2)
+            time.sleep(_sleep)
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
@@ -440,20 +457,21 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
+    # Cap workers: no point having more workers than ~3× the target count.
+    # Excessive workers cause connection saturation and trigger rate limits.
+    actual_workers = min(WORKERS, max(count * 3, 10))
+
     jq.put({'type': 'log', 'level': 'info',
-            'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
+            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
 
     try:
-        # Spawn one raw OS thread per worker — no pool cap, no queuing.
-        # With 100+ users × 150 workers each, threads spend ~99% of their time
-        # waiting on network I/O so the OS handles tens-of-thousands just fine.
         workers = [
             threading.Thread(
                 target=_create_one,
                 args=(name_type, gender, password_type, custom_password, count, session_id, email_domain, job),
                 daemon=True,
             )
-            for _ in range(WORKERS)
+            for _ in range(actual_workers)
         ]
         for w in workers:
             w.start()
