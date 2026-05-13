@@ -67,9 +67,9 @@ _session_lock  = threading.Lock()
 
 WORKERS = 150  # workers per job (all I/O-bound — more = faster)
 
-# Shared pool avoids per-job thread-creation overhead.
-# 1000 slots → up to ~6 concurrent users at 150 workers each without queueing.
-_GLOBAL_POOL = ThreadPoolExecutor(max_workers=1000)
+# Shared pool sized for 20 concurrent users × 150 workers each = 3000 threads.
+# Extra 500 buffer ensures no queuing even during bursts.
+_GLOBAL_POOL = ThreadPoolExecutor(max_workers=3500)
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -235,8 +235,16 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 return
 
         try:
-            ses      = m.requests.Session()
-            response = ses.get("https://m.facebook.com/reg/", timeout=15)
+            ses = m.requests.Session()
+            # Tune adapter for high-concurrency: larger pool, fast retry on connect errors
+            _adapter = m.requests.adapters.HTTPAdapter(
+                pool_connections=4,
+                pool_maxsize=8,
+                max_retries=1,
+            )
+            ses.mount('https://', _adapter)
+            ses.mount('http://',  _adapter)
+            response = ses.get("https://m.facebook.com/reg/", timeout=10)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
@@ -320,7 +328,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'viewport-width':    '980',
             }
 
-            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=20)
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=12)
             login_coki = ses.cookies.get_dict()
 
             if "c_user" in login_coki:
