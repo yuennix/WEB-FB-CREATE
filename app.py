@@ -51,12 +51,33 @@ def _get_webhook_secret():
 _jobs      = {}          # job_id -> job state dict
 _jobs_lock = threading.Lock()
 
+
+class _LoggingQueue(queue.Queue):
+    """Queue that also appends every put() item to a persistent event_log list.
+
+    This allows the SSE generator to replay missed events to reconnecting
+    clients without losing anything that was already consumed from the queue.
+    """
+    def __init__(self, event_log, log_lock):
+        super().__init__()
+        self._event_log  = event_log
+        self._log_lock   = log_lock
+
+    def put(self, item, *args, **kwargs):
+        with self._log_lock:
+            self._event_log.append(item)
+        super().put(item, *args, **kwargs)
+
+
 def _new_job_state():
+    lock      = threading.Lock()
+    event_log = []
     return {
-        'task_queue':   queue.Queue(),
+        'task_queue':   _LoggingQueue(event_log, lock),
+        'event_log':    event_log,
         'result_store': [],
         'running':      True,
-        'lock':         threading.Lock(),
+        'lock':         lock,
         'done_count':   [0],
         'cp_count':     [0],
     }
@@ -479,28 +500,74 @@ def stream():
             headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
         )
 
-    jq = job['task_queue']
+    jq        = job['task_queue']
+    event_log = job['event_log']
+    jlk       = job['lock']
+
+    # Browser sends Last-Event-ID header on auto-reconnect; use it as a cursor
+    # so we only replay events the client hasn't seen yet.
+    _last_id = request.headers.get('Last-Event-ID', '')
+    _start   = int(_last_id) + 1 if _last_id.lstrip('-').isdigit() and int(_last_id) >= 0 else 0
 
     def generate():
         yield 'retry: 3000\n\n'
-        # If job already finished, send the final event immediately
+        pos = _start
+
+        # ── Phase 1: replay already-logged events from event_log ────────────
+        # This covers both first-connect (pos=0) and reconnect (pos=N) cases.
+        while True:
+            with jlk:
+                item = event_log[pos] if pos < len(event_log) else None
+            if item is None:
+                break
+            yield f'id: {pos}\ndata: {json.dumps(item)}\n\n'
+            pos += 1
+            if item.get('type') == 'done':
+                return
+
+        # ── Phase 2: job already finished — nothing more to send ────────────
         if not job.get('running') and job.get('final'):
-            yield f'data: {json.dumps(job["final"])}\n\n'
+            final = job['final']
+            # Emit the final event if it wasn't already in the replay above
+            with jlk:
+                already_in_log = any(e.get('type') == 'done' for e in event_log)
+            if not already_in_log:
+                yield f'id: {pos}\ndata: {json.dumps(final)}\n\n'
             return
+
+        # ── Phase 3: follow live events via queue signals ────────────────────
+        # The queue is only used as a wake-up signal; the actual event data
+        # is always read from event_log so nothing can be lost.
         empty = 0
         while empty < 38:
             try:
-                item = jq.get(timeout=8)
+                jq.get(timeout=8)   # blocks until a new event is put()
                 empty = 0
-                yield f'data: {json.dumps(item)}\n\n'
-                if item.get('type') == 'done':
-                    return
             except queue.Empty:
                 empty += 1
                 yield f'data: {json.dumps({"type": "ping"})}\n\n'
-                # If job finished while we were waiting, send final and exit
+                # Check whether job finished while we were waiting
                 if not job.get('running') and job.get('final'):
-                    yield f'data: {json.dumps(job["final"])}\n\n'
+                    with jlk:
+                        remaining = list(event_log[pos:])
+                    for i, item in enumerate(remaining):
+                        yield f'id: {pos + i}\ndata: {json.dumps(item)}\n\n'
+                        if item.get('type') == 'done':
+                            return
+                    if not any(e.get('type') == 'done' for e in remaining):
+                        yield f'id: {pos + len(remaining)}\ndata: {json.dumps(job["final"])}\n\n'
+                    return
+                continue
+
+            # Drain all new log entries since last pos
+            while True:
+                with jlk:
+                    item = event_log[pos] if pos < len(event_log) else None
+                if item is None:
+                    break
+                yield f'id: {pos}\ndata: {json.dumps(item)}\n\n'
+                pos += 1
+                if item.get('type') == 'done':
                     return
 
     return Response(
