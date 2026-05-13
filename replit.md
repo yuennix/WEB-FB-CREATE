@@ -13,10 +13,11 @@ A Flask web application for automating the creation of Facebook accounts. Featur
 - `static/` - Static assets
 
 ## Running the App
-The app starts with gunicorn on port 5000 using gevent workers for concurrent SSE streams:
+The app starts with gunicorn on port 5000 using a single gevent worker for concurrent SSE streams:
 ```
-gunicorn --bind 0.0.0.0:5000 --reuse-port --reload --worker-class gevent --workers 4 --worker-connections 1000 --timeout 300 app:app
+gunicorn --bind 0.0.0.0:5000 --reuse-port --reload --worker-class gevent --workers 1 --worker-connections 2000 --timeout 300 app:app
 ```
+**Important:** Must use `--workers 1` because the job registry (`_jobs` dict) is in-process memory. Multiple workers would give each worker its own copy, so `/start` (worker A) and `/stream` (worker B) would never see the same job. With gevent, a single worker handles thousands of concurrent SSE streams and creation jobs via coroutines.
 
 ## Dependencies
 All dependencies are in `requirements.txt` and managed via pip:
