@@ -1201,26 +1201,29 @@ function _connectStream(jobId) {
       addLog(msg.msg, 'success');
       setRunning(false);
       _stopTicker();
-      eventSource.close();
-      eventSource = null;
+      if (eventSource) { eventSource.close(); eventSource = null; }
       document.getElementById('progressLabel').textContent = 'Completed';
     }
   };
   eventSource.onerror = () => {
     if (eventSource) { eventSource.close(); eventSource = null; }
-    fetch('/status?job_id=' + jobId).then(r => r.json()).then(s => {
-      if (s.running) {
-        addLog('Connection dropped — reconnecting…', 'warn');
+    fetch('/status?job_id=' + jobId)
+      .then(r => r.ok ? r.json() : Promise.reject('not_ok'))
+      .then(s => {
+        if (s.running) {
+          setTimeout(() => _connectStream(jobId), 2000);
+        } else if (s.found) {
+          // Job finished cleanly — reconnect once to get the done event
+          setTimeout(() => _connectStream(jobId), 1000);
+        } else {
+          setRunning(false);
+          _stopTicker();
+        }
+      })
+      .catch(() => {
+        // Network hiccup — always reconnect
         setTimeout(() => _connectStream(jobId), 3000);
-      } else {
-        setRunning(false);
-        _stopTicker();
-        addLog('Connection lost. Job finished or was stopped.', 'warn');
-      }
-    }).catch(() => {
-      addLog('Connection dropped — retrying…', 'warn');
-      setTimeout(() => _connectStream(jobId), 5000);
-    });
+      });
   };
 }
 

@@ -428,16 +428,22 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
                     jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
     finally:
         job['running'] = False
-        jq.put({
+        job['completed_at'] = time.time()
+        job['final'] = {
             'type':       'done',
             'total':      count,
             'created':    job['done_count'][0],
             'checkpoint': job['cp_count'][0],
             'msg':        (f'Done — {job["done_count"][0]}/{count} created'
                            + (f', {job["cp_count"][0]} checkpointed' if job['cp_count'][0] else '') + '.'),
-        })
-        with _jobs_lock:
-            _jobs.pop(job_id, None)
+        }
+        jq.put(job['final'])
+        # Keep job in registry for 30 min so reconnecting SSE clients get a clean done event
+        def _expire_job(jid):
+            time.sleep(1800)
+            with _jobs_lock:
+                _jobs.pop(jid, None)
+        threading.Thread(target=_expire_job, args=(job_id,), daemon=True).start()
 
 
 # ── SSE stream ────────────────────────────────────────────────────────────────
@@ -451,27 +457,62 @@ def stream():
     with _jobs_lock:
         job = _jobs.get(job_id)
     if not job:
-        return jsonify({'error': 'Invalid job_id'}), 404
+        # Job not found — send a done event so the client stops retrying
+        def _gen_not_found():
+            yield 'retry: 3000\n\n'
+            yield f'data: {json.dumps({"type": "done", "msg": "Job not found or expired.", "created": 0, "total": 0, "checkpoint": 0})}\n\n'
+        return Response(
+            _gen_not_found(),
+            mimetype='text/event-stream',
+            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
+        )
 
     jq = job['task_queue']
 
     def generate():
         yield 'retry: 3000\n\n'
+        # If job already finished, send the final event immediately
+        if not job.get('running') and job.get('final'):
+            yield f'data: {json.dumps(job["final"])}\n\n'
+            return
         empty = 0
         while empty < 38:
             try:
                 item = jq.get(timeout=8)
                 empty = 0
                 yield f'data: {json.dumps(item)}\n\n'
+                if item.get('type') == 'done':
+                    return
             except queue.Empty:
                 empty += 1
                 yield f'data: {json.dumps({"type": "ping"})}\n\n'
+                # If job finished while we were waiting, send final and exit
+                if not job.get('running') and job.get('final'):
+                    yield f'data: {json.dumps(job["final"])}\n\n'
+                    return
 
     return Response(
         generate(),
         mimetype='text/event-stream',
         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
     )
+
+
+@app.route('/status')
+def job_status():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    job_id = request.args.get('job_id', '')
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if not job:
+        return jsonify({'running': False, 'found': False})
+    return jsonify({
+        'running':   job.get('running', False),
+        'found':     True,
+        'created':   job['done_count'][0],
+        'checkpoint': job['cp_count'][0],
+    })
 
 
 @app.route('/stop', methods=['POST'])
