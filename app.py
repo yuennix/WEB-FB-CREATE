@@ -73,13 +73,14 @@ def _new_job_state():
     lock      = threading.Lock()
     event_log = []
     return {
-        'task_queue':   _LoggingQueue(event_log, lock),
-        'event_log':    event_log,
-        'result_store': [],
-        'running':      True,
-        'lock':         lock,
-        'done_count':   [0],
-        'cp_count':     [0],
+        'task_queue':     _LoggingQueue(event_log, lock),
+        'event_log':      event_log,
+        'result_store':   [],
+        'running':        True,
+        'lock':           lock,
+        'done_count':     [0],
+        'cp_count':       [0],
+        'last_error_log': [0.0],   # timestamp — throttles error messages across all workers
     }
 
 # ── Session store for retry-confirm ──────────────────────────────────────────
@@ -247,7 +248,6 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
     jrs  = job['result_store']
 
     _consecutive_errors = 0
-    _MAX_CONSECUTIVE    = 8   # worker exits after this many back-to-back failures
 
     while True:
         with jlk:
@@ -433,17 +433,27 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
         except Exception as e:
             _consecutive_errors += 1
-            err_msg = str(e)
-            # Only log every few errors to avoid flooding the console
-            if _consecutive_errors <= 2 or _consecutive_errors % 5 == 0:
-                jq.put({'type': 'log', 'level': 'error',
-                        'msg': f'[attempt {_consecutive_errors}] {err_msg}'})
-            # Exit worker if it keeps failing — other workers will cover it
-            if _consecutive_errors >= _MAX_CONSECUTIVE:
-                return
-            # Exponential backoff: 2s, 4s, 8s … capped at 20s
-            _sleep = min(2 ** _consecutive_errors, 20) + _random.uniform(0, 2)
-            time.sleep(_sleep)
+            # Throttle error logs at the job level: at most one message per 15s
+            # across all workers combined, so the console stays clean.
+            _now = time.time()
+            with jlk:
+                _log_due = (_now - job['last_error_log'][0]) >= 15
+                if _log_due:
+                    job['last_error_log'][0] = _now
+            if _log_due:
+                _ename = type(e).__name__
+                jq.put({'type': 'log', 'level': 'warn',
+                        'msg': f'⏳ Connection issue ({_ename}), workers backing off and retrying…'})
+
+            if _consecutive_errors >= 8:
+                # After 8 straight failures take a longer break, then reset and
+                # keep going — never permanently abandon the job.
+                _consecutive_errors = 0
+                time.sleep(_random.uniform(20, 35))
+            else:
+                # Exponential backoff: 2s, 4s, 8s … capped at 15s
+                _sleep = min(2 ** _consecutive_errors, 15) + _random.uniform(0, 2)
+                time.sleep(_sleep)
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
