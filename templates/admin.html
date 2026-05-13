@@ -1114,6 +1114,7 @@ let cStartTime     = null;
 let _cCustomDomains = [];
 let _cTimerTick = null;
 let cAllAccounts   = [];
+let cCurrentJobId  = null;
 const _cAcqtEmails = {};  // uid -> email for retry fetch
 
 function _cStartTicker() {
@@ -1334,36 +1335,61 @@ async function cStartJob() {
 
   if (!resp.ok) { const err = await resp.json(); toast('Error: ' + (err.error || 'Unknown'), true); return; }
 
+  const result = await resp.json();
+  cCurrentJobId = result.job_id;
+
   cSetRunning(true);
   _cStartTicker();
   cAddLog(`Started — ${count} account(s) on ${emailDomain}`, 'info');
 
   if (cEventSource) cEventSource.close();
-  cEventSource = new EventSource('/stream');
+  _cConnectStream(cCurrentJobId);
+}
+
+function _cConnectStream(jobId) {
+  if (cEventSource) { cEventSource.close(); cEventSource = null; }
+  cEventSource = new EventSource('/stream?job_id=' + jobId);
   cEventSource.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'ping') return;
-    if (msg.type === 'log')          cAddLog(msg.msg, msg.level);
-    if (msg.type === 'account')      cAddAccount(msg.data);
-    if (msg.type === 'confirm_code') cAutofillCode(msg.uid, msg.code);
+    if (msg.type === 'log')            cAddLog(msg.msg, msg.level);
+    if (msg.type === 'account')        cAddAccount(msg.data);
+    if (msg.type === 'confirm_code')   cAutofillCode(msg.uid, msg.code);
     if (msg.type === 'confirm_result') cHandleConfirmResult(msg.uid, msg.status);
     if (msg.type === 'done') {
       cAddLog(msg.msg, 'success');
       cSetRunning(false);
       _cStopTicker();
-      cEventSource.close();
+      if (cEventSource) { cEventSource.close(); cEventSource = null; }
       document.getElementById('c-progressLabel').textContent = 'Completed';
     }
   };
   cEventSource.onerror = () => {
-    cSetRunning(false);
-    cAddLog('Connection lost.', 'warn');
-    cEventSource.close();
+    if (cEventSource) { cEventSource.close(); cEventSource = null; }
+    fetch('/status?job_id=' + jobId)
+      .then(r => r.ok ? r.json() : Promise.reject('not_ok'))
+      .then(s => {
+        if (s.running) {
+          setTimeout(() => _cConnectStream(jobId), 2000);
+        } else if (s.found) {
+          setTimeout(() => _cConnectStream(jobId), 1000);
+        } else {
+          cSetRunning(false);
+          _cStopTicker();
+        }
+      })
+      .catch(() => {
+        setTimeout(() => _cConnectStream(jobId), 3000);
+      });
   };
 }
 
 async function cStopJob() {
-  await fetch('/stop', { method: 'POST' });
+  await fetch('/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: cCurrentJobId }),
+  });
   cSetRunning(false);
   _cStopTicker();
   cAddLog('Stop requested.', 'warn');
