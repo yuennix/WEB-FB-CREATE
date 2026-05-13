@@ -1260,19 +1260,22 @@ def get_custom_email(firstname='', lastname=''):
     return generate_natural_email(firstname, lastname, EMAIL_DOMAIN)
 
 
-def get_email_for_registration(firstname='', lastname=''):
+def get_email_for_registration(firstname='', lastname='', domain=None):
     """Return an email for registration.
     For temp-mail.io domains, calls their API to get a real email+token.
-    For all other domains, generates locally."""
+    For all other domains, generates locally.
+    Pass domain explicitly to avoid the global EMAIL_DOMAIN race condition
+    when multiple jobs run concurrently."""
+    _domain = domain or EMAIL_DOMAIN
     if not firstname:
         firstname = fake.first_name()
     if not lastname:
         lastname = fake.last_name()
-    if EMAIL_DOMAIN in _TEMPMAIL_IO_DOMAIN_SET:
+    if _domain in _TEMPMAIL_IO_DOMAIN_SET:
         try:
             _r = requests.post(
                 f'{_TEMPMAIL_IO_API}/v3/email/new',
-                json={'domain': EMAIL_DOMAIN,
+                json={'domain': _domain,
                       'min_name_length': 8, 'max_name_length': 14},
                 headers={**_TEMPMAIL_IO_HDRS, 'Content-Type': 'application/json'},
                 timeout=10,
@@ -1287,7 +1290,7 @@ def get_email_for_registration(firstname='', lastname=''):
                     return _email
         except Exception:
             pass
-    return generate_natural_email(firstname, lastname, EMAIL_DOMAIN)
+    return generate_natural_email(firstname, lastname, _domain)
 
 def choose_email_domain():
     """Email Domain Selection Menu"""

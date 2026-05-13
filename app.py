@@ -65,7 +65,11 @@ def _new_job_state():
 _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
 
-WORKERS = 50   # 50 parallel workers
+WORKERS = 150  # workers per job (all I/O-bound — more = faster)
+
+# Shared pool avoids per-job thread-creation overhead.
+# 1000 slots → up to ~6 concurrent users at 150 workers each without queueing.
+_GLOBAL_POOL = ThreadPoolExecutor(max_workers=1000)
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -259,8 +263,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             else:
                 fb_sex = m.random.choice(["1", "2"])
 
-            m.EMAIL_DOMAIN = email_domain
-            phone = m.get_email_for_registration(firstname, lastname)
+            phone = m.get_email_for_registration(firstname, lastname, domain=email_domain)
             pww   = m.get_pass() if password_type == 'auto' else custom_password
 
             _pt = form.get('privacy_mutation_token', '')
@@ -416,16 +419,15 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
             'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
 
     try:
-        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            futures = [
-                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
-                for _ in range(WORKERS)
-            ]
-            for f in as_completed(futures):
-                try:
-                    f.result()
-                except Exception as e:
-                    jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
+        futures = [
+            _GLOBAL_POOL.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
+            for _ in range(WORKERS)
+        ]
+        for f in as_completed(futures):
+            try:
+                f.result()
+            except Exception as e:
+                jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
     finally:
         job['running'] = False
         job['completed_at'] = time.time()
