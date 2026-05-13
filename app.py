@@ -8,7 +8,7 @@ import threading
 import re as _re
 import random as _random
 import concurrent.futures as _cfi
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote as _uq
 
 from flask import Flask, render_template, request, jsonify, Response, send_file, session
@@ -65,11 +65,7 @@ def _new_job_state():
 _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
 
-WORKERS = 150  # workers per job (all I/O-bound — more = faster)
-
-# Shared pool sized for 20 concurrent users × 150 workers each = 3000 threads.
-# Extra 500 buffer ensures no queuing even during bursts.
-_GLOBAL_POOL = ThreadPoolExecutor(max_workers=3500)
+WORKERS = 150  # workers per job — threads are I/O-bound so more = faster
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -427,15 +423,21 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
             'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
 
     try:
-        futures = [
-            _GLOBAL_POOL.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
+        # Spawn one raw OS thread per worker — no pool cap, no queuing.
+        # With 100+ users × 150 workers each, threads spend ~99% of their time
+        # waiting on network I/O so the OS handles tens-of-thousands just fine.
+        workers = [
+            threading.Thread(
+                target=_create_one,
+                args=(name_type, gender, password_type, custom_password, count, session_id, email_domain, job),
+                daemon=True,
+            )
             for _ in range(WORKERS)
         ]
-        for f in as_completed(futures):
-            try:
-                f.result()
-            except Exception as e:
-                jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
+        for w in workers:
+            w.start()
+        for w in workers:
+            w.join()
     finally:
         job['running'] = False
         job['completed_at'] = time.time()
