@@ -1825,8 +1825,8 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
     }
     _HARAKIRI_DOMAINS    = {'harakirimail.com'}
-    _WEYN_EMAILS_DOMAINS = {'cunt.abrdns.com', 'jinbilowg.cloud-ip.cc', 'yuennix.work.gd', 'yuennix.cc.cd'}
-    _WEYN_EMAILS_API     = 'https://weyn-emails-production.up.railway.app'
+    _WEYN_EMAILS_DOMAINS = _dm.get_weyn_email_domains()
+    _WEYN_EMAILS_API     = _dm.WEYN_EMAILS_API
     _domain = email.split('@')[1].lower() if '@' in email else ''
     _is_secmail       = _domain in _SECMAIL_DOMAINS
     _is_harakiri      = _domain in _HARAKIRI_DOMAINS

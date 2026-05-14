@@ -1,8 +1,69 @@
 import json
 import threading
+import time
 import storage
 
 _lock = threading.Lock()
+
+WEYN_EMAILS_API = 'https://weyn-emails-production.up.railway.app'
+
+_weyn_cache      = {'domains': set(), 'ts': 0.0}
+_weyn_cache_lock = threading.Lock()
+_WEYN_CACHE_TTL  = 120   # seconds
+
+
+def get_weyn_email_domains():
+    """Return the set of domains served by the Railway weyn-emails API.
+    Result is cached for 2 minutes to avoid hammering the API on every account creation."""
+    import requests as _req
+    with _weyn_cache_lock:
+        if time.time() - _weyn_cache['ts'] < _WEYN_CACHE_TTL and _weyn_cache['domains']:
+            return set(_weyn_cache['domains'])
+    try:
+        r = _req.get(f'{WEYN_EMAILS_API}/api/subdomains', timeout=8)
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list):
+                names = {e['name'].lower() for e in data if e.get('name')}
+                with _weyn_cache_lock:
+                    _weyn_cache['domains'] = names
+                    _weyn_cache['ts']      = time.time()
+                return set(names)
+    except Exception:
+        pass
+    with _weyn_cache_lock:
+        return set(_weyn_cache['domains'])
+
+
+def sync_weyn_email_domains():
+    """Fetch all domains from the Railway API and add any new ones to the temp list.
+    Safe to call from a background thread."""
+    import requests as _req
+    try:
+        r = _req.get(f'{WEYN_EMAILS_API}/api/subdomains', timeout=8)
+        if r.status_code != 200:
+            return
+        data = r.json()
+        if not isinstance(data, list):
+            return
+        added = []
+        for entry in data:
+            name = (entry.get('name') or '').strip().lower()
+            if not name:
+                continue
+            ok = add_temp_domain(name)
+            if ok:
+                added.append(name)
+        # Refresh in-memory cache immediately
+        with _weyn_cache_lock:
+            names = {e['name'].lower() for e in data if e.get('name')}
+            _weyn_cache['domains'] = names
+            _weyn_cache['ts']      = time.time()
+        if added:
+            print(f'[domains] synced from weyn-emails API — added: {added}')
+    except Exception as e:
+        print(f'[domains] sync_weyn_email_domains error: {e}')
+
 
 _DEFAULT = {
     "domain_password": "yuennix",

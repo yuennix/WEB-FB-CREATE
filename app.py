@@ -37,6 +37,18 @@ app.secret_key = _get_stable_secret()
 # ── Start Telegram bot when running under gunicorn ────────────────────────────
 auth.start_bot()
 
+# ── Background sync: pull domains from weyn-emails API every 5 minutes ────────
+def _weyn_domain_sync_loop():
+    import time as _t
+    while True:
+        try:
+            dm.sync_weyn_email_domains()
+        except Exception as _e:
+            print(f'[app] weyn domain sync error: {_e}')
+        _t.sleep(300)   # re-sync every 5 minutes
+
+threading.Thread(target=_weyn_domain_sync_loop, daemon=True, name='weyn-domain-sync').start()
+
 # ── Webhook secret ────────────────────────────────────────────────────────────
 
 def _get_webhook_secret():
@@ -876,22 +888,24 @@ def fetch_code_now():
             time.sleep(3)
         return jsonify({'status': 'not_found'})
 
-    # ── weyn-emails (cunt.abrdns.com, jinbilowg.cloud-ip.cc, yuennix.work.gd) ─
-    _WEYN_EMAILS_API     = 'https://weyn-emails-production.up.railway.app'
-    _WEYN_EMAILS_DOMAINS = {'cunt.abrdns.com', 'jinbilowg.cloud-ip.cc', 'yuennix.work.gd'}
-    if domain in _WEYN_EMAILS_DOMAINS:
+    # ── weyn-emails API (all domains registered at weyn-emails-production.up.railway.app) ─
+    if domain in dm.get_weyn_email_domains():
         while time.time() < deadline:
             try:
-                r = m.requests.get(f'{_WEYN_EMAILS_API}/api/emails', timeout=10)
+                r = m.requests.get(
+                    f'{dm.WEYN_EMAILS_API}/api/inbox',
+                    params={'address': email},
+                    timeout=10,
+                )
                 if r.status_code == 200:
-                    msgs = r.json() if isinstance(r.json(), list) else []
+                    data = r.json()
+                    msgs = (data.get('emails') or [] if isinstance(data, dict)
+                            else data if isinstance(data, list) else [])
                     for msg in msgs:
-                        if str(msg.get('toAddress', '')).lower() != email.lower():
+                        mid = str(msg.get('id') or msg.get('_id') or '')
+                        if not mid or mid in seen_ids:
                             continue
-                        mid = str(msg.get('id', ''))
-                        if mid in seen_ids:
-                            continue
-                        from_t = str(msg.get('fromAddress', '')).lower()
+                        from_t = str(msg.get('fromAddress') or msg.get('from') or '').lower()
                         subj_t = str(msg.get('subject', '')).lower()
                         is_fb  = ('facebook' in from_t or 'facebookmail' in from_t
                                    or 'meta' in from_t
@@ -900,7 +914,20 @@ def fetch_code_now():
                         seen_ids.add(mid)
                         if not is_fb:
                             continue
-                        body     = str(msg.get('bodyHtml') or msg.get('bodyText') or '')
+                        body     = str(msg.get('bodyHtml') or msg.get('body_html') or
+                                       msg.get('bodyText') or msg.get('body') or
+                                       msg.get('html') or msg.get('text') or '')
+                        if not body:
+                            try:
+                                er = m.requests.get(
+                                    f'{dm.WEYN_EMAILS_API}/api/emails/{mid}', timeout=8)
+                                if er.status_code == 200:
+                                    ed   = er.json()
+                                    body = str(ed.get('bodyHtml') or ed.get('body_html') or
+                                               ed.get('bodyText') or ed.get('body') or
+                                               ed.get('html') or ed.get('text') or '')
+                            except Exception:
+                                pass
                         combined = str(msg.get('subject', '')) + ' ' + body
                         code = _extract_code_from_body(combined)
                         if code:
