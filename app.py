@@ -78,7 +78,7 @@ def _new_job_state():
 _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
 
-WORKERS = 50   # 50 parallel workers
+WORKERS = 200  # parallel workers per job
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -244,14 +244,17 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 return
 
         try:
-            ses      = m.requests.Session()
-            response = ses.get("https://m.facebook.com/reg/", timeout=15)
+            ses = m.requests.Session()
+            _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
+            ses.mount('https://', _adp)
+            ses.mount('http://',  _adp)
+            response = ses.get("https://m.facebook.com/reg/", timeout=10)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
                 jq.put({'type': 'log', 'level': 'warn',
                         'msg': 'Could not load reg page, retrying…'})
-                time.sleep(_random.uniform(1.5, 3.0))
+                time.sleep(_random.uniform(0.3, 0.8))
                 continue
 
             if name_type == '2':
@@ -331,7 +334,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'viewport-width':    '980',
             }
 
-            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=20)
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=12)
             login_coki = ses.cookies.get_dict()
 
             if "c_user" in login_coki:
@@ -426,14 +429,16 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
+    actual_workers = min(WORKERS, max(count * 4, 20))
+
     jq.put({'type': 'log', 'level': 'info',
-            'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
+            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
 
     try:
-        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        with ThreadPoolExecutor(max_workers=actual_workers) as pool:
             futures = [
                 pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
-                for _ in range(WORKERS)
+                for _ in range(actual_workers)
             ]
             for f in as_completed(futures):
                 try:
