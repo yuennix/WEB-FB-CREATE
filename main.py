@@ -2109,20 +2109,8 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                             print(f"{G}║{W}  EMAIL {DIM}│{G} {_el}{' '*(37-len(_el))}{G}║")
                             print(f"{G}║{W}  CODE  {DIM}│{Y}  {_c}{' '*(36-len(_c))}{G}║")
                             print(f"{G}╚{'═'*47}╝{W}")
-                            # Auto-submit immediately; fall back to manual UI
-                            print(f"{G}  [auto] Submitting code {_c} for UID {uid}…{W}")
-                            _as = _auto_submit_code(_c)
-                            print(f"{G}  [auto] Result: {_as}{W}")
                             if result_queue:
-                                if _as == 'confirmed':
-                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                                      'status': 'confirmed', 'method': 'code'})
-                                elif _as == 'checkpoint':
-                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                                      'status': 'checkpoint'})
-                                else:
-                                    # Auto-submit failed → show code for manual entry
-                                    result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                                result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                             _stop_poll.set()
                             return
             except Exception:
@@ -2433,19 +2421,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                                 if 1900 <= _n <= 2100:
                                     continue
                                 print(f"{G}  [tempmail.io] Code fetched → {_c}{W}")
-                                # Always show code in UI first (same as harakirimail)
                                 if result_queue:
                                     result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                                 _stop_poll.set()
-                                # Also try auto-submit; emit result if it worked
-                                _as = _auto_submit_code(_c)
-                                if result_queue:
-                                    if _as == 'confirmed':
-                                        result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                                          'status': 'confirmed', 'method': 'code'})
-                                    elif _as == 'checkpoint':
-                                        result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                                          'status': 'checkpoint'})
                                 _found = True
                                 break
                             if _found:
@@ -2529,15 +2507,6 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                     if result_queue:
                         result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                     _stop_poll.set()
-                    _as = _auto_submit_code(_c)
-                    print(f"{G}  [weyn-emails] Auto-submit result: {_as}{W}")
-                    if result_queue:
-                        if _as == 'confirmed':
-                            result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                              'status': 'confirmed', 'method': 'code'})
-                        elif _as == 'checkpoint':
-                            result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                              'status': 'checkpoint'})
                     return True
 
             # ── 4) Last-resort: any standalone 5–6 digit number ───────────────
@@ -2548,14 +2517,6 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                 if result_queue:
                     result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                 _stop_poll.set()
-                _as = _auto_submit_code(_c)
-                if result_queue:
-                    if _as == 'confirmed':
-                        result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                          'status': 'confirmed', 'method': 'code'})
-                    elif _as == 'checkpoint':
-                        result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                          'status': 'checkpoint'})
                 return True
 
             return False
@@ -2647,16 +2608,6 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                     if result_queue:
                         result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
                     _stop_poll.set()
-                    # Attempt auto-submit; report result
-                    _as = _auto_submit_code(_c)
-                    print(f"{G}  [webhook] Auto-submit result: {_as}{W}")
-                    if result_queue:
-                        if _as == 'confirmed':
-                            result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                              'status': 'confirmed', 'method': 'code'})
-                        elif _as == 'checkpoint':
-                            result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                              'status': 'checkpoint'})
                     return
             except Exception as _we:
                 print(f"{Y}  [webhook] poll error: {_we}{W}")
