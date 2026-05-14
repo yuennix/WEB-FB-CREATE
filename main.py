@@ -21,7 +21,7 @@ from os import path
 from urllib.request import Request, urlopen
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, filename="app.log", format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, filename="/tmp/app.log", format="%(asctime)s - %(levelname)s - %(message)s")
 
 # ANSI color codes
 W  = '\033[97m'      # Bright white
