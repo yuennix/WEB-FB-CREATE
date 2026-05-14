@@ -8,7 +8,7 @@ import threading
 import re as _re
 import random as _random
 import concurrent.futures as _cfi
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote as _uq
 
 from flask import Flask, render_template, request, jsonify, Response, send_file, session
@@ -64,42 +64,21 @@ _jobs      = {}          # job_id -> job state dict
 _jobs_lock = threading.Lock()
 
 
-class _LoggingQueue(queue.Queue):
-    """Queue that also appends every put() item to a persistent event_log list.
-
-    This allows the SSE generator to replay missed events to reconnecting
-    clients without losing anything that was already consumed from the queue.
-    """
-    def __init__(self, event_log, log_lock):
-        super().__init__()
-        self._event_log  = event_log
-        self._log_lock   = log_lock
-
-    def put(self, item, *args, **kwargs):
-        with self._log_lock:
-            self._event_log.append(item)
-        super().put(item, *args, **kwargs)
-
-
 def _new_job_state():
-    lock      = threading.Lock()
-    event_log = []
     return {
-        'task_queue':     _LoggingQueue(event_log, lock),
-        'event_log':      event_log,
-        'result_store':   [],
-        'running':        True,
-        'lock':           lock,
-        'done_count':     [0],
-        'cp_count':       [0],
-        'last_error_log': [0.0],   # timestamp — throttles error messages across all workers
+        'task_queue':   queue.Queue(),
+        'result_store': [],
+        'running':      True,
+        'lock':         threading.Lock(),
+        'done_count':   [0],
+        'cp_count':     [0],
     }
 
 # ── Session store for retry-confirm ──────────────────────────────────────────
 _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
 
-WORKERS = 150  # workers per job — threads are I/O-bound so more = faster
+WORKERS = 50   # 50 parallel workers
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -259,22 +238,13 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
     jcp  = job['cp_count']
     jrs  = job['result_store']
 
-    _consecutive_errors = 0
-
     while True:
         with jlk:
             if jdc[0] >= num or not job['running']:
                 return
 
         try:
-            ses = m.requests.Session()
-            _adapter = m.requests.adapters.HTTPAdapter(
-                pool_connections=2,
-                pool_maxsize=4,
-                max_retries=0,   # we handle retries ourselves with backoff
-            )
-            ses.mount('https://', _adapter)
-            ses.mount('http://',  _adapter)
+            ses      = m.requests.Session()
             response = ses.get("https://m.facebook.com/reg/", timeout=15)
             form     = m.extractor(response.text)
 
@@ -303,7 +273,8 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             else:
                 fb_sex = m.random.choice(["1", "2"])
 
-            phone = m.get_email_for_registration(firstname, lastname, domain=email_domain)
+            m.EMAIL_DOMAIN = email_domain
+            phone = m.get_email_for_registration(firstname, lastname)
             pww   = m.get_pass() if password_type == 'auto' else custom_password
 
             _pt = form.get('privacy_mutation_token', '')
@@ -360,7 +331,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'viewport-width':    '980',
             }
 
-            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=12)
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=20)
             login_coki = ses.cookies.get_dict()
 
             if "c_user" in login_coki:
@@ -440,32 +411,8 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 jq.put({'type': 'log', 'level': 'warn',
                         'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
 
-            # Got a real HTTP response — connection is working, reset error streak
-            _consecutive_errors = 0
-
         except Exception as e:
-            _consecutive_errors += 1
-            # Throttle error logs at the job level: at most one message per 15s
-            # across all workers combined, so the console stays clean.
-            _now = time.time()
-            with jlk:
-                _log_due = (_now - job['last_error_log'][0]) >= 15
-                if _log_due:
-                    job['last_error_log'][0] = _now
-            if _log_due:
-                _ename = type(e).__name__
-                jq.put({'type': 'log', 'level': 'warn',
-                        'msg': f'⏳ Connection issue ({_ename}), workers backing off and retrying…'})
-
-            if _consecutive_errors >= 8:
-                # After 8 straight failures take a longer break, then reset and
-                # keep going — never permanently abandon the job.
-                _consecutive_errors = 0
-                time.sleep(_random.uniform(20, 35))
-            else:
-                # Exponential backoff: 2s, 4s, 8s … capped at 15s
-                _sleep = min(2 ** _consecutive_errors, 15) + _random.uniform(0, 2)
-                time.sleep(_sleep)
+            jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
@@ -479,26 +426,20 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
-    # Cap workers: no point having more workers than ~3× the target count.
-    # Excessive workers cause connection saturation and trigger rate limits.
-    actual_workers = min(WORKERS, max(count * 3, 10))
-
     jq.put({'type': 'log', 'level': 'info',
-            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
+            'msg': f'Starting {count} account(s) with {WORKERS} workers on {email_domain}…'})
 
     try:
-        workers = [
-            threading.Thread(
-                target=_create_one,
-                args=(name_type, gender, password_type, custom_password, count, session_id, email_domain, job),
-                daemon=True,
-            )
-            for _ in range(actual_workers)
-        ]
-        for w in workers:
-            w.start()
-        for w in workers:
-            w.join()
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            futures = [
+                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
+                for _ in range(WORKERS)
+            ]
+            for f in as_completed(futures):
+                try:
+                    f.result()
+                except Exception as e:
+                    jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
     finally:
         job['running'] = False
         job['completed_at'] = time.time()
@@ -540,74 +481,28 @@ def stream():
             headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
         )
 
-    jq        = job['task_queue']
-    event_log = job['event_log']
-    jlk       = job['lock']
-
-    # Browser sends Last-Event-ID header on auto-reconnect; use it as a cursor
-    # so we only replay events the client hasn't seen yet.
-    _last_id = request.headers.get('Last-Event-ID', '')
-    _start   = int(_last_id) + 1 if _last_id.lstrip('-').isdigit() and int(_last_id) >= 0 else 0
+    jq = job['task_queue']
 
     def generate():
         yield 'retry: 3000\n\n'
-        pos = _start
-
-        # ── Phase 1: replay already-logged events from event_log ────────────
-        # This covers both first-connect (pos=0) and reconnect (pos=N) cases.
-        while True:
-            with jlk:
-                item = event_log[pos] if pos < len(event_log) else None
-            if item is None:
-                break
-            yield f'id: {pos}\ndata: {json.dumps(item)}\n\n'
-            pos += 1
-            if item.get('type') == 'done':
-                return
-
-        # ── Phase 2: job already finished — nothing more to send ────────────
+        # If job already finished, send the final event immediately
         if not job.get('running') and job.get('final'):
-            final = job['final']
-            # Emit the final event if it wasn't already in the replay above
-            with jlk:
-                already_in_log = any(e.get('type') == 'done' for e in event_log)
-            if not already_in_log:
-                yield f'id: {pos}\ndata: {json.dumps(final)}\n\n'
+            yield f'data: {json.dumps(job["final"])}\n\n'
             return
-
-        # ── Phase 3: follow live events via queue signals ────────────────────
-        # The queue is only used as a wake-up signal; the actual event data
-        # is always read from event_log so nothing can be lost.
         empty = 0
         while empty < 38:
             try:
-                jq.get(timeout=8)   # blocks until a new event is put()
+                item = jq.get(timeout=8)
                 empty = 0
+                yield f'data: {json.dumps(item)}\n\n'
+                if item.get('type') == 'done':
+                    return
             except queue.Empty:
                 empty += 1
                 yield f'data: {json.dumps({"type": "ping"})}\n\n'
-                # Check whether job finished while we were waiting
+                # If job finished while we were waiting, send final and exit
                 if not job.get('running') and job.get('final'):
-                    with jlk:
-                        remaining = list(event_log[pos:])
-                    for i, item in enumerate(remaining):
-                        yield f'id: {pos + i}\ndata: {json.dumps(item)}\n\n'
-                        if item.get('type') == 'done':
-                            return
-                    if not any(e.get('type') == 'done' for e in remaining):
-                        yield f'id: {pos + len(remaining)}\ndata: {json.dumps(job["final"])}\n\n'
-                    return
-                continue
-
-            # Drain all new log entries since last pos
-            while True:
-                with jlk:
-                    item = event_log[pos] if pos < len(event_log) else None
-                if item is None:
-                    break
-                yield f'id: {pos}\ndata: {json.dumps(item)}\n\n'
-                pos += 1
-                if item.get('type') == 'done':
+                    yield f'data: {json.dumps(job["final"])}\n\n'
                     return
 
     return Response(
