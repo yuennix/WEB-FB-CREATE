@@ -429,7 +429,7 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
-    actual_workers = min(WORKERS, max(count * 4, 20))
+    actual_workers = WORKERS
 
     jq.put({'type': 'log', 'level': 'info',
             'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
