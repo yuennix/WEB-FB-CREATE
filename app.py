@@ -1126,6 +1126,17 @@ def admin_domains():
         return jsonify({'error': 'Unauthorized'}), 401
     return jsonify(dm.get_all_info())
 
+@app.route('/admin/api/domains/sync-weyn', methods=['POST'])
+def admin_sync_weyn_domains():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    before = set(dm.get_all_info().get('temp', []))
+    dm.sync_weyn_email_domains()
+    after  = set(dm.get_all_info().get('temp', []))
+    added  = sorted(after - before)
+    return jsonify({'status': 'ok', 'added': added, 'total': len(after)})
+
+
 @app.route('/admin/api/domains/add-temp', methods=['POST'])
 def admin_add_temp():
     if not _require_admin():

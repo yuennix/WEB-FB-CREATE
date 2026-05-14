@@ -587,6 +587,11 @@
         <input type="text" id="newTempDomain" placeholder="e.g. tempmail.net">
         <button onclick="addTempDomain()">+ Add</button>
       </div>
+      <div style="margin-bottom:10px;">
+        <button id="syncWeynBtn" onclick="syncWeynDomains()" style="width:100%;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:9px;padding:9px 0;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;">
+          🔄 Sync from weyn-emails.app
+        </button>
+      </div>
       <div id="tempDomainList" class="domain-section"></div>
     </div>
     <div>
@@ -1054,6 +1059,26 @@ function domainPill(domain, isCustom) {
     <button class="rm" title="Remove domain" onclick="removeDomain('${esc(domain)}')">×</button>
   `;
   return pill;
+}
+
+async function syncWeynDomains() {
+  const btn = document.getElementById('syncWeynBtn');
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try {
+    const d = await api('/admin/api/domains/sync-weyn', 'POST');
+    if (d.added && d.added.length > 0) {
+      toast(`✓ Synced — added: ${d.added.join(', ')}`);
+    } else {
+      toast(`✓ All ${d.total} domains already up to date`);
+    }
+    loadDomains();
+  } catch(e) {
+    toast('Sync failed', true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Sync from weyn-emails.app';
+  }
 }
 
 async function addTempDomain() {
