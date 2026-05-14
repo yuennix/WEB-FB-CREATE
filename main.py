@@ -1825,7 +1825,7 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
         'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
     }
     _HARAKIRI_DOMAINS    = {'harakirimail.com'}
-    _WEYN_EMAILS_DOMAINS = {'cunt.abrdns.com', 'jinbilowg.cloud-ip.cc', 'yuennix.work.gd'}
+    _WEYN_EMAILS_DOMAINS = {'cunt.abrdns.com', 'jinbilowg.cloud-ip.cc', 'yuennix.work.gd', 'yuennix.cc.cd'}
     _WEYN_EMAILS_API     = 'https://weyn-emails-production.up.railway.app'
     _domain = email.split('@')[1].lower() if '@' in email else ''
     _is_secmail       = _domain in _SECMAIL_DOMAINS
@@ -2474,52 +2474,153 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
                 result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': 'timeout'})
 
     def _poll_weyn_emails():
-        """Poll weyn-emails API every 3s for up to 2.5 min."""
-        _login   = email.split('@')[0]
-        _seen    = set()
+        """Poll weyn-emails API every 3s for up to 2.5 min.
+        Uses GET /api/inbox?address={email} → {"domain":…,"emails":[…]}
+        Falls back to GET /api/emails (list all) for older subdomains.
+        """
+        _seen     = set()
         _deadline = time.time() + 150
         print(f"{G}  [weyn-emails] Polling inbox for {email}…{W}")
+
+        def _handle_body(_body_str, _subj_str=''):
+            """Extract FB link or numeric code from email body. Returns True if handled."""
+            _combined = (_subj_str + ' ' + _body_str).strip()
+
+            # ── 1) FB confirmation link ────────────────────────────────────────
+            _lm = re.search(
+                r'https://(?:www|m)\.facebook\.com/(?:confirm|r\.php)[^\s"<>\]\\]+',
+                _combined, re.IGNORECASE
+            )
+            if _lm:
+                _link = _lm.group(0).replace('&amp;', '&').rstrip('.')
+                print(f"{G}  [weyn-emails] Confirm link → {_link[:60]}{W}")
+                if result_queue:
+                    try:
+                        _lr = ses.get(_link, headers=_ch, timeout=12, allow_redirects=True)
+                        _st = ('checkpoint' if 'checkpoint' in str(_lr.url) else 'confirmed')
+                    except Exception:
+                        _st = 'link_error'
+                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _st})
+                _stop_poll.set()
+                return True
+
+            # ── 2) Convert HTML → plain text, strip URLs ───────────────────────
+            try:
+                _plain = BeautifulSoup(_combined, 'html.parser').get_text(separator=' ')
+            except Exception:
+                _plain = _combined
+            _clean = re.sub(r'https?://\S+', ' ', _plain)
+            _clean = re.sub(r'\s+', ' ', _clean)
+
+            # ── 3) Contextual code patterns ────────────────────────────────────
+            _ctx_pats = [
+                r'(?:confirmation|verification|confirm(?:ation)?)\s*code[:\s\-]+(\d{5,6})',
+                r'(?:your|the)\s+(?:confirmation\s+)?code\s+(?:is\s+)?[:\-]?\s*(\d{5,6})',
+                r'code[:\s\-]+(\d{5,6})\b',
+                r'\b(\d{5,6})\s+(?:is\s+your|to\s+confirm|to\s+verify)',
+                r'enter\s+(?:the\s+)?(?:code|number)[:\s\-]+(\d{5,6})',
+                r'(?:^|\s)(\d{5,6})(?:\s|$)',
+            ]
+            for _pat in _ctx_pats:
+                for _c in re.findall(_pat, _clean, re.IGNORECASE | re.MULTILINE):
+                    if 1900 <= int(_c) <= 2100:
+                        continue
+                    print(f"{G}  [weyn-emails] Code found → {_c}{W}")
+                    if result_queue:
+                        result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                    _stop_poll.set()
+                    _as = _auto_submit_code(_c)
+                    print(f"{G}  [weyn-emails] Auto-submit result: {_as}{W}")
+                    if result_queue:
+                        if _as == 'confirmed':
+                            result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                              'status': 'confirmed', 'method': 'code'})
+                        elif _as == 'checkpoint':
+                            result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                              'status': 'checkpoint'})
+                    return True
+
+            # ── 4) Last-resort: any standalone 5–6 digit number ───────────────
+            for _c in re.findall(r'\b(\d{5,6})\b', _clean):
+                if 1900 <= int(_c) <= 2100:
+                    continue
+                print(f"{G}  [weyn-emails] Code (last-resort) → {_c}{W}")
+                if result_queue:
+                    result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                _stop_poll.set()
+                _as = _auto_submit_code(_c)
+                if result_queue:
+                    if _as == 'confirmed':
+                        result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                          'status': 'confirmed', 'method': 'code'})
+                    elif _as == 'checkpoint':
+                        result_queue.put({'type': 'confirm_result', 'uid': uid,
+                                          'status': 'checkpoint'})
+                return True
+
+            return False
+
+        def _fetch_and_process_msgs(_msgs):
+            """Process a list of email dicts. Returns True if code/link found."""
+            for _msg in _msgs:
+                _mid = str(_msg.get('id') or _msg.get('_id') or '')
+                if not _mid or _mid in _seen:
+                    continue
+                _from_t = str(_msg.get('fromAddress') or _msg.get('from') or '').lower()
+                _subj_t = str(_msg.get('subject', '')).lower()
+                _is_fb  = ('facebook' in _from_t or 'facebookmail' in _from_t
+                           or 'meta'         in _from_t
+                           or 'confirm'      in _subj_t or 'code'  in _subj_t
+                           or 'verification' in _subj_t or 'registration' in _subj_t)
+                _seen.add(_mid)
+                if not _is_fb:
+                    continue
+                print(f"{G}  [weyn-emails] FB email found — id={_mid} subj={_msg.get('subject','')}{W}")
+
+                # Body may be inline in the list response
+                _body = str(_msg.get('bodyHtml') or _msg.get('body_html') or
+                            _msg.get('bodyText') or _msg.get('body') or
+                            _msg.get('html') or _msg.get('text') or '')
+
+                # If not, try fetching individual message
+                if not _body:
+                    try:
+                        _er = requests.get(f'{_WEYN_EMAILS_API}/api/emails/{_mid}', timeout=10)
+                        if _er.status_code == 200:
+                            try:
+                                _ed   = _er.json()
+                                _body = str(_ed.get('bodyHtml') or _ed.get('body_html') or
+                                            _ed.get('bodyText') or _ed.get('body') or
+                                            _ed.get('html') or _ed.get('text') or '')
+                                if not _body:
+                                    _body = _er.text
+                            except Exception:
+                                _body = _er.text
+                    except Exception as _fe:
+                        print(f"{Y}  [weyn-emails] email fetch error: {_fe}{W}")
+
+                if _body and _handle_body(_body, _msg.get('subject', '')):
+                    return True
+            return False
+
         while time.time() < _deadline and not _stop_poll.is_set():
             try:
-                _r = requests.get(f'{_WEYN_EMAILS_API}/api/emails', timeout=10)
+                # Primary: per-address inbox endpoint (works for yuennix.cc.cd and others)
+                _r = requests.get(
+                    f'{_WEYN_EMAILS_API}/api/inbox',
+                    params={'address': email},
+                    timeout=10,
+                )
                 if _r.status_code == 200:
-                    _msgs = _r.json() if isinstance(_r.json(), list) else []
-                    for _msg in _msgs:
-                        if str(_msg.get('toAddress', '')).lower() != email.lower():
-                            continue
-                        _mid = str(_msg.get('id', ''))
-                        if _mid in _seen:
-                            continue
-                        _from_t = str(_msg.get('fromAddress', '')).lower()
-                        _subj_t = str(_msg.get('subject', '')).lower()
-                        _is_fb  = ('facebook' in _from_t or 'facebookmail' in _from_t
-                                    or 'meta' in _from_t
-                                    or 'confirm' in _subj_t or 'code' in _subj_t
-                                    or 'verification' in _subj_t or 'registration' in _subj_t)
-                        _seen.add(_mid)
-                        if not _is_fb:
-                            continue
-                        _body     = str(_msg.get('bodyHtml') or _msg.get('bodyText') or '')
-                        _combined = str(_msg.get('subject', '')) + ' ' + _body
-                        _c = _process_body(_combined)
-                        if _c:
-                            print(f"{G}  [weyn-emails] Code found → {_c}{W}")
-                            if result_queue:
-                                result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
-                            _stop_poll.set()
-                            _as = _auto_submit_code(_c)
-                            print(f"{G}  [weyn-emails] Auto-submit result: {_as}{W}")
-                            if result_queue:
-                                if _as == 'confirmed':
-                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                                      'status': 'confirmed', 'method': 'code'})
-                                elif _as == 'checkpoint':
-                                    result_queue.put({'type': 'confirm_result', 'uid': uid,
-                                                      'status': 'checkpoint'})
-                            return
+                    _data = _r.json()
+                    _msgs = (_data.get('emails') or [] if isinstance(_data, dict)
+                             else _data if isinstance(_data, list) else [])
+                    if _fetch_and_process_msgs(_msgs):
+                        return
             except Exception as _we:
                 print(f"{Y}  [weyn-emails] error: {_we}{W}")
             time.sleep(3)
+
         if not _stop_poll.is_set():
             print(f"{Y}  [!] No weyn-emails code for {email} within 2.5 min{W}")
             if result_queue:

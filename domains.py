@@ -9,6 +9,7 @@ _DEFAULT = {
     "temp": [
         "1secmail.com", "harakirimail.com",
         "cunt.abrdns.com", "jinbilowg.cloud-ip.cc", "yuennix.work.gd",
+        "yuennix.cc.cd",
     ],
     "custom": [
         {"domain": "weyn.store",    "imap_host": "mail.weyn.store",    "imap_user": "admin@weyn.store",    "imap_pass": "yuennix"},
