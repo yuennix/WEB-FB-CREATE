@@ -75,9 +75,14 @@
     position: sticky;
     top: 60px;
     z-index: 90;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  nav::-webkit-scrollbar { display: none; }
 
   .nav-tab {
+    flex-shrink: 0;
     padding: 14px 20px;
     font-size: 12px;
     font-weight: 600;
