@@ -1,4 +1,4 @@
-modules = ["python-3.11", "web"]
+modules = ["python-3.11", "web", "nix"]
 [agent]
 expertMode = true
 stack = "FLASK_VANILLA_JS"
@@ -28,7 +28,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python -m gunicorn --bind 0.0.0.0:5000 --reuse-port --worker-class gevent --workers 1 --worker-connections 2000 --timeout 300 app:app"
+args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --worker-class gevent --workers 1 --worker-connections 2000 --timeout 300 app:app"
 waitForPort = 5000
 
 [[ports]]
