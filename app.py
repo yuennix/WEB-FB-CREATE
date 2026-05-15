@@ -66,12 +66,13 @@ _jobs_lock = threading.Lock()
 
 def _new_job_state():
     return {
-        'task_queue':   queue.Queue(),
-        'result_store': [],
-        'running':      True,
-        'lock':         threading.Lock(),
-        'done_count':   [0],
-        'cp_count':     [0],
+        'task_queue':        queue.Queue(),
+        'result_store':      [],
+        'running':           True,
+        'lock':              threading.Lock(),
+        'done_count':        [0],
+        'cp_count':          [0],
+        'proxy_removed_count': [0],
     }
 
 # ── Session store for retry-confirm ──────────────────────────────────────────
@@ -320,8 +321,12 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                             proxy_pool.remove(_proxy_url)
                         except ValueError:
                             pass
+                    job['proxy_removed_count'][0] += 1
+                    jq.put({'type': 'proxy_stat',
+                            'active': len(proxy_pool),
+                            'removed': job['proxy_removed_count'][0]})
                     jq.put({'type': 'log', 'level': 'warn',
-                            'msg': f'Proxy removed (failed): {_proxy_url}'})
+                            'msg': f'Proxy failed & removed — {len(proxy_pool)} remaining'})
                 time.sleep(_random.uniform(0.3, 0.8))
                 continue
             form     = m.extractor(response.text)
@@ -509,6 +514,8 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
     proxy_info = f' via {len(proxy_pool)} proxies' if proxy_pool else ''
     jq.put({'type': 'log', 'level': 'info',
             'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}{proxy_info}…'})
+    if proxy_pool:
+        jq.put({'type': 'proxy_stat', 'active': len(proxy_pool), 'removed': 0})
 
     try:
         with ThreadPoolExecutor(max_workers=actual_workers) as pool:
