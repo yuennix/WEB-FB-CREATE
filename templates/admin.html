@@ -75,14 +75,9 @@
     position: sticky;
     top: 60px;
     z-index: 90;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
   }
-  nav::-webkit-scrollbar { display: none; }
 
   .nav-tab {
-    flex-shrink: 0;
     padding: 14px 20px;
     font-size: 12px;
     font-weight: 600;
@@ -537,7 +532,6 @@
   <div class="nav-tab active" onclick="showPage('overview')">Overview</div>
   <div class="nav-tab" onclick="showPage('users')">Users <span id="pendingBadge" style="display:none;color:#fbbf24;"> ●</span></div>
   <div class="nav-tab" onclick="showPage('domains')">Domains</div>
-  <div class="nav-tab" onclick="showPage('proxies')">Proxies <span id="pxBadge" style="display:none;font-size:10px;color:#00e676;font-weight:700;background:rgba(0,230,118,0.12);border:1px solid rgba(0,230,118,0.25);border-radius:99px;padding:1px 7px;margin-left:3px;"></span></div>
   <div class="nav-tab create-tab" onclick="showPage('create')">Create Accounts</div>
 </nav>
 
@@ -674,36 +668,6 @@
   </div>
 </div>
 
-<!-- PROXIES -->
-<div class="page" id="page-proxies">
-  <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);max-width:280px;margin-bottom:24px;">
-    <div class="stat-card blue"><div class="num" id="px-total">0</div><div class="lbl">Total</div></div>
-    <div class="stat-card danger"><div class="num" id="px-dead" style="color:#f87171;">0</div><div class="lbl">Auto-removed</div></div>
-  </div>
-
-  <div style="font-size:12px;color:#475569;max-width:680px;margin-bottom:20px;line-height:1.7;background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:10px;padding:12px 15px;">
-    Proxies are saved instantly without testing. If a proxy fails during account creation, it is <strong style="color:#60a5fa;">automatically removed</strong> from the pool.
-  </div>
-
-  <div class="section-label">Add Proxies</div>
-  <div style="display:flex;flex-direction:column;gap:10px;max-width:680px;margin-bottom:28px;">
-    <textarea id="pxInput" placeholder="Paste proxies, one per line:&#10;host:port&#10;http://host:port&#10;http://user:pass@host:port&#10;socks5://host:port"
-      style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e2e8f0;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;width:100%;resize:vertical;min-height:130px;line-height:1.7;transition:border-color .2s;"
-      onfocus="this.style.borderColor='rgba(245,158,11,0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.07)'"></textarea>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button onclick="pxAdd()" id="pxAddBtn" style="flex:1;padding:10px 18px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:9px;color:#000;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;min-width:160px;transition:all .2s;box-shadow:0 4px 12px rgba(245,158,11,0.2);">
-        + Add Proxies
-      </button>
-      <button onclick="pxClearAll()" style="padding:10px 18px;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:9px;color:#f87171;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">
-        🗑 Clear All
-      </button>
-    </div>
-  </div>
-
-  <div class="section-label">Proxy List</div>
-  <div id="pxList" style="display:flex;flex-direction:column;gap:6px;max-width:720px;"></div>
-</div>
-
 <!-- CREATE ACCOUNTS -->
 <div class="page" id="page-create">
 <div class="cr-container">
@@ -825,77 +789,13 @@ function showPage(name) {
   document.querySelectorAll('nav .nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   const tabs = document.querySelectorAll('nav .nav-tab');
-  const map = { overview: 0, users: 1, domains: 2, proxies: 3, create: 4 };
+  const map = { overview: 0, users: 1, domains: 2, create: 3 };
   if (tabs[map[name]]) tabs[map[name]].classList.add('active');
 
   if (name === 'overview') loadOverview();
   if (name === 'users')    loadUsers();
   if (name === 'domains')  loadDomains();
-  if (name === 'proxies')  pxLoad();
   if (name === 'create')   cLoadDomains();
-}
-
-// ── Proxy management ──────────────────────────────────────────────────────────
-
-async function pxLoad() {
-  const d = await api('/admin/proxies');
-  pxRender(d.proxies || []);
-}
-
-function pxRender(proxies) {
-  const total = proxies.length;
-  document.getElementById('px-total').textContent = total;
-
-  const badge = document.getElementById('pxBadge');
-  if (total > 0) { badge.textContent = total; badge.style.display = ''; }
-  else badge.style.display = 'none';
-
-  const list = document.getElementById('pxList');
-  if (!proxies.length) {
-    list.innerHTML = '<div style="color:#475569;text-align:center;padding:30px;font-size:13px;font-weight:500;">No proxies yet — paste some above and click Add Proxies.</div>';
-    return;
-  }
-  list.innerHTML = '';
-  proxies.forEach((url, i) => {
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:9px;padding:9px 14px;';
-    div.innerHTML = `
-      <span style="font-size:10px;font-weight:700;color:#94a3b8;width:28px;flex-shrink:0;text-align:right;">#${i+1}</span>
-      <span style="flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;color:#e2e8f0;word-break:break-all;">${esc(url)}</span>
-      <button onclick="pxDelete('${escAttr(url)}')" title="Remove" style="background:none;border:none;color:#475569;cursor:pointer;font-size:18px;padding:0 2px;line-height:1;transition:color .15s;flex-shrink:0;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#475569'">×</button>
-    `;
-    list.appendChild(div);
-  });
-}
-
-async function pxAdd() {
-  const raw = document.getElementById('pxInput').value.trim();
-  if (!raw) { toast('Paste at least one proxy first', true); return; }
-  const btn = document.getElementById('pxAddBtn');
-  btn.disabled = true; btn.style.opacity = '0.6';
-  try {
-    const d = await api('/admin/proxies/add', 'POST', { proxies: raw });
-    btn.disabled = false; btn.style.opacity = '';
-    document.getElementById('pxInput').value = '';
-    pxRender(d.proxies || []);
-    toast(`✓ ${d.added} prox${d.added === 1 ? 'y' : 'ies'} added (${d.total} total)`);
-  } catch(e) {
-    btn.disabled = false; btn.style.opacity = '';
-    toast('Error saving proxies', true);
-  }
-}
-
-async function pxDelete(url) {
-  const d = await api('/admin/proxies/delete', 'POST', { url });
-  pxRender(d.proxies || []);
-  toast('Proxy removed');
-}
-
-async function pxClearAll() {
-  if (!confirm('Remove all proxies?')) return;
-  await api('/admin/proxies/clear', 'POST');
-  pxRender([]);
-  toast('All proxies cleared');
 }
 
 function toast(msg, isErr) {
@@ -1601,3 +1501,4 @@ loadOverview();
 </script>
 </body>
 </html>
+

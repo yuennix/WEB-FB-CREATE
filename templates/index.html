@@ -715,14 +715,6 @@
       </div>
     </div>
 
-    <div id="proxyInfoBar" style="display:none;align-items:center;gap:8px;background:rgba(0,230,118,0.05);border:1px solid rgba(0,230,118,0.15);border-radius:10px;padding:9px 13px;">
-      <span style="font-size:16px;">🛡</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:11px;font-weight:700;color:#00e676;" id="proxyInfoLabel">0 proxies active</div>
-        <div style="font-size:10px;color:#334155;margin-top:1px;">Managed in Admin → Proxies</div>
-      </div>
-    </div>
-
     <div>
       <div class="section-label">Progress</div>
       <div class="progress-wrap">
@@ -746,16 +738,6 @@
         <div class="stat-box">
           <div class="stat-num" id="statTime" style="color:#475569;font-size:16px;">—</div>
           <div class="stat-label">Time</div>
-        </div>
-      </div>
-      <div class="stats-row" id="proxyStatRow" style="margin-top:6px;display:none;">
-        <div class="stat-box">
-          <div class="stat-num" id="statProxyActive" style="color:#00e676;">—</div>
-          <div class="stat-label">Proxies Active</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-num" id="statProxyRemoved" style="color:#f87171;">0</div>
-          <div class="stat-label">Auto-removed</div>
         </div>
       </div>
     </div>
@@ -866,7 +848,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('userNameBadge').textContent = _userName;
   }
   loadDomains();
-  loadProxyStatus();
 });
 
 function onPassTypeChange() {
@@ -1163,20 +1144,6 @@ function setRunning(running) {
   document.getElementById('runningBadge').classList.toggle('visible', running);
 }
 
-async function loadProxyStatus() {
-  try {
-    const d = await fetch('/admin/proxies').then(r => r.json());
-    const alive = d.alive || 0;
-    const bar   = document.getElementById('proxyInfoBar');
-    if (alive > 0) {
-      document.getElementById('proxyInfoLabel').textContent = `${alive} prox${alive === 1 ? 'y' : 'ies'} active`;
-      bar.style.display = 'flex';
-    } else {
-      bar.style.display = 'none';
-    }
-  } catch(e) {}
-}
-
 async function startJob() {
   const nameType       = document.getElementById('nameType').value;
   const emailDomain    = document.getElementById('emailDomain').value;
@@ -1190,9 +1157,6 @@ async function startJob() {
   createdCount = 0; targetCount = count; startTime = Date.now();
   allAccounts = [];
   document.getElementById('statCreated').textContent = '0';
-  document.getElementById('proxyStatRow').style.display = 'none';
-  document.getElementById('statProxyActive').textContent  = '—';
-  document.getElementById('statProxyRemoved').textContent = '0';
   document.getElementById('statTotal').textContent   = count;
   document.getElementById('statTime').textContent    = '0s';
   document.getElementById('statTime').style.color    = '';
@@ -1233,12 +1197,6 @@ function _connectStream(jobId) {
     if (msg.type === 'account') addAccount(msg.data);
     if (msg.type === 'confirm_code') autofillCode(msg.uid, msg.code);
     if (msg.type === 'confirm_result') handleConfirmResult(msg.uid, msg.status, msg.method);
-    if (msg.type === 'proxy_stat') {
-      const row = document.getElementById('proxyStatRow');
-      row.style.display = 'flex';
-      document.getElementById('statProxyActive').textContent  = msg.active;
-      document.getElementById('statProxyRemoved').textContent = msg.removed;
-    }
     if (msg.type === 'done') {
       addLog(msg.msg, 'success');
       setRunning(false);
@@ -1292,3 +1250,4 @@ function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
 </script>
 </body>
 </html>
+

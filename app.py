@@ -66,13 +66,12 @@ _jobs_lock = threading.Lock()
 
 def _new_job_state():
     return {
-        'task_queue':        queue.Queue(),
-        'result_store':      [],
-        'running':           True,
-        'lock':              threading.Lock(),
-        'done_count':        [0],
-        'cp_count':          [0],
-        'proxy_removed_count': [0],
+        'task_queue':   queue.Queue(),
+        'result_store': [],
+        'running':      True,
+        'lock':         threading.Lock(),
+        'done_count':   [0],
+        'cp_count':     [0],
     }
 
 # ── Session store for retry-confirm ──────────────────────────────────────────
@@ -80,60 +79,6 @@ _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password
 _session_lock  = threading.Lock()
 
 WORKERS = 50  # parallel workers per job
-
-
-# ── Proxy helpers ─────────────────────────────────────────────────────────────
-
-_proxy_lock = __import__('threading').Lock()
-
-
-def _parse_proxy_list(raw):
-    """Parse a newline/comma-separated list of proxy strings into normalized URLs."""
-    proxies = []
-    for line in raw.replace(',', '\n').splitlines():
-        p = line.strip()
-        if not p:
-            continue
-        if '://' not in p:
-            p = 'http://' + p
-        proxies.append(p)
-    return proxies
-
-
-def _pick_proxy(proxy_pool):
-    """Return (url, proxy_dict) from the pool, or (None, None)."""
-    if not proxy_pool:
-        return None, None
-    url = _random.choice(proxy_pool)
-    return url, {'http': url, 'https': url}
-
-
-def _remove_dead_proxy(url):
-    """Remove a proxy URL from storage (called when a worker detects failure)."""
-    if not url:
-        return
-    with _proxy_lock:
-        stored = _sto.load('proxies', default=[])
-        if not isinstance(stored, list):
-            return
-        cleaned = [u for u in stored if u != url]
-        if len(cleaned) != len(stored):
-            _sto.save('proxies', cleaned)
-
-
-def _load_active_proxies():
-    """Load all proxy URLs from admin-configured store."""
-    stored = _sto.load('proxies', default=[])
-    if not isinstance(stored, list):
-        return []
-    result = []
-    for p in stored:
-        if isinstance(p, str):
-            result.append(p)
-        elif isinstance(p, dict) and p.get('url'):
-            result.append(p['url'])
-    return result
-
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -265,11 +210,6 @@ def start():
     password_type   = data.get('password_type', 'auto')
     custom_password = data.get('custom_password', '')
     gender          = data.get('gender', '3')
-    proxy_raw       = data.get('proxies', '')
-    if proxy_raw:
-        proxy_pool = _parse_proxy_list(proxy_raw)
-    else:
-        proxy_pool = _load_active_proxies()
 
     if email_domain in dm.get_custom_domains():
         if domain_password != dm.get_domain_password():
@@ -282,7 +222,7 @@ def start():
 
     threading.Thread(
         target=run_creation,
-        args=(name_type, email_domain, count, password_type, custom_password, gender, job_id, job, proxy_pool),
+        args=(name_type, email_domain, count, password_type, custom_password, gender, job_id, job),
         daemon=True,
     ).start()
 
@@ -291,7 +231,7 @@ def start():
 
 # ── Worker ────────────────────────────────────────────────────────────────────
 
-def _create_one(name_type, gender, password_type, custom_password, num, session_id, email_domain, job, proxy_pool=None):
+def _create_one(name_type, gender, password_type, custom_password, num, session_id, email_domain, job):
     jq   = job['task_queue']
     jlk  = job['lock']
     jdc  = job['done_count']
@@ -308,27 +248,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            _proxy_url, _proxy = _pick_proxy(proxy_pool)
-            if _proxy:
-                ses.proxies.update(_proxy)
-            try:
-                response = ses.get("https://m.facebook.com/reg/", timeout=10)
-            except Exception as _conn_err:
-                if _proxy_url:
-                    _remove_dead_proxy(_proxy_url)
-                    with _proxy_lock:
-                        try:
-                            proxy_pool.remove(_proxy_url)
-                        except ValueError:
-                            pass
-                    job['proxy_removed_count'][0] += 1
-                    jq.put({'type': 'proxy_stat',
-                            'active': len(proxy_pool),
-                            'removed': job['proxy_removed_count'][0]})
-                    jq.put({'type': 'log', 'level': 'warn',
-                            'msg': f'Proxy failed & removed — {len(proxy_pool)} remaining'})
-                time.sleep(_random.uniform(0.3, 0.8))
-                continue
+            response = ses.get("https://m.facebook.com/reg/", timeout=10)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
@@ -500,7 +420,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
-def run_creation(name_type, email_domain, count, password_type, custom_password, gender, job_id, job, proxy_pool=None):
+def run_creation(name_type, email_domain, count, password_type, custom_password, gender, job_id, job):
     import uuid
     session_id = str(uuid.uuid4())
 
@@ -511,16 +431,13 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     actual_workers = WORKERS
 
-    proxy_info = f' via {len(proxy_pool)} proxies' if proxy_pool else ''
     jq.put({'type': 'log', 'level': 'info',
-            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}{proxy_info}…'})
-    if proxy_pool:
-        jq.put({'type': 'proxy_stat', 'active': len(proxy_pool), 'removed': 0})
+            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
 
     try:
         with ThreadPoolExecutor(max_workers=actual_workers) as pool:
             futures = [
-                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job, proxy_pool)
+                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
                 for _ in range(actual_workers)
             ]
             for f in as_completed(futures):
@@ -1002,52 +919,6 @@ def admin_logout():
     session.pop('is_admin', None)
     return jsonify({'status': 'ok'})
 
-# ── Admin proxy management ────────────────────────────────────────────────────
-
-@app.route('/admin/proxies', methods=['GET'])
-def admin_proxies_get():
-    if not _require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    urls = _load_active_proxies()
-    return jsonify({'proxies': urls, 'total': len(urls)})
-
-
-@app.route('/admin/proxies/add', methods=['POST'])
-def admin_proxies_add():
-    if not _require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    data     = request.json or {}
-    raw      = data.get('proxies', '')
-    new_urls = _parse_proxy_list(raw)
-    if not new_urls:
-        return jsonify({'error': 'No proxies provided'}), 400
-    with _proxy_lock:
-        existing = _load_active_proxies()
-        merged   = list(dict.fromkeys(existing + new_urls))
-        _sto.save('proxies', merged)
-    return jsonify({'proxies': merged, 'total': len(merged), 'added': len(new_urls)})
-
-
-@app.route('/admin/proxies/delete', methods=['POST'])
-def admin_proxies_delete():
-    if not _require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    url = (request.json or {}).get('url', '')
-    with _proxy_lock:
-        existing = _load_active_proxies()
-        updated  = [u for u in existing if u != url]
-        _sto.save('proxies', updated)
-    return jsonify({'status': 'ok', 'proxies': updated})
-
-
-@app.route('/admin/proxies/clear', methods=['POST'])
-def admin_proxies_clear():
-    if not _require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    _sto.save('proxies', [])
-    return jsonify({'status': 'ok'})
-
-
 @app.route('/admin/api/stats')
 def admin_stats():
     if not _require_admin():
@@ -1394,3 +1265,4 @@ if __name__ == '__main__':
     auth.start_bot()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+
