@@ -83,6 +83,9 @@ WORKERS = 50  # parallel workers per job
 
 # ── Proxy helpers ─────────────────────────────────────────────────────────────
 
+_proxy_lock = __import__('threading').Lock()
+
+
 def _parse_proxy_list(raw):
     """Parse a newline/comma-separated list of proxy strings into normalized URLs."""
     proxies = []
@@ -97,44 +100,38 @@ def _parse_proxy_list(raw):
 
 
 def _pick_proxy(proxy_pool):
-    """Return a requests-compatible proxy dict from the pool, or None."""
+    """Return (url, proxy_dict) from the pool, or (None, None)."""
     if not proxy_pool:
-        return None
+        return None, None
     url = _random.choice(proxy_pool)
-    return {'http': url, 'https': url}
+    return url, {'http': url, 'https': url}
 
 
-def _check_proxies(urls, timeout=8):
-    """Test each proxy URL concurrently. Returns {url: alive_bool}."""
-    import concurrent.futures as _cf2
-
-    def _test(url):
-        try:
-            r = m.requests.get(
-                'http://www.gstatic.com/generate_204',
-                proxies={'http': url, 'https': url},
-                timeout=timeout,
-                allow_redirects=True,
-            )
-            return url, r.status_code < 500
-        except Exception:
-            return url, False
-
-    results = {}
-    if not urls:
-        return results
-    with _cf2.ThreadPoolExecutor(max_workers=min(len(urls), 40)) as pool:
-        for url, alive in pool.map(_test, urls):
-            results[url] = alive
-    return results
+def _remove_dead_proxy(url):
+    """Remove a proxy URL from storage (called when a worker detects failure)."""
+    if not url:
+        return
+    with _proxy_lock:
+        stored = _sto.load('proxies', default=[])
+        if not isinstance(stored, list):
+            return
+        cleaned = [u for u in stored if u != url]
+        if len(cleaned) != len(stored):
+            _sto.save('proxies', cleaned)
 
 
 def _load_active_proxies():
-    """Load alive proxy URLs from admin-configured store."""
+    """Load all proxy URLs from admin-configured store."""
     stored = _sto.load('proxies', default=[])
-    if isinstance(stored, list):
-        return [p['url'] for p in stored if isinstance(p, dict) and p.get('alive', True)]
-    return []
+    if not isinstance(stored, list):
+        return []
+    result = []
+    for p in stored:
+        if isinstance(p, str):
+            result.append(p)
+        elif isinstance(p, dict) and p.get('url'):
+            result.append(p['url'])
+    return result
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -310,10 +307,23 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            _proxy = _pick_proxy(proxy_pool)
+            _proxy_url, _proxy = _pick_proxy(proxy_pool)
             if _proxy:
                 ses.proxies.update(_proxy)
-            response = ses.get("https://m.facebook.com/reg/", timeout=10)
+            try:
+                response = ses.get("https://m.facebook.com/reg/", timeout=10)
+            except Exception as _conn_err:
+                if _proxy_url:
+                    _remove_dead_proxy(_proxy_url)
+                    with _proxy_lock:
+                        try:
+                            proxy_pool.remove(_proxy_url)
+                        except ValueError:
+                            pass
+                    jq.put({'type': 'log', 'level': 'warn',
+                            'msg': f'Proxy removed (failed): {_proxy_url}'})
+                time.sleep(_random.uniform(0.3, 0.8))
+                continue
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
@@ -991,80 +1001,36 @@ def admin_logout():
 def admin_proxies_get():
     if not _require_admin():
         return jsonify({'error': 'Unauthorized'}), 401
-    proxies = _sto.load('proxies', default=[])
-    if not isinstance(proxies, list):
-        proxies = []
-    alive = sum(1 for p in proxies if isinstance(p, dict) and p.get('alive', True))
-    return jsonify({'proxies': proxies, 'alive': alive, 'total': len(proxies)})
+    urls = _load_active_proxies()
+    return jsonify({'proxies': urls, 'total': len(urls)})
 
 
 @app.route('/admin/proxies/add', methods=['POST'])
 def admin_proxies_add():
     if not _require_admin():
         return jsonify({'error': 'Unauthorized'}), 401
-    data    = request.json or {}
-    raw     = data.get('proxies', '')
+    data     = request.json or {}
+    raw      = data.get('proxies', '')
     new_urls = _parse_proxy_list(raw)
     if not new_urls:
         return jsonify({'error': 'No proxies provided'}), 400
-
-    results = _check_proxies(new_urls)
-    total_checked = len(new_urls)
-
-    existing = _sto.load('proxies', default=[])
-    if not isinstance(existing, list):
-        existing = []
-    existing_map = {p['url']: p for p in existing if isinstance(p, dict)}
-
-    for url in new_urls:
-        alive = results.get(url, False)
-        if not alive:
-            existing_map.pop(url, None)
-            continue
-        existing_map[url] = {'url': url, 'alive': alive, 'checked_at': time.time()}
-
-    updated = list(existing_map.values())
-    _sto.save('proxies', updated)
-    alive_count = sum(1 for p in updated if p.get('alive'))
-    return jsonify({'proxies': updated, 'alive': alive_count,
-                    'total': len(updated), 'total_checked': total_checked})
-
-
-@app.route('/admin/proxies/check', methods=['POST'])
-def admin_proxies_check():
-    if not _require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    existing = _sto.load('proxies', default=[])
-    if not isinstance(existing, list) or not existing:
-        return jsonify({'proxies': [], 'alive': 0, 'total': 0})
-
-    urls    = [p['url'] for p in existing if isinstance(p, dict) and p.get('url')]
-    results = _check_proxies(urls)
-    ts      = time.time()
-    updated = []
-    for p in existing:
-        if not isinstance(p, dict):
-            continue
-        p['alive']      = results.get(p.get('url', ''), False)
-        p['checked_at'] = ts
-        if p['alive']:
-            updated.append(p)
-
-    _sto.save('proxies', updated)
-    return jsonify({'proxies': updated, 'alive': len(updated), 'total': len(updated)})
+    with _proxy_lock:
+        existing = _load_active_proxies()
+        merged   = list(dict.fromkeys(existing + new_urls))
+        _sto.save('proxies', merged)
+    return jsonify({'proxies': merged, 'total': len(merged), 'added': len(new_urls)})
 
 
 @app.route('/admin/proxies/delete', methods=['POST'])
 def admin_proxies_delete():
     if not _require_admin():
         return jsonify({'error': 'Unauthorized'}), 401
-    url      = (request.json or {}).get('url', '')
-    existing = _sto.load('proxies', default=[])
-    if not isinstance(existing, list):
-        existing = []
-    existing = [p for p in existing if isinstance(p, dict) and p.get('url') != url]
-    _sto.save('proxies', existing)
-    return jsonify({'status': 'ok', 'proxies': existing})
+    url = (request.json or {}).get('url', '')
+    with _proxy_lock:
+        existing = _load_active_proxies()
+        updated  = [u for u in existing if u != url]
+        _sto.save('proxies', updated)
+    return jsonify({'status': 'ok', 'proxies': updated})
 
 
 @app.route('/admin/proxies/clear', methods=['POST'])
