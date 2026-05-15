@@ -103,6 +103,40 @@ def _pick_proxy(proxy_pool):
     url = _random.choice(proxy_pool)
     return {'http': url, 'https': url}
 
+
+def _check_proxies(urls, timeout=8):
+    """Test each proxy URL concurrently. Returns {url: alive_bool}."""
+    import concurrent.futures as _cf2
+
+    def _test(url):
+        try:
+            r = m.requests.get(
+                'http://www.gstatic.com/generate_204',
+                proxies={'http': url, 'https': url},
+                timeout=timeout,
+                allow_redirects=True,
+            )
+            return url, r.status_code < 500
+        except Exception:
+            return url, False
+
+    results = {}
+    if not urls:
+        return results
+    with _cf2.ThreadPoolExecutor(max_workers=min(len(urls), 40)) as pool:
+        for url, alive in pool.map(_test, urls):
+            results[url] = alive
+    return results
+
+
+def _load_active_proxies():
+    """Load alive proxy URLs from admin-configured store."""
+    stored = _sto.load('proxies', default=[])
+    if isinstance(stored, list):
+        return [p['url'] for p in stored if isinstance(p, dict) and p.get('alive', True)]
+    return []
+
+
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -234,7 +268,10 @@ def start():
     custom_password = data.get('custom_password', '')
     gender          = data.get('gender', '3')
     proxy_raw       = data.get('proxies', '')
-    proxy_pool      = _parse_proxy_list(proxy_raw) if proxy_raw else []
+    if proxy_raw:
+        proxy_pool = _parse_proxy_list(proxy_raw)
+    else:
+        proxy_pool = _load_active_proxies()
 
     if email_domain in dm.get_custom_domains():
         if domain_password != dm.get_domain_password():
@@ -947,6 +984,96 @@ def admin_login():
 def admin_logout():
     session.pop('is_admin', None)
     return jsonify({'status': 'ok'})
+
+# ── Admin proxy management ────────────────────────────────────────────────────
+
+@app.route('/admin/proxies', methods=['GET'])
+def admin_proxies_get():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    proxies = _sto.load('proxies', default=[])
+    if not isinstance(proxies, list):
+        proxies = []
+    alive = sum(1 for p in proxies if isinstance(p, dict) and p.get('alive', True))
+    return jsonify({'proxies': proxies, 'alive': alive, 'total': len(proxies)})
+
+
+@app.route('/admin/proxies/add', methods=['POST'])
+def admin_proxies_add():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    data    = request.json or {}
+    raw     = data.get('proxies', '')
+    new_urls = _parse_proxy_list(raw)
+    if not new_urls:
+        return jsonify({'error': 'No proxies provided'}), 400
+
+    results = _check_proxies(new_urls)
+    total_checked = len(new_urls)
+
+    existing = _sto.load('proxies', default=[])
+    if not isinstance(existing, list):
+        existing = []
+    existing_map = {p['url']: p for p in existing if isinstance(p, dict)}
+
+    for url in new_urls:
+        alive = results.get(url, False)
+        if not alive:
+            existing_map.pop(url, None)
+            continue
+        existing_map[url] = {'url': url, 'alive': alive, 'checked_at': time.time()}
+
+    updated = list(existing_map.values())
+    _sto.save('proxies', updated)
+    alive_count = sum(1 for p in updated if p.get('alive'))
+    return jsonify({'proxies': updated, 'alive': alive_count,
+                    'total': len(updated), 'total_checked': total_checked})
+
+
+@app.route('/admin/proxies/check', methods=['POST'])
+def admin_proxies_check():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    existing = _sto.load('proxies', default=[])
+    if not isinstance(existing, list) or not existing:
+        return jsonify({'proxies': [], 'alive': 0, 'total': 0})
+
+    urls    = [p['url'] for p in existing if isinstance(p, dict) and p.get('url')]
+    results = _check_proxies(urls)
+    ts      = time.time()
+    updated = []
+    for p in existing:
+        if not isinstance(p, dict):
+            continue
+        p['alive']      = results.get(p.get('url', ''), False)
+        p['checked_at'] = ts
+        if p['alive']:
+            updated.append(p)
+
+    _sto.save('proxies', updated)
+    return jsonify({'proxies': updated, 'alive': len(updated), 'total': len(updated)})
+
+
+@app.route('/admin/proxies/delete', methods=['POST'])
+def admin_proxies_delete():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    url      = (request.json or {}).get('url', '')
+    existing = _sto.load('proxies', default=[])
+    if not isinstance(existing, list):
+        existing = []
+    existing = [p for p in existing if isinstance(p, dict) and p.get('url') != url]
+    _sto.save('proxies', existing)
+    return jsonify({'status': 'ok', 'proxies': existing})
+
+
+@app.route('/admin/proxies/clear', methods=['POST'])
+def admin_proxies_clear():
+    if not _require_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    _sto.save('proxies', [])
+    return jsonify({'status': 'ok'})
+
 
 @app.route('/admin/api/stats')
 def admin_stats():
