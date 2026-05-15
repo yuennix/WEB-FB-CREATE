@@ -748,6 +748,16 @@
           <div class="stat-label">Time</div>
         </div>
       </div>
+      <div class="stats-row" id="proxyStatRow" style="margin-top:6px;display:none;">
+        <div class="stat-box">
+          <div class="stat-num" id="statProxyActive" style="color:#00e676;">—</div>
+          <div class="stat-label">Proxies Active</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statProxyRemoved" style="color:#f87171;">0</div>
+          <div class="stat-label">Auto-removed</div>
+        </div>
+      </div>
     </div>
 
     <div class="action-group">
@@ -1180,6 +1190,9 @@ async function startJob() {
   createdCount = 0; targetCount = count; startTime = Date.now();
   allAccounts = [];
   document.getElementById('statCreated').textContent = '0';
+  document.getElementById('proxyStatRow').style.display = 'none';
+  document.getElementById('statProxyActive').textContent  = '—';
+  document.getElementById('statProxyRemoved').textContent = '0';
   document.getElementById('statTotal').textContent   = count;
   document.getElementById('statTime').textContent    = '0s';
   document.getElementById('statTime').style.color    = '';
@@ -1220,6 +1233,12 @@ function _connectStream(jobId) {
     if (msg.type === 'account') addAccount(msg.data);
     if (msg.type === 'confirm_code') autofillCode(msg.uid, msg.code);
     if (msg.type === 'confirm_result') handleConfirmResult(msg.uid, msg.status, msg.method);
+    if (msg.type === 'proxy_stat') {
+      const row = document.getElementById('proxyStatRow');
+      row.style.display = 'flex';
+      document.getElementById('statProxyActive').textContent  = msg.active;
+      document.getElementById('statProxyRemoved').textContent = msg.removed;
+    }
     if (msg.type === 'done') {
       addLog(msg.msg, 'success');
       setRunning(false);
