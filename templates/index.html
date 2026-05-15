@@ -716,6 +716,23 @@
     </div>
 
     <div>
+      <div class="section-label">Proxies</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="form-group">
+          <label class="field-label" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Proxy List <span id="proxyCount" style="color:#334155;">(0)</span></span>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:#475569;font-weight:500;">
+              <input type="checkbox" id="proxyEnabled" onchange="onProxyToggle()" style="width:auto;border:none;background:none;padding:0;accent-color:#00e676;">
+              Enable
+            </label>
+          </label>
+          <textarea id="proxyList" oninput="onProxyInput()" placeholder="One proxy per line:&#10;host:port&#10;http://host:port&#10;http://user:pass@host:port&#10;socks5://host:port" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#e2e8f0;padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:400;outline:none;transition:border-color .2s,box-shadow .2s;width:100%;resize:vertical;min-height:80px;line-height:1.6;" disabled></textarea>
+        </div>
+        <div id="proxyStatus" style="font-size:11px;font-weight:500;color:#334155;display:none;">No proxies loaded</div>
+      </div>
+    </div>
+
+    <div>
       <div class="section-label">Progress</div>
       <div class="progress-wrap">
         <div class="progress-meta">
@@ -1144,6 +1161,37 @@ function setRunning(running) {
   document.getElementById('runningBadge').classList.toggle('visible', running);
 }
 
+function onProxyToggle() {
+  const enabled = document.getElementById('proxyEnabled').checked;
+  const ta = document.getElementById('proxyList');
+  ta.disabled = !enabled;
+  if (enabled) {
+    ta.style.borderColor = 'rgba(0,230,118,0.3)';
+    ta.focus();
+    onProxyInput();
+  } else {
+    ta.style.borderColor = 'rgba(255,255,255,0.08)';
+    document.getElementById('proxyStatus').style.display = 'none';
+    document.getElementById('proxyCount').textContent = '(0)';
+  }
+}
+
+function onProxyInput() {
+  const lines = document.getElementById('proxyList').value
+    .split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const count = lines.length;
+  document.getElementById('proxyCount').textContent = `(${count})`;
+  const status = document.getElementById('proxyStatus');
+  if (count === 0) {
+    status.textContent = 'No proxies loaded';
+    status.style.color = '#334155';
+  } else {
+    status.textContent = `${count} prox${count === 1 ? 'y' : 'ies'} ready`;
+    status.style.color = '#00e676';
+  }
+  status.style.display = 'block';
+}
+
 async function startJob() {
   const nameType       = document.getElementById('nameType').value;
   const emailDomain    = document.getElementById('emailDomain').value;
@@ -1152,7 +1200,10 @@ async function startJob() {
   const passwordType   = document.getElementById('passwordType').value;
   const customPassword = document.getElementById('customPassword').value;
   const gender         = document.getElementById('gender').value;
+  const proxyEnabled   = document.getElementById('proxyEnabled').checked;
+  const proxies        = proxyEnabled ? document.getElementById('proxyList').value.trim() : '';
   if (passwordType === 'custom' && !customPassword.trim()) { alert('Please enter a custom password.'); return; }
+  if (proxyEnabled && !proxies) { alert('Proxies are enabled but the list is empty. Add proxies or uncheck Enable.'); return; }
 
   createdCount = 0; targetCount = count; startTime = Date.now();
   allAccounts = [];
@@ -1173,7 +1224,7 @@ async function startJob() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name_type: nameType, email_domain: emailDomain,
       domain_password: domainPassword, count, password_type: passwordType,
-      custom_password: customPassword, gender }),
+      custom_password: customPassword, gender, proxies }),
   });
   if (!resp.ok) { const err = await resp.json(); alert('Error: ' + (err.error || 'Unknown')); return; }
 

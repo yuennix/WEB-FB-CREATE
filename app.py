@@ -80,6 +80,29 @@ _session_lock  = threading.Lock()
 
 WORKERS = 50  # parallel workers per job
 
+
+# ── Proxy helpers ─────────────────────────────────────────────────────────────
+
+def _parse_proxy_list(raw):
+    """Parse a newline/comma-separated list of proxy strings into normalized URLs."""
+    proxies = []
+    for line in raw.replace(',', '\n').splitlines():
+        p = line.strip()
+        if not p:
+            continue
+        if '://' not in p:
+            p = 'http://' + p
+        proxies.append(p)
+    return proxies
+
+
+def _pick_proxy(proxy_pool):
+    """Return a requests-compatible proxy dict from the pool, or None."""
+    if not proxy_pool:
+        return None
+    url = _random.choice(proxy_pool)
+    return {'http': url, 'https': url}
+
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -210,6 +233,8 @@ def start():
     password_type   = data.get('password_type', 'auto')
     custom_password = data.get('custom_password', '')
     gender          = data.get('gender', '3')
+    proxy_raw       = data.get('proxies', '')
+    proxy_pool      = _parse_proxy_list(proxy_raw) if proxy_raw else []
 
     if email_domain in dm.get_custom_domains():
         if domain_password != dm.get_domain_password():
@@ -222,7 +247,7 @@ def start():
 
     threading.Thread(
         target=run_creation,
-        args=(name_type, email_domain, count, password_type, custom_password, gender, job_id, job),
+        args=(name_type, email_domain, count, password_type, custom_password, gender, job_id, job, proxy_pool),
         daemon=True,
     ).start()
 
@@ -231,7 +256,7 @@ def start():
 
 # ── Worker ────────────────────────────────────────────────────────────────────
 
-def _create_one(name_type, gender, password_type, custom_password, num, session_id, email_domain, job):
+def _create_one(name_type, gender, password_type, custom_password, num, session_id, email_domain, job, proxy_pool=None):
     jq   = job['task_queue']
     jlk  = job['lock']
     jdc  = job['done_count']
@@ -248,6 +273,9 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
+            _proxy = _pick_proxy(proxy_pool)
+            if _proxy:
+                ses.proxies.update(_proxy)
             response = ses.get("https://m.facebook.com/reg/", timeout=10)
             form     = m.extractor(response.text)
 
@@ -420,7 +448,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
-def run_creation(name_type, email_domain, count, password_type, custom_password, gender, job_id, job):
+def run_creation(name_type, email_domain, count, password_type, custom_password, gender, job_id, job, proxy_pool=None):
     import uuid
     session_id = str(uuid.uuid4())
 
@@ -431,13 +459,14 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     actual_workers = WORKERS
 
+    proxy_info = f' via {len(proxy_pool)} proxies' if proxy_pool else ''
     jq.put({'type': 'log', 'level': 'info',
-            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
+            'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}{proxy_info}…'})
 
     try:
         with ThreadPoolExecutor(max_workers=actual_workers) as pool:
             futures = [
-                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
+                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job, proxy_pool)
                 for _ in range(actual_workers)
             ]
             for f in as_completed(futures):
