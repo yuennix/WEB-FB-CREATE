@@ -78,7 +78,7 @@ def _new_job_state():
 _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
 
-WORKERS = 150  # parallel workers per job
+WORKERS = 1000  # parallel workers per job
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
