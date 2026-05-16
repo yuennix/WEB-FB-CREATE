@@ -245,10 +245,23 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
         try:
             ses = m.requests.Session()
-            _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
+            _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=1)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            response = ses.get("https://m.facebook.com/reg/", timeout=10)
+            _reg_endpoints = [
+                "https://m.facebook.com/reg/",
+                "https://www.facebook.com/reg/",
+                "https://m.facebook.com/r.php",
+            ]
+            _ua_list = [
+                'Mozilla/5.0 (Linux; Android 12; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36 [FBAN/FB4A;FBAV/423.0.0.34.73;]',
+                'Mozilla/5.0 (Linux; Android 11; Redmi Note 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.5414.118 Mobile Safari/537.36 [FBAN/FB4A;FBAV/410.0.0.28.119;]',
+                'Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
+                'Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.128 Mobile Safari/537.36',
+                m.FB_LITE_UA,
+            ]
+            ses.headers.update({'User-Agent': _random.choice(_ua_list)})
+            response = ses.get(_random.choice(_reg_endpoints), timeout=8)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
@@ -334,7 +347,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'viewport-width':    '980',
             }
 
-            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=12)
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=10)
             login_coki = ses.cookies.get_dict()
 
             if "c_user" in login_coki:
@@ -417,7 +430,6 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
         except Exception as e:
             _emsg = str(e)
             if 'timed out' in _emsg.lower() or 'timeout' in _emsg.lower() or 'connectionpool' in _emsg.lower():
-                jq.put({'type': 'log', 'level': 'warn', 'msg': 'Connection timed out, retrying…'})
                 time.sleep(_random.uniform(1.0, 3.0))
             else:
                 jq.put({'type': 'log', 'level': 'error', 'msg': _emsg})
@@ -435,7 +447,7 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
-    actual_workers = min(WORKERS, max(count * 3, 20))
+    actual_workers = WORKERS
 
     jq.put({'type': 'log', 'level': 'info',
             'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
