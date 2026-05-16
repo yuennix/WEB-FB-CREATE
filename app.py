@@ -415,7 +415,11 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                         'msg': f'⚠ Checkpoint — {firstname} {lastname} | {phone}'})
 
         except Exception as e:
-            jq.put({'type': 'log', 'level': 'error', 'msg': str(e)})
+            _emsg = str(e)
+            if 'timed out' in _emsg.lower() or 'timeout' in _emsg.lower() or 'connectionpool' in _emsg.lower():
+                jq.put({'type': 'log', 'level': 'warn', 'msg': 'Connection timed out, retrying…'})
+            else:
+                jq.put({'type': 'log', 'level': 'error', 'msg': _emsg})
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
