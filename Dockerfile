@@ -4,5 +4,5 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir gunicorn gevent
 COPY . .
-EXPOSE 8080
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --worker-class gevent --workers 1 --worker-connections 2000 --timeout 300 app:app
+EXPOSE 80
+CMD ["python3", "-m", "gunicorn", "--bind", "0.0.0.0:80", "--worker-class", "gevent", "--workers", "1", "--worker-connections", "2000", "--timeout", "300", "app:app"]
