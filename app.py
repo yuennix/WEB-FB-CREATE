@@ -248,11 +248,6 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=1)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            _reg_endpoints = [
-                "https://m.facebook.com/reg/",
-                "https://www.facebook.com/reg/",
-                "https://m.facebook.com/r.php",
-            ]
             _ua_list = [
                 'Mozilla/5.0 (Linux; Android 12; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36 [FBAN/FB4A;FBAV/423.0.0.34.73;]',
                 'Mozilla/5.0 (Linux; Android 11; Redmi Note 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.5414.118 Mobile Safari/537.36 [FBAN/FB4A;FBAV/410.0.0.28.119;]',
@@ -261,7 +256,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 m.FB_LITE_UA,
             ]
             ses.headers.update({'User-Agent': _random.choice(_ua_list)})
-            response = ses.get(_random.choice(_reg_endpoints), timeout=8)
+            response = ses.get("https://m.facebook.com/reg/", timeout=8)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
