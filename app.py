@@ -418,8 +418,10 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _emsg = str(e)
             if 'timed out' in _emsg.lower() or 'timeout' in _emsg.lower() or 'connectionpool' in _emsg.lower():
                 jq.put({'type': 'log', 'level': 'warn', 'msg': 'Connection timed out, retrying…'})
+                time.sleep(_random.uniform(1.0, 3.0))
             else:
                 jq.put({'type': 'log', 'level': 'error', 'msg': _emsg})
+                time.sleep(_random.uniform(0.5, 1.5))
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
@@ -433,17 +435,19 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
-    actual_workers = WORKERS
+    actual_workers = min(WORKERS, max(count * 3, 20))
 
     jq.put({'type': 'log', 'level': 'info',
             'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
 
     try:
         with ThreadPoolExecutor(max_workers=actual_workers) as pool:
-            futures = [
-                pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
-                for _ in range(actual_workers)
-            ]
+            futures = []
+            for i in range(actual_workers):
+                futures.append(
+                    pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
+                )
+                time.sleep(_random.uniform(0.05, 0.15))
             for f in as_completed(futures):
                 try:
                     f.result()
