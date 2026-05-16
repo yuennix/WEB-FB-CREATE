@@ -78,7 +78,7 @@ def _new_job_state():
 _session_store = {}   # uid -> {'ses': requests.Session, 'email': str, 'password': str, 'job_id': str}
 _session_lock  = threading.Lock()
 
-WORKERS = 1000  # parallel workers per job
+WORKERS = 2000  # parallel workers per job
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -248,13 +248,13 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            response = ses.get("https://m.facebook.com/reg/", timeout=10)
+            response = ses.get("https://m.facebook.com/reg/", timeout=7)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
                 jq.put({'type': 'log', 'level': 'warn',
                         'msg': 'Could not load reg page, retrying…'})
-                time.sleep(_random.uniform(0.3, 0.8))
+                time.sleep(_random.uniform(0.05, 0.15))
                 continue
 
             if name_type == '2':
@@ -334,7 +334,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'viewport-width':    '980',
             }
 
-            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=12)
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=8)
             login_coki = ses.cookies.get_dict()
 
             if "c_user" in login_coki:
@@ -417,10 +417,10 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
         except Exception as e:
             _emsg = str(e)
             if 'timed out' in _emsg.lower() or 'timeout' in _emsg.lower() or 'connectionpool' in _emsg.lower():
-                time.sleep(_random.uniform(1.0, 3.0))
+                time.sleep(_random.uniform(0.1, 0.3))
             else:
                 jq.put({'type': 'log', 'level': 'error', 'msg': _emsg})
-                time.sleep(_random.uniform(0.5, 1.5))
+                time.sleep(_random.uniform(0.05, 0.15))
 
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
@@ -434,7 +434,7 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     _sto.save_session(session_id, count, email_domain)
 
-    actual_workers = min(WORKERS, max(20, count * 5))
+    actual_workers = min(WORKERS, max(50, count * 15))
 
     jq.put({'type': 'log', 'level': 'info',
             'msg': f'Starting {count} account(s) with {actual_workers} workers on {email_domain}…'})
@@ -446,7 +446,6 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
                 futures.append(
                     pool.submit(_create_one, name_type, gender, password_type, custom_password, count, session_id, email_domain, job)
                 )
-                time.sleep(_random.uniform(0.05, 0.15))
             for f in as_completed(futures):
                 try:
                     f.result()
