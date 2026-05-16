@@ -862,25 +862,6 @@ def fetch_code_now():
                 return jsonify({'code': code})
             return jsonify({'status': 'waiting_webhook',
                             'msg': 'Waiting for email via webhook — check your mail server is forwarding correctly.'})
-        # IMAP domain
-        imap_host = cfg.get('imap_host', f'mail.{domain}')
-        imap_user = cfg.get('imap_user', f'admin@{domain}')
-        imap_pass = cfg.get('imap_pass', '')
-        try:
-            body = m._poll_imap_inbox(
-                to_addr=email,
-                imap_host=imap_host,
-                imap_user=imap_user,
-                imap_pass=imap_pass,
-                timeout_secs=28,
-            )
-            if body:
-                code = _extract_code_from_body(body)
-                if code:
-                    if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                    return jsonify({'code': code})
-        except Exception:
-            pass
         return jsonify({'status': 'not_found'})
 
     return jsonify({'status': 'unsupported_domain',
