@@ -245,18 +245,10 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
 
         try:
             ses = m.requests.Session()
-            _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=1)
+            _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            _ua_list = [
-                'Mozilla/5.0 (Linux; Android 12; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36 [FBAN/FB4A;FBAV/423.0.0.34.73;]',
-                'Mozilla/5.0 (Linux; Android 11; Redmi Note 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.5414.118 Mobile Safari/537.36 [FBAN/FB4A;FBAV/410.0.0.28.119;]',
-                'Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
-                'Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.128 Mobile Safari/537.36',
-                m.FB_LITE_UA,
-            ]
-            ses.headers.update({'User-Agent': _random.choice(_ua_list)})
-            response = ses.get("https://m.facebook.com/reg/", timeout=8)
+            response = ses.get("https://m.facebook.com/reg/", timeout=10)
             form     = m.extractor(response.text)
 
             if not form.get("lsd") and not form.get("fb_dtsg"):
@@ -342,7 +334,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'viewport-width':    '980',
             }
 
-            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=10)
+            ses.post(_reg_url, data=payload, headers=merged_headers, timeout=12)
             login_coki = ses.cookies.get_dict()
 
             if "c_user" in login_coki:
