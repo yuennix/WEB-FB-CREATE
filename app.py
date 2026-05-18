@@ -379,34 +379,6 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                         'msg': (f'[{current}/{num}] ✓ '
                                 f'{firstname} {lastname} | {phone} | UID:{uid}')})
 
-                _instant_urls = [
-                    'https://m.facebook.com/confirmemail.php?send=1',
-                    'https://m.facebook.com/confirmemail.php?soft=hjk&send=1',
-                    'https://m.facebook.com/confirmemail.php?soft=hjk&resend=1',
-                    'https://m.facebook.com/confirmemail.php?soft=1&send=1',
-                    'https://www.facebook.com/confirmemail.php?send=1',
-                ]
-                _ih = {
-                    'User-Agent':       m.FB_LITE_UA,
-                    'Accept':           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language':  'en-US,en;q=0.9',
-                    'Accept-Encoding':  'gzip, deflate, br',
-                    'Referer':          'https://m.facebook.com/confirmemail.php',
-                    'x-requested-with': 'com.facebook.lite',
-                }
-                def _ifire(u):
-                    try:
-                        ses.get(u, headers=_ih, timeout=6, allow_redirects=True)
-                    except Exception:
-                        pass
-                with _cfi.ThreadPoolExecutor(max_workers=len(_instant_urls)) as _ipool:
-                    _ipool.map(_ifire, _instant_urls)
-
-                threading.Thread(
-                    target=m._full_email_confirm,
-                    args=(ses, phone, uid, pww, jq),
-                    daemon=False,
-                ).start()
 
             elif "checkpoint" in login_coki:
                 with jlk:
@@ -584,181 +556,6 @@ def download():
     return jsonify({'error': 'No results yet'}), 404
 
 
-def _fb_relogin(email, password):
-    """Log in to Facebook mobile with email+password. Returns fresh session or None."""
-    import requests as _req
-    from bs4 import BeautifulSoup as _bsr
-    ses = _req.Session()
-    hdrs = {
-        'User-Agent':      m.FB_LITE_UA,
-        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection':      'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-    }
-    try:
-        r = ses.get('https://m.facebook.com/', headers=hdrs, timeout=12)
-        soup = _bsr(r.text, 'html.parser')
-        form = soup.find('form', id='login_form') or soup.find('form')
-        if not form:
-            return None
-        fields = {i.get('name'): i.get('value', '') for i in form.find_all('input') if i.get('name')}
-        fields['email'] = email
-        fields['pass']  = password
-        action = (form.get('action') or '').strip()
-        if not action:
-            action = 'https://m.facebook.com/login/device-based/regular/login/'
-        if not action.startswith('http'):
-            action = 'https://m.facebook.com' + action
-        ses.post(action, data=fields, headers={
-            **hdrs,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin':   'https://m.facebook.com',
-            'Referer':  'https://m.facebook.com/',
-        }, timeout=15, allow_redirects=True)
-        if 'c_user' in ses.cookies.get_dict():
-            return ses
-    except Exception as e:
-        print(f'[relogin] {e}')
-    return None
-
-
-def _submit_confirm_code(ses, email, uid, code):
-    """Submit a FB confirmation code using an active session. Returns 'confirmed', 'checkpoint', or 'failed'."""
-    from bs4 import BeautifulSoup as _bss
-    hdrs = {
-        'User-Agent':      m.FB_LITE_UA,
-        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'x-requested-with': 'com.facebook.lite',
-    }
-    phdrs = {
-        **hdrs,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Origin':   'https://m.facebook.com',
-        'Referer':  'https://m.facebook.com/confirmemail.php?soft=hjk',
-    }
-
-    def _chk(url, text):
-        u = url.lower(); t = text.lower()
-        if 'checkpoint' in u:
-            return 'checkpoint'
-        if ('home.php' in u or u.rstrip('/').endswith('facebook.com')
-                or 'confirmed' in t or 'verified' in t or 'thank' in t):
-            return 'confirmed'
-        return None
-
-    for url in [
-        'https://m.facebook.com/confirmemail.php?soft=hjk',
-        'https://m.facebook.com/confirmemail.php',
-        'https://m.facebook.com/confirmemail.php?soft=1',
-    ]:
-        try:
-            r = ses.get(url, headers=hdrs, timeout=12, allow_redirects=True)
-            q = _chk(str(r.url), r.text)
-            if q:
-                return q
-            soup = _bss(r.text, 'html.parser')
-            fd = {}
-            act = url
-            form = soup.find('form')
-            if form:
-                a = (form.get('action') or '').strip()
-                if a:
-                    act = a if a.startswith('http') else 'https://m.facebook.com' + a
-                for inp in form.find_all('input'):
-                    n = inp.get('name', '')
-                    if n:
-                        fd[n] = inp.get('value', '')
-            for fn in ['n', 'code', 'confirm_code']:
-                fd[fn] = code
-            resp = ses.post(act, data=fd, headers={**phdrs, 'Referer': url},
-                            allow_redirects=True, timeout=15)
-            q = _chk(str(resp.url), resp.text)
-            if q:
-                return q
-        except Exception:
-            pass
-    return 'failed'
-
-
-@app.route('/confirm-code', methods=['POST'])
-def confirm_code():
-    if not _require_auth():
-        return jsonify({'error': 'Unauthorized'}), 401
-    data     = request.json or {}
-    uid      = (data.get('uid')      or '').strip()
-    code     = (data.get('code')     or '').strip()
-    email    = (data.get('email')    or '').strip()
-    password = (data.get('password') or '').strip()
-    if not uid or not code:
-        return jsonify({'error': 'uid and code required'}), 400
-
-    with _session_lock:
-        entry = _session_store.get(uid)
-
-    ses      = entry['ses']      if entry else None
-    email    = email    or (entry['email']    if entry else '')
-    password = password or (entry['password'] if entry else '')
-
-    if not ses:
-        if not email or not password:
-            accts = _sto.get_accounts_full()
-            acct  = next((a for a in accts if a['uid'] == uid), None)
-            if acct:
-                email    = email    or acct['email']
-                password = password or acct['password']
-        if email and password:
-            ses = _fb_relogin(email, password)
-            if ses:
-                with _session_lock:
-                    _session_store[uid] = {'ses': ses, 'email': email, 'password': password, 'job_id': ''}
-
-    if not ses:
-        return jsonify({'error': 'Login failed — session expired and re-login unsuccessful'}), 400
-
-    result = _submit_confirm_code(ses, email, uid, code)
-    return jsonify({'status': result})
-
-
-@app.route('/manual-confirm', methods=['POST'])
-def manual_confirm():
-    return confirm_code()
-
-
-@app.route('/api/accounts/full')
-def api_accounts_full():
-    if not _require_auth():
-        return jsonify({'error': 'Unauthorized'}), 401
-    return jsonify({'accounts': _sto.get_accounts_full()})
-
-
-@app.route('/retry-confirm', methods=['POST'])
-def retry_confirm():
-    if not _require_auth():
-        return jsonify({'error': 'Unauthorized'}), 401
-    data = request.json or {}
-    uid  = (data.get('uid') or '').strip()
-    if not uid:
-        return jsonify({'error': 'uid required'}), 400
-    with _session_lock:
-        entry = _session_store.get(uid)
-    if not entry:
-        return jsonify({'error': 'Session expired — cannot retry'}), 404
-    ses      = entry['ses']
-    email    = entry['email']
-    password = entry['password']
-    job_id   = entry.get('job_id', '')
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-    jq = job['task_queue'] if job else queue.Queue()
-    threading.Thread(
-        target=m._full_email_confirm,
-        args=(ses, email, uid, password, jq),
-        daemon=False,
-    ).start()
-    return jsonify({'status': 'retrying'})
 
 
 def _extract_code_from_body(body):
@@ -994,6 +791,50 @@ def fetch_code_now():
             time.sleep(3)
         return jsonify({'status': 'not_found'})
 
+    # ── 1secmail and its aliases ──────────────────────────────────────────────
+    _SECMAIL_DOMAINS = {
+        '1secmail.com', '1secmail.net', '1secmail.org',
+        'wwjmp.com', 'esiix.com', 'xojxe.com', 'yoggm.com',
+    }
+    if domain in _SECMAIL_DOMAINS:
+        _1sec_api = 'https://www.1secmail.com/api/v1/'
+        while time.time() < deadline:
+            try:
+                r = m.requests.get(
+                    f'{_1sec_api}?action=getMessages&login={login}&domain={domain}',
+                    timeout=10,
+                )
+                msgs = r.json() if r.status_code == 200 else []
+                for msg in msgs:
+                    mid    = msg.get('id')
+                    from_t = str(msg.get('from', '')).lower()
+                    subj_t = str(msg.get('subject', '')).lower()
+                    is_fb  = ('facebook' in from_t or 'facebookmail' in from_t
+                               or 'confirm' in subj_t or 'code' in subj_t
+                               or 'verification' in subj_t or 'registration' in subj_t)
+                    if not is_fb or mid in seen_ids:
+                        continue
+                    seen_ids.add(mid)
+                    try:
+                        r2 = m.requests.get(
+                            f'{_1sec_api}?action=readMessage&login={login}&domain={domain}&id={mid}',
+                            timeout=10,
+                        )
+                        if r2.status_code == 200:
+                            d2   = r2.json()
+                            body = str(d2.get('htmlBody') or d2.get('body') or
+                                       d2.get('textBody') or '')
+                            code = _extract_code_from_body(body)
+                            if code:
+                                if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                return jsonify({'code': code})
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            time.sleep(3)
+        return jsonify({'status': 'not_found'})
+
     # ── Custom IMAP / Webhook domains ────────────────────────────────────────
     cfg = dm.get_imap_config(domain)
     if cfg:
@@ -1007,11 +848,77 @@ def fetch_code_now():
             if stored and isinstance(stored, dict) and stored.get('code'):
                 code = stored['code']
                 if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                # Persist by uid too for future fast lookups
                 _sto.save(f'webhook_code_{uid}', {'code': code})
                 return jsonify({'code': code})
             return jsonify({'status': 'waiting_webhook',
                             'msg': 'Waiting for email via webhook — check your mail server is forwarding correctly.'})
+
+        # IMAP domain — poll the catch-all mailbox for the FB code
+        imap_host = cfg.get('imap_host', '')
+        imap_user = cfg.get('imap_user', '')
+        imap_pass = cfg.get('imap_pass', '')
+        if imap_host and imap_user and imap_pass:
+            import imaplib
+            import email as _email_lib
+
+            hosts_to_try = list(dict.fromkeys([
+                imap_host,
+                f"mail.{imap_host.replace('mail.', '')}",
+                imap_host.replace('mail.', ''),
+            ]))
+            while time.time() < deadline:
+                for host in hosts_to_try:
+                    for port, use_ssl in [(993, True), (143, False)]:
+                        try:
+                            conn = (imaplib.IMAP4_SSL(host, port, timeout=12)
+                                    if use_ssl else imaplib.IMAP4(host, port))
+                            conn.login(imap_user, imap_pass)
+                            conn.select('INBOX')
+                            for criteria in ['(FROM "facebook")', '(SUBJECT "confirm")', 'ALL']:
+                                try:
+                                    _, idata = conn.search(None, criteria)
+                                    ids = idata[0].split() if idata[0] else []
+                                    for num in reversed(ids[-20:]):
+                                        try:
+                                            _, msg_data = conn.fetch(num, '(RFC822)')
+                                            raw = msg_data[0][1]
+                                            msg = _email_lib.message_from_bytes(raw)
+                                            from_h = msg.get('From', '').lower()
+                                            subj_h = msg.get('Subject', '').lower()
+                                            to_h   = msg.get('To', '').lower()
+                                            is_fb  = ('facebook' in from_h or 'confirm' in subj_h
+                                                      or 'registration' in subj_h)
+                                            is_ours = (email.lower() in to_h or not to_h)
+                                            if not (is_fb and is_ours):
+                                                continue
+                                            body = ''
+                                            if msg.is_multipart():
+                                                for part in msg.walk():
+                                                    if part.get_content_type() in ('text/html', 'text/plain'):
+                                                        try:
+                                                            body += part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                                        except Exception:
+                                                            pass
+                                            else:
+                                                try:
+                                                    body = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                                except Exception:
+                                                    body = str(msg.get_payload())
+                                            code = _extract_code_from_body(body)
+                                            if code:
+                                                conn.logout()
+                                                if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                                return jsonify({'code': code})
+                                        except Exception:
+                                            continue
+                                except Exception:
+                                    continue
+                            conn.logout()
+                            break
+                        except Exception:
+                            continue
+                time.sleep(5)
+            return jsonify({'status': 'not_found'})
         return jsonify({'status': 'not_found'})
 
     return jsonify({'status': 'unsupported_domain',
