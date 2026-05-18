@@ -755,7 +755,6 @@
     <div class="tabs-bar">
       <div class="tab active" onclick="switchTab('log')">Console Log</div>
       <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#1e293b;">(0)</span></div>
-      <div class="tab" onclick="switchTab('confirm'); loadConfirmAccounts()">Confirm Emails</div>
     </div>
 
     <div class="copy-all-bar" id="copyAllBar" onclick="copyAllAccounts(this)">
@@ -781,18 +780,6 @@
       </div>
     </div>
 
-    <div class="tab-content" id="tab-confirm">
-      <div id="confirm-panel" style="padding:0 0 12px;">
-        <div style="padding:12px 12px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.05);">
-          <button class="confirm-btn" style="padding:7px 16px;font-size:12px;font-weight:600;" onclick="loadConfirmAccounts()">↻ Reload Accounts</button>
-          <span id="confirmLoadStatus" style="font-size:12px;color:#64748b;"></span>
-        </div>
-        <div style="padding:8px 12px 4px;font-size:11px;color:#475569;line-height:1.5;">
-          Log into <b style="color:#94a3b8;">Facebook Lite</b> with the email + password below, then enter the confirmation code you received and hit <b style="color:#94a3b8;">Submit</b>.
-        </div>
-        <div id="confirm-list"></div>
-      </div>
-    </div>
 
   </div>
 </div>
@@ -1129,120 +1116,6 @@ function copyAllAccounts(el) {
   bar.classList.add('copied');
   label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (email|password|uid)!`;
   setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
-}
-
-let _confirmLoaded = false;
-async function loadConfirmAccounts() {
-  const status = document.getElementById('confirmLoadStatus');
-  const list   = document.getElementById('confirm-list');
-  if (status) status.textContent = 'Loading…';
-  try {
-    const r = await fetch('/api/accounts/full');
-    if (!r.ok) { if (status) status.textContent = '✗ Unauthorized'; return; }
-    const d = await r.json();
-    const accts = d.accounts || [];
-    list.innerHTML = '';
-    if (!accts.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">⬡</div><div class="empty-text">No accounts saved yet — create some first</div></div>';
-      if (status) status.textContent = '';
-      return;
-    }
-    accts.forEach((a, i) => {
-      const card = document.createElement('div');
-      card.className = 'acct-card';
-      const cid  = `mc-code-${a.uid}`;
-      const csid = `mc-status-${a.uid}`;
-      const cbid = `mc-btn-${a.uid}`;
-      const emailAttr    = escAttr(a.email    || '');
-      const passwordAttr = escAttr(a.password || '');
-      const uidAttr      = escAttr(a.uid      || '');
-      card.innerHTML = `
-        <span class="acct-num">#${i + 1}</span>
-        <div class="acct-row">
-          <span class="acct-field-label">Name</span>
-          <span class="acct-field-value">${escHtml(a.name || '—')}</span>
-        </div>
-        <div class="acct-row">
-          <span class="acct-field-label">Email</span>
-          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
-            <span class="acct-field-value acct-email" style="flex:1;">${escHtml(a.email || '—')}</span>
-            ${a.email ? `<button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${emailAttr}')">Copy</button>` : ''}
-          </div>
-        </div>
-        <div class="acct-row">
-          <span class="acct-field-label">Password</span>
-          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
-            <span class="acct-field-value" style="flex:1;font-family:monospace;">${escHtml(a.password || '—')}</span>
-            ${a.password ? `<button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${passwordAttr}')">Copy</button>` : ''}
-          </div>
-        </div>
-        <div class="acct-row">
-          <span class="acct-field-label">UID</span>
-          <span class="acct-field-value" style="font-family:monospace;font-size:11px;">${escHtml(a.uid)}</span>
-        </div>
-        <div class="confirm-section">
-          <span class="confirm-label">✉ Enter Confirmation Code</span>
-          <div class="confirm-row" style="gap:8px;">
-            <input id="${cid}" class="confirm-input" type="text" maxlength="8"
-                   placeholder="e.g. 847291" style="cursor:text;" autocomplete="off">
-            <button id="${cbid}" class="confirm-btn"
-                    onclick="submitManualCode('${uidAttr}','${emailAttr}','${passwordAttr}')">Submit</button>
-          </div>
-          <div id="${csid}" class="confirm-status"></div>
-        </div>
-      `;
-      list.appendChild(card);
-    });
-    if (status) status.textContent = `${accts.length} account${accts.length !== 1 ? 's' : ''} loaded`;
-    _confirmLoaded = true;
-  } catch(e) {
-    if (status) status.textContent = '✗ Failed to load';
-  }
-}
-
-async function submitManualCode(uid, email, password) {
-  const input  = document.getElementById(`mc-code-${uid}`);
-  const status = document.getElementById(`mc-status-${uid}`);
-  const btn    = document.getElementById(`mc-btn-${uid}`);
-  const code   = (input ? input.value : '').trim();
-
-  if (!code || code.length < 5) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = 'Enter the 5–8 digit code first.'; }
-    return;
-  }
-
-  if (btn)    { btn.disabled = true; btn.textContent = 'Submitting…'; }
-  if (status) { status.className = 'confirm-status loading'; status.textContent = '⏳ Logging in & submitting code…'; }
-
-  try {
-    const resp = await fetch('/manual-confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, email, password, code }),
-    });
-    const result = await resp.json();
-
-    if (!resp.ok) {
-      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Error'); }
-      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
-      return;
-    }
-
-    if (result.status === 'confirmed') {
-      if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed!'; }
-      if (btn)    { btn.textContent = 'Done'; }
-      addLog(`✓ Email confirmed: UID ${uid}`, 'success');
-    } else if (result.status === 'checkpoint') {
-      if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint — try again later.'; }
-      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
-    } else {
-      if (status) { status.className = 'confirm-status submitted'; status.textContent = '↑ Submitted — verify in Facebook Lite to confirm.'; }
-      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
-    }
-  } catch(e) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error'; }
-    if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
-  }
 }
 
 function copyField(btn, text) {
