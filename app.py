@@ -556,6 +556,135 @@ def download():
     return jsonify({'error': 'No results yet'}), 404
 
 
+def _fb_relogin(email, password):
+    """Re-login to Facebook from the server (same IP as registration). Returns session or None."""
+    import requests as _req
+    from bs4 import BeautifulSoup as _bs
+    ses = _req.Session()
+    hdrs = {
+        'User-Agent': m.FB_LITE_UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'x-requested-with': 'com.facebook.lite',
+    }
+    try:
+        r = ses.get('https://m.facebook.com/', headers=hdrs, timeout=12)
+        from bs4 import BeautifulSoup as _bs2
+        soup = _bs2(r.text, 'html.parser')
+        form = soup.find('form', id='login_form') or soup.find('form')
+        if not form:
+            return None
+        fields = {i.get('name'): i.get('value', '') for i in form.find_all('input') if i.get('name')}
+        fields['email'] = email
+        fields['pass']  = password
+        action = (form.get('action') or '').strip() or 'https://m.facebook.com/login/device-based/regular/login/'
+        if not action.startswith('http'):
+            action = 'https://m.facebook.com' + action
+        ses.post(action, data=fields, headers={
+            **hdrs,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://m.facebook.com',
+            'Referer': 'https://m.facebook.com/',
+        }, timeout=15, allow_redirects=True)
+        if 'c_user' in ses.cookies.get_dict():
+            return ses
+    except Exception as e:
+        print(f'[relogin] {e}')
+    return None
+
+
+def _submit_confirm_code(ses, code):
+    """Submit a FB email confirmation code using an active server session. Returns confirmed/checkpoint/failed."""
+    from bs4 import BeautifulSoup as _bss
+    hdrs = {
+        'User-Agent': m.FB_LITE_UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'x-requested-with': 'com.facebook.lite',
+    }
+    phdrs = {**hdrs, 'Content-Type': 'application/x-www-form-urlencoded',
+             'Origin': 'https://m.facebook.com',
+             'Referer': 'https://m.facebook.com/confirmemail.php?soft=hjk'}
+
+    def _chk(url, text):
+        u = url.lower(); t = text.lower()
+        if 'checkpoint' in u or 'checkpoint' in t:
+            return 'checkpoint'
+        if ('home.php' in u or u.rstrip('/').endswith('facebook.com')
+                or 'confirmed' in t or 'verified' in t or 'thank' in t):
+            return 'confirmed'
+        return None
+
+    for url in ['https://m.facebook.com/confirmemail.php?soft=hjk',
+                'https://m.facebook.com/confirmemail.php',
+                'https://m.facebook.com/confirmemail.php?soft=1']:
+        try:
+            r = ses.get(url, headers=hdrs, timeout=12, allow_redirects=True)
+            q = _chk(str(r.url), r.text)
+            if q:
+                return q
+            soup = _bss(r.text, 'html.parser')
+            fd, act = {}, url
+            form = soup.find('form')
+            if form:
+                a = (form.get('action') or '').strip()
+                if a:
+                    act = a if a.startswith('http') else 'https://m.facebook.com' + a
+                for inp in form.find_all('input'):
+                    n = inp.get('name', '')
+                    if n:
+                        fd[n] = inp.get('value', '')
+            for fn in ['n', 'code', 'confirm_code']:
+                fd[fn] = code
+            resp = ses.post(act, data=fd, headers={**phdrs, 'Referer': url},
+                            allow_redirects=True, timeout=15)
+            q = _chk(str(resp.url), resp.text)
+            if q:
+                return q
+        except Exception:
+            pass
+    return 'failed'
+
+
+@app.route('/confirm-code', methods=['POST'])
+def confirm_code():
+    """Confirm email using the server session (same IP/UA as registration — avoids checkpoint)."""
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json or {}
+    uid  = (data.get('uid')  or '').strip()
+    code = (data.get('code') or '').strip()
+    if not uid or not code:
+        return jsonify({'error': 'uid and code required'}), 400
+
+    with _session_lock:
+        entry = _session_store.get(uid)
+    ses      = entry['ses']      if entry else None
+    email    = entry['email']    if entry else ''
+    password = entry['password'] if entry else ''
+
+    if not ses:
+        # Session lost (server restart) — re-login from same server IP
+        if not email or not password:
+            accts = _sto.get_accounts_full()
+            acct  = next((a for a in accts if a['uid'] == uid), None)
+            if acct:
+                email    = acct.get('email', '')
+                password = acct.get('password', '')
+        if email and password:
+            ses = _fb_relogin(email, password)
+            if ses:
+                with _session_lock:
+                    _session_store[uid] = {'ses': ses, 'email': email, 'password': password, 'job_id': ''}
+
+    if not ses:
+        return jsonify({'status': 'session_expired',
+                        'error': 'Session expired — re-create the account or retry shortly after creation'}), 400
+
+    result = _submit_confirm_code(ses, code)
+    return jsonify({'status': result})
 
 
 def _extract_code_from_body(body):
