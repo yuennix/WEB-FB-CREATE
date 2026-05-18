@@ -759,7 +759,7 @@
 
     <div class="copy-all-bar" id="copyAllBar" onclick="copyAllAccounts(this)">
       <span class="copy-all-bar-icon">⎘</span>
-      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(email|password|uid)</span></span>
+      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
     </div>
 
     <div class="tab-content active" id="tab-log">
@@ -779,7 +779,6 @@
         </div>
       </div>
     </div>
-
 
   </div>
 </div>
@@ -858,12 +857,10 @@ function onPassTypeChange() {
 
 function switchTab(name) {
   document.querySelectorAll('.tabs-bar .tab').forEach((t, i) => {
-    t.classList.toggle('active', ['log','accounts','confirm'][i] === name);
+    t.classList.toggle('active', ['log','accounts'][i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
-  const bar = document.getElementById('copyAllBar');
-  if (bar) bar.style.display = (name === 'accounts') ? '' : 'none';
 }
 
 function addLog(msg, level) {
@@ -880,7 +877,7 @@ function addLog(msg, level) {
 
 function addAccount(data) {
   document.getElementById('acctEmpty').style.display = 'none';
-  const uidPass = `${data.email}|${data.password}|${data.uid}`;
+  const uidPass = `${data.uid}|${data.password}`;
   allAccounts.push(uidPass);
   if (data.uid && data.email) _acctEmails[data.uid] = data.email;
   const panel = document.getElementById('accounts-panel');
@@ -889,9 +886,7 @@ function addAccount(data) {
   const inputId    = `ci-${data.uid}`;
   const statusId   = `cs-${data.uid}`;
   const btnId      = `cb-${data.uid}`;
-  const emailAttr  = escAttr(data.email    || '');
-  const passAttr   = escAttr(data.password || '');
-  const _isAutoFetch = true;
+  const _isAutoFetch  = true;
   card.innerHTML = `
     <span class="acct-num">#${data.num}</span>
     <div class="acct-row">
@@ -902,15 +897,12 @@ function addAccount(data) {
       <span class="acct-field-label">Email</span>
       <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
         <span class="acct-field-value acct-email" style="flex:1;">${escHtml(data.email)}</span>
-        <button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${emailAttr}')">Copy</button>
+        <button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${escAttr(data.email)}')">Copy</button>
       </div>
     </div>
     <div class="acct-row">
       <span class="acct-field-label">Password</span>
-      <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
-        <span class="acct-field-value acct-pass" style="flex:1;">${escHtml(data.password)}</span>
-        <button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${passAttr}')">Copy</button>
-      </div>
+      <span class="acct-field-value acct-pass">${escHtml(data.password)}</span>
     </div>
     <div class="acct-row">
       <span class="acct-field-label">UID</span>
@@ -928,13 +920,9 @@ function addAccount(data) {
       <div id="retry-row-${data.uid}" style="display:block;margin-top:4px;">
         <button class="confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="retryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
       </div>
-      <div id="srv-confirm-row-${data.uid}" style="display:none;margin-top:6px;">
-        <button class="confirm-btn" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;width:100%;padding:9px 14px;font-size:13px;font-weight:700;border:none;" onclick="serverConfirm('${escAttr(data.uid)}')">✓ Confirm Email on Server</button>
-        <div style="font-size:10px;color:#64748b;text-align:center;margin-top:3px;">Uses same IP as registration — no checkpoint</div>
-      </div>
       <div id="${statusId}" class="confirm-status ${_isAutoFetch ? 'fetching' : ''}">${_isAutoFetch ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
-    <button class="acct-copy-all" title="Copy email|password|uid" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
+    <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
   `;
   panel.appendChild(card);
   createdCount++;
@@ -944,6 +932,7 @@ function addAccount(data) {
 
   if (_isAutoFetch) _scheduleAutoRetry(data.uid);
 
+  // Auto-switch to Accounts tab so user sees the code box
   switchTab('accounts');
 }
 
@@ -1013,48 +1002,6 @@ function handleConfirmResult(uid, statusVal) {
   }
 }
 
-async function _submitToFacebook(uid, code) {
-  const status  = document.getElementById(`cs-${uid}`);
-  const srvRow  = document.getElementById(`srv-confirm-row-${uid}`);
-  if (status) { status.className = 'confirm-status loading'; status.textContent = '⏳ Submitting code to Facebook…'; }
-  try {
-    const resp = await fetch('/confirm-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, code }),
-    });
-    const r = await resp.json();
-    if (r.status === 'confirmed') {
-      if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed!'; }
-      if (srvRow) srvRow.style.display = 'none';
-      addLog(`✓ Email confirmed: UID ${uid}`, 'success');
-    } else if (r.status === 'checkpoint') {
-      if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint after submit — account may need review'; }
-      if (srvRow) srvRow.style.display = 'block';
-    } else if (r.status === 'session_expired') {
-      if (status) { status.className = 'confirm-status error'; status.textContent = '⚠ Session expired — confirm manually in Facebook Lite using code above'; }
-      if (srvRow) srvRow.style.display = 'none';
-    } else {
-      if (status) { status.className = 'confirm-status submitted'; status.textContent = '↑ Code submitted — verifying…'; }
-      if (srvRow) srvRow.style.display = 'block';
-    }
-  } catch(e) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error — tap retry to resubmit'; }
-    if (srvRow) srvRow.style.display = 'block';
-  }
-}
-
-async function serverConfirm(uid) {
-  const input  = document.getElementById(`ci-${uid}`);
-  const status = document.getElementById(`cs-${uid}`);
-  const code   = (input ? input.value : '').trim();
-  if (!code) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ No code yet — wait for fetch to complete'; }
-    return;
-  }
-  await _submitToFacebook(uid, code);
-}
-
 async function retryConfirm(uid) {
   _clearFetchTimer(uid);
   const status = document.getElementById(`cs-${uid}`);
@@ -1073,23 +1020,76 @@ async function retryConfirm(uid) {
     const result = await resp.json();
 
     if (result.code) {
-      if (input) { input.value = result.code; input.classList.add('code-ready'); }
-      if (retry) retry.style.display = '';
-      addLog(`✉ Code ${result.code} fetched for UID ${uid} — submitting…`, 'success');
-      await _submitToFacebook(uid, result.code);
+      // Code found — fill box, do NOT submit
+      if (input)  { input.value = result.code; input.classList.add('code-ready'); }
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code + ' (tap to copy)'; }
+      if (retry)  retry.style.display = '';
+      addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
     } else if (result.status === 'not_found' || result.status === 'waiting_webhook') {
+      // Auto-retry in 5 seconds
       _scheduleAutoRetry(uid);
     } else if (result.status === 'unsupported_domain') {
-      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.msg || result.error || 'Domain not supported'); }
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.msg || result.error || 'Domain not configured'); }
       if (retry)  retry.style.display = '';
     } else {
+      // Unknown — auto-retry
       _scheduleAutoRetry(uid);
     }
   } catch(e) {
+    // Network error — auto-retry after 5 seconds
     _scheduleAutoRetry(uid);
   }
 }
 
+async function submitCode(uid) {
+  const input  = document.getElementById(`ci-${uid}`);
+  const status = document.getElementById(`cs-${uid}`);
+  const btn    = document.getElementById(`cb-${uid}`);
+  const code   = (input ? input.value : '').trim();
+
+  if (!code || code.length < 5) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = 'Enter the 5–8 digit code first.'; }
+    return;
+  }
+
+  if (input)  { input.disabled = true; }
+  if (btn)    { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  if (status) { status.className = 'confirm-status loading'; status.textContent = '⏳ Submitting to Facebook…'; }
+
+  try {
+    const resp = await fetch('/confirm-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, code }),
+    });
+    const result = await resp.json();
+
+    if (!resp.ok) {
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Error'); }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
+      return;
+    }
+
+    if (result.status === 'confirmed') {
+      if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed successfully!'; }
+      if (btn)    { btn.textContent = 'Done'; }
+      addLog(`✓ Email confirmed: UID ${uid}`, 'success');
+    } else if (result.status === 'checkpoint') {
+      if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered — try again later.'; }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
+    } else {
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '↑ Code submitted — check the account manually to verify.'; }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
+    }
+  } catch(e) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error: ' + e.message; }
+    if (input)  { input.disabled = false; }
+    if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
+  }
+}
 
 function copyAllAccounts(el) {
   const bar   = document.getElementById('copyAllBar');
@@ -1107,7 +1107,7 @@ function copyAllAccounts(el) {
     document.execCommand('copy'); document.body.removeChild(ta);
   });
   bar.classList.add('copied');
-  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (email|password|uid)!`;
+  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (uid|password)!`;
   setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
 }
 

@@ -291,40 +291,6 @@ def get_accounts_list():
             return []
 
 
-def get_accounts_full():
-    """Return all accounts as list of dicts with uid, email, password, name."""
-    if _DB_URL:
-        _init_db()
-        try:
-            conn = _get_conn()
-            cur  = conn.cursor()
-            cur.execute("SELECT uid, password, name, email FROM accounts ORDER BY id ASC")
-            rows = cur.fetchall()
-            cur.close()
-            conn.close()
-            return [
-                {'uid': uid, 'password': pw, 'name': name or '', 'email': email or ''}
-                for uid, pw, name, email in rows
-            ]
-        except Exception as e:
-            print(f'[storage] get_accounts_full error: {e}')
-            return []
-    else:
-        try:
-            result = []
-            with open('weynFBCreate.txt') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith('=') or line.startswith(' SESSION'):
-                        continue
-                    parts = line.split('|')
-                    if len(parts) >= 2:
-                        result.append({'uid': parts[0], 'password': parts[1], 'name': '', 'email': ''})
-            return result
-        except Exception:
-            return []
-
-
 def count_accounts():
     """Return total number of created accounts."""
     if _DB_URL:
