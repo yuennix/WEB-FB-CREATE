@@ -658,9 +658,10 @@ def fetch_code_now():
                                 except Exception:
                                     body = er.text
                                 code = _extract_code_from_body(body)
-                                if code:
-                                    if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                                    return jsonify({'code': code})
+                                _lnk = m._extract_fb_confirm_link(body)
+                                if code or _lnk:
+                                    if code and _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                    return jsonify({'code': code or '', 'link': _lnk or ''})
                         except Exception:
                             pass
             except Exception:
@@ -733,9 +734,10 @@ def fetch_code_now():
                             pass
 
                     code = _extract_code_from_body(body)
-                    if code:
-                        if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                        return jsonify({'code': code})
+                    _lnk = m._extract_fb_confirm_link(body)
+                    if code or _lnk:
+                        if code and _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                        return jsonify({'code': code or '', 'link': _lnk or ''})
             except Exception:
                 pass
             time.sleep(3)
@@ -783,9 +785,10 @@ def fetch_code_now():
                                 pass
                         combined = str(msg.get('subject', '')) + ' ' + body
                         code = _extract_code_from_body(combined)
-                        if code:
-                            if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                            return jsonify({'code': code})
+                        _lnk = m._extract_fb_confirm_link(body)
+                        if code or _lnk:
+                            if code and _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                            return jsonify({'code': code or '', 'link': _lnk or ''})
             except Exception:
                 pass
             time.sleep(3)
@@ -825,9 +828,10 @@ def fetch_code_now():
                             body = str(d2.get('htmlBody') or d2.get('body') or
                                        d2.get('textBody') or '')
                             code = _extract_code_from_body(body)
-                            if code:
-                                if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                                return jsonify({'code': code})
+                            _lnk = m._extract_fb_confirm_link(body)
+                            if code or _lnk:
+                                if code and _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                return jsonify({'code': code or '', 'link': _lnk or ''})
                     except Exception:
                         pass
             except Exception:
@@ -905,10 +909,11 @@ def fetch_code_now():
                                                 except Exception:
                                                     body = str(msg.get_payload())
                                             code = _extract_code_from_body(body)
-                                            if code:
+                                            _lnk = m._extract_fb_confirm_link(body)
+                                            if code or _lnk:
                                                 conn.logout()
-                                                if _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
-                                                return jsonify({'code': code})
+                                                if code and _fcn_jq: _fcn_jq.put({'type': 'confirm_code', 'uid': uid, 'code': code})
+                                                return jsonify({'code': code or '', 'link': _lnk or ''})
                                         except Exception:
                                             continue
                                 except Exception:
