@@ -928,6 +928,7 @@ function addAccount(data) {
       <div id="retry-row-${data.uid}" style="display:block;margin-top:4px;">
         <button class="confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="retryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
       </div>
+      <div id="link-row-${data.uid}" style="display:none;margin-top:6px;"></div>
       <div id="${statusId}" class="confirm-status ${_isAutoFetch ? 'fetching' : ''}">${_isAutoFetch ? '⏳ Fetching code from inbox…' : ''}</div>
     </div>
     <button class="acct-copy-all" title="Copy email|password|uid" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
@@ -1026,12 +1027,21 @@ async function retryConfirm(uid) {
     });
     const result = await resp.json();
 
-    if (result.code) {
-      // Code found — fill box, do NOT submit
-      if (input)  { input.value = result.code; input.classList.add('code-ready'); }
-      if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code + ' (tap to copy)'; }
-      if (retry)  retry.style.display = '';
-      addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+    if (result.code || result.link) {
+      const linkRow = document.getElementById(`link-row-${uid}`);
+      if (result.link && linkRow) {
+        linkRow.innerHTML = `<a href="${result.link}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;text-decoration:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:10px 14px;font-size:13px;font-weight:700;border-radius:8px;letter-spacing:0.01em;">👆 Tap Here to Confirm Email</a><div style="font-size:10px;color:#64748b;text-align:center;margin-top:4px;">Opens in browser — no FB Lite login needed</div>`;
+        linkRow.style.display = 'block';
+      }
+      if (result.code) {
+        if (input)  { input.value = result.code; input.classList.add('code-ready'); }
+        if (status) { status.className = 'confirm-status submitted'; status.textContent = result.link ? '✉ Code: ' + result.code + ' · or tap button above' : '✉ Code fetched: ' + result.code + ' (tap to copy)'; }
+        addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+      } else if (result.link) {
+        if (status) { status.className = 'confirm-status submitted'; status.textContent = '🔗 Confirm link ready — tap the green button above'; }
+        addLog(`🔗 Confirm link fetched for UID ${uid}`, 'success');
+      }
+      if (retry) retry.style.display = '';
     } else if (result.status === 'not_found' || result.status === 'waiting_webhook') {
       // Auto-retry in 5 seconds
       _scheduleAutoRetry(uid);
@@ -1048,55 +1058,6 @@ async function retryConfirm(uid) {
   }
 }
 
-async function submitCode(uid) {
-  const input  = document.getElementById(`ci-${uid}`);
-  const status = document.getElementById(`cs-${uid}`);
-  const btn    = document.getElementById(`cb-${uid}`);
-  const code   = (input ? input.value : '').trim();
-
-  if (!code || code.length < 5) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = 'Enter the 5–8 digit code first.'; }
-    return;
-  }
-
-  if (input)  { input.disabled = true; }
-  if (btn)    { btn.disabled = true; btn.textContent = 'Submitting…'; }
-  if (status) { status.className = 'confirm-status loading'; status.textContent = '⏳ Submitting to Facebook…'; }
-
-  try {
-    const resp = await fetch('/confirm-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, code }),
-    });
-    const result = await resp.json();
-
-    if (!resp.ok) {
-      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Error'); }
-      if (input)  { input.disabled = false; }
-      if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
-      return;
-    }
-
-    if (result.status === 'confirmed') {
-      if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed successfully!'; }
-      if (btn)    { btn.textContent = 'Done'; }
-      addLog(`✓ Email confirmed: UID ${uid}`, 'success');
-    } else if (result.status === 'checkpoint') {
-      if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered — try again later.'; }
-      if (input)  { input.disabled = false; }
-      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
-    } else {
-      if (status) { status.className = 'confirm-status submitted'; status.textContent = '↑ Code submitted — check the account manually to verify.'; }
-      if (input)  { input.disabled = false; }
-      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
-    }
-  } catch(e) {
-    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error: ' + e.message; }
-    if (input)  { input.disabled = false; }
-    if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
-  }
-}
 
 function copyAllAccounts(el) {
   const bar   = document.getElementById('copyAllBar');
