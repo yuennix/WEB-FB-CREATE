@@ -322,7 +322,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                                   'image/avif,image/webp,image/apng,*/*;q=0.8,'
                                   'application/signed-exchange;v=b3;q=0.7'),
                 'Accept-Encoding':   'gzip, deflate, br',
-                'Accept-Language':   'en-US,en;q=0.9',
+                'Accept-Language':   _dp['locale'],
                 'Cache-Control':     'max-age=0',
                 'Origin':            'https://m.facebook.com',
                 'Referer':           'https://m.facebook.com/reg/',
@@ -397,9 +397,14 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 _ih = {
                     'User-Agent':       _dp['ua'],
                     'Accept':           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language':  'en-US,en;q=0.9',
+                    'Accept-Language':  _dp['locale'],
                     'Accept-Encoding':  'gzip, deflate, br',
                     'Referer':          'https://m.facebook.com/confirmemail.php',
+                    'sec-ch-ua':        _dp['sec_ch_ua'],
+                    'sec-ch-ua-mobile': '?1',
+                    'sec-ch-ua-model':  f'"{_dp["model"]}"',
+                    'sec-ch-ua-platform': '"Android"',
+                    'sec-ch-ua-platform-version': f'"{_dp["android_ver"]}"',
                     'x-requested-with': 'com.facebook.lite',
                 }
                 def _ifire(u):
@@ -1240,9 +1245,19 @@ def webhook_email():
             with _session_lock:
                 ses_entry = _session_store.get(uid)
             if ses_entry:
-                def _follow_link(ses, link, u, jq):
+                _dp_wh = ses_entry.get('device_profile')
+                def _follow_link(ses, link, u, jq, dp=_dp_wh):
                     try:
-                        _ih = {'User-Agent': m.FB_LITE_UA, 'Accept-Language': 'en-US,en;q=0.9'}
+                        _ih = {
+                            'User-Agent':    dp['ua']        if dp else m.FB_LITE_UA,
+                            'Accept-Language': dp['locale']  if dp else 'en-US,en;q=0.9',
+                            'sec-ch-ua':     dp['sec_ch_ua'] if dp else '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+                            'sec-ch-ua-mobile': '?1',
+                            'sec-ch-ua-model': f'"{dp["model"]}"' if dp else '"2201117TY"',
+                            'sec-ch-ua-platform': '"Android"',
+                            'sec-ch-ua-platform-version': f'"{dp["android_ver"]}"' if dp else '"12"',
+                            'x-requested-with': 'com.facebook.lite',
+                        }
                         r = ses.get(link, headers=_ih, timeout=12, allow_redirects=True)
                         st = 'checkpoint' if 'checkpoint' in str(r.url) else 'confirmed'
                     except Exception:

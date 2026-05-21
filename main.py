@@ -1492,6 +1492,45 @@ _CHROME_VERSIONS = [
 _BUILD_SUFFIXES = ['001', '002', '003', '011', '012', '014', '020', '021', '022']
 
 
+# Locale pool per manufacturer — reflects real-world market distribution.
+# Each account picks one locale and keeps it for all requests so the
+# Accept-Language header is consistent throughout the session.
+_LOCALE_BY_MFR = {
+    'Xiaomi':  [
+        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+        'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'en-PH,en;q=0.9',
+        'ms-MY,ms;q=0.9,en-US;q=0.8',
+    ],
+    'Samsung': [
+        'ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7',
+        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+        'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'th-TH,th;q=0.9,en-US;q=0.8',
+    ],
+    'OPPO':    [
+        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+        'th-TH,th;q=0.9,en-US;q=0.8',
+        'en-PH,en;q=0.9',
+    ],
+    'realme':  [
+        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+        'en-IN,hi;q=0.9,en;q=0.8',
+        'ms-MY,ms;q=0.9,en-US;q=0.8',
+    ],
+    'Infinix': [
+        'en-NG,en;q=0.9',
+        'fr-CI,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'ar-EG,ar;q=0.9,en-US;q=0.8',
+    ],
+    'vivo':    [
+        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+        'my-MM,my;q=0.9,en-US;q=0.8',
+        'th-TH,th;q=0.9,en-US;q=0.8',
+    ],
+}
+
+
 def make_device_profile():
     """Generate a unique, consistent device fingerprint for one account.
 
@@ -1505,6 +1544,7 @@ def make_device_profile():
     build_date   = random.randint(200000, 230000)
     build_suffix = random.choice(_BUILD_SUFFIXES)
     build_str    = f"{build_pfx}.{build_date}.{build_suffix}"
+    locale       = random.choice(_LOCALE_BY_MFR.get(mfr, ['en-US,en;q=0.9']))
 
     ua = (
         f"Mozilla/5.0 (Linux; Android {android_ver}; {model} Build/{build_str}; wv) "
@@ -1523,6 +1563,7 @@ def make_device_profile():
     )
     return {
         'ua':           ua,
+        'locale':       locale,
         'android_ver':  android_ver,
         'model':        model,
         'chrome_ver':   chrome_ver,
@@ -1735,11 +1776,12 @@ def confirm_id(mail, uid, otp, data, ses, password='', device_profile=None):
         _dp_sec_ch_ua   = device_profile['sec_ch_ua']   if device_profile else '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"'
         _dp_model       = device_profile['model']       if device_profile else '2201117TY'
         _dp_android_ver = device_profile['android_ver'] if device_profile else '12'
+        _dp_locale      = device_profile['locale']      if device_profile else 'en-US,en;q=0.9'
         post_headers = {
             'User-Agent': _dp_ua,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+            'Accept-Language': _dp_locale,
             'Cache-Control': 'max-age=0',
             'Content-Type': 'application/x-www-form-urlencoded',
             'Origin': 'https://m.facebook.com',
@@ -1852,13 +1894,22 @@ def trigger_email_confirmation(ses, email, uid, device_profile=None):
         if domain in SECMAIL_DOMAINS:
             return
 
-        _ua = device_profile['ua'] if device_profile else FB_LITE_UA
+        _ua        = device_profile['ua']        if device_profile else FB_LITE_UA
+        _locale    = device_profile['locale']    if device_profile else 'en-US,en;q=0.9'
+        _sec_ch_ua = device_profile['sec_ch_ua'] if device_profile else '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"'
+        _model     = device_profile['model']     if device_profile else '2201117TY'
+        _andver    = device_profile['android_ver'] if device_profile else '12'
         _ch = {
             'User-Agent': _ua,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Language': _locale,
             'Accept-Encoding': 'gzip, deflate, br',
             'Referer': 'https://m.facebook.com/',
+            'sec-ch-ua': _sec_ch_ua,
+            'sec-ch-ua-mobile': '?1',
+            'sec-ch-ua-model': f'"{_model}"',
+            'sec-ch-ua-platform': '"Android"',
+            'sec-ch-ua-platform-version': f'"{_andver}"',
             'x-requested-with': 'com.facebook.lite',
         }
         _ph = {
@@ -1932,13 +1983,22 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
     _is_tempmail_io   = _domain in _TEMPMAIL_IO_DOMAIN_SET
     _is_weyn_emails   = _domain in _WEYN_EMAILS_DOMAINS
 
-    _ua = device_profile['ua'] if device_profile else FB_LITE_UA
+    _ua        = device_profile['ua']          if device_profile else FB_LITE_UA
+    _locale    = device_profile['locale']      if device_profile else 'en-US,en;q=0.9'
+    _sec_ch_ua = device_profile['sec_ch_ua']   if device_profile else '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"'
+    _model     = device_profile['model']       if device_profile else '2201117TY'
+    _andver    = device_profile['android_ver'] if device_profile else '12'
     _ch = {
         'User-Agent': _ua,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Language': _locale,
         'Accept-Encoding': 'gzip, deflate, br',
         'Referer': 'https://m.facebook.com/',
+        'sec-ch-ua': _sec_ch_ua,
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-model': f'"{_model}"',
+        'sec-ch-ua-platform': '"Android"',
+        'sec-ch-ua-platform-version': f'"{_andver}"',
         'x-requested-with': 'com.facebook.lite',
     }
     _ph = {
@@ -2007,9 +2067,6 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
             'Content-Type':    'application/x-www-form-urlencoded',
             'Origin':          'https://m.facebook.com',
             'Cache-Control':   'max-age=0',
-            'sec-ch-ua':       '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
-            'sec-ch-ua-mobile':    '?1',
-            'sec-ch-ua-platform':  '"Android"',
             'sec-fetch-dest':  'document',
             'sec-fetch-mode':  'navigate',
             'sec-fetch-site':  'same-origin',
@@ -2966,7 +3023,7 @@ def createfb_method_1():
                     'User-Agent': _cli_dp['ua'],
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                     'Accept-Encoding': 'gzip, deflate, br',
-                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Language': _cli_dp['locale'],
                     'Cache-Control': 'max-age=0',
                     'Origin': 'https://m.facebook.com',
                     'Referer': 'https://m.facebook.com/reg/',
@@ -3009,11 +3066,16 @@ def createfb_method_1():
                         'https://www.facebook.com/confirmemail.php?send=1',
                     ]
                     _ih = {
-                        'User-Agent': FB_LITE_UA,
+                        'User-Agent': _cli_dp['ua'],
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Language': _cli_dp['locale'],
                         'Accept-Encoding': 'gzip, deflate, br',
                         'Referer': 'https://m.facebook.com/confirmemail.php',
+                        'sec-ch-ua': _cli_dp['sec_ch_ua'],
+                        'sec-ch-ua-mobile': '?1',
+                        'sec-ch-ua-model': f'"{_cli_dp["model"]}"',
+                        'sec-ch-ua-platform': '"Android"',
+                        'sec-ch-ua-platform-version': f'"{_cli_dp["android_ver"]}"',
                         'x-requested-with': 'com.facebook.lite',
                     }
                     def _ifire(u):
@@ -3025,7 +3087,8 @@ def createfb_method_1():
                         _ipool.map(_ifire, _instant_urls)
 
                     # Background thread handles 1secmail polling + repeat trigger waves
-                    _t = _th.Thread(target=_full_email_confirm, args=(ses, phone, uid, pww), daemon=False)
+                    _t = _th.Thread(target=_full_email_confirm, args=(ses, phone, uid, pww),
+                                    kwargs={'device_profile': _cli_dp}, daemon=False)
                     _t.start()
 
                     with lock:
@@ -3150,7 +3213,7 @@ def register_account(domain_choice, name_option="1", gender_option="3", custom_p
                 'User-Agent': _cli_dp2['ua'],
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Language': _cli_dp2['locale'],
                 'Cache-Control': 'max-age=0',
                 'Origin': 'https://m.facebook.com',
                 'Referer': 'https://m.facebook.com/reg/',
@@ -3166,7 +3229,7 @@ def register_account(domain_choice, name_option="1", gender_option="3", custom_p
                 'sec-fetch-user': '?1',
                 'upgrade-insecure-requests': '1',
                 'x-requested-with': 'com.facebook.lite',
-                'viewport-width': '980',
+                'viewport-width': _cli_dp2['viewport_width'],
             }
 
             reg_submit = ses.post(_reg_url, data=payload, headers=headers, timeout=20)
