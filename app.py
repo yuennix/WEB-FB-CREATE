@@ -244,6 +244,11 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 return
 
         try:
+            # Generate a unique device fingerprint for this account.
+            # Every request for this account (register + email confirm) uses the
+            # same profile so the session looks like one consistent physical device.
+            _dp = m.make_device_profile()
+
             ses = m.requests.Session()
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
@@ -312,7 +317,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             }
 
             merged_headers = {
-                'User-Agent':    m.FB_LITE_UA,
+                'User-Agent':    _dp['ua'],
                 'Accept':        ('text/html,application/xhtml+xml,application/xml;q=0.9,'
                                   'image/avif,image/webp,image/apng,*/*;q=0.8,'
                                   'application/signed-exchange;v=b3;q=0.7'),
@@ -322,16 +327,18 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'Origin':            'https://m.facebook.com',
                 'Referer':           'https://m.facebook.com/reg/',
                 'sec-ch-prefers-color-scheme': 'light',
-                'sec-ch-ua':         '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+                'sec-ch-ua':          _dp['sec_ch_ua'],
                 'sec-ch-ua-mobile':  '?1',
-                'sec-ch-ua-platform':'"Android"',
+                'sec-ch-ua-model':   f'"{_dp["model"]}"',
+                'sec-ch-ua-platform': '"Android"',
+                'sec-ch-ua-platform-version': f'"{_dp["android_ver"]}"',
                 'sec-fetch-dest':    'document',
                 'sec-fetch-mode':    'navigate',
                 'sec-fetch-site':    'same-origin',
                 'sec-fetch-user':    '?1',
                 'upgrade-insecure-requests': '1',
                 'x-requested-with':  'com.facebook.lite',
-                'viewport-width':    '980',
+                'viewport-width':    _dp['viewport_width'],
             }
 
             ses.post(_reg_url, data=payload, headers=merged_headers, timeout=8)
@@ -367,6 +374,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                     _session_store[uid] = {
                         'ses': ses, 'email': phone, 'password': pww,
                         'tmail_token': _tmail_tok,
+                        'device_profile': _dp,
                         'job_id': job.get('job_id', ''),
                     }
 
@@ -387,7 +395,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                     'https://www.facebook.com/confirmemail.php?send=1',
                 ]
                 _ih = {
-                    'User-Agent':       m.FB_LITE_UA,
+                    'User-Agent':       _dp['ua'],
                     'Accept':           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Accept-Language':  'en-US,en;q=0.9',
                     'Accept-Encoding':  'gzip, deflate, br',
@@ -405,6 +413,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 threading.Thread(
                     target=m._full_email_confirm,
                     args=(ses, phone, uid, pww, jq),
+                    kwargs={'device_profile': _dp},
                     daemon=False,
                 ).start()
 
@@ -596,16 +605,18 @@ def retry_confirm():
         entry = _session_store.get(uid)
     if not entry:
         return jsonify({'error': 'Session expired — cannot retry'}), 404
-    ses      = entry['ses']
-    email    = entry['email']
-    password = entry['password']
-    job_id   = entry.get('job_id', '')
+    ses            = entry['ses']
+    email          = entry['email']
+    password       = entry['password']
+    device_profile = entry.get('device_profile')
+    job_id         = entry.get('job_id', '')
     with _jobs_lock:
         job = _jobs.get(job_id)
     jq = job['task_queue'] if job else queue.Queue()
     threading.Thread(
         target=m._full_email_confirm,
         args=(ses, email, uid, password, jq),
+        kwargs={'device_profile': device_profile},
         daemon=False,
     ).start()
     return jsonify({'status': 'retrying'})

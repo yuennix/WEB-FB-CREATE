@@ -1442,6 +1442,100 @@ FB_LITE_UA = (
     "FBSV/12;FBOP/1;FBCA/armeabi-v7a:armeabi;]"
 )
 
+# ── Per-account device fingerprint generator ──────────────────────────────────
+_DEVICE_POOL = [
+    # (manufacturer, board, model, android_ver, abi, density, width, height, build_prefix)
+    ('Xiaomi',  'Redmi',   '2201117TY',  '12', 'armeabi-v7a:armeabi',       '2.75', 1080, 2280, 'SKQ1'),
+    ('Xiaomi',  'Redmi',   'M2004J19C',  '10', 'armeabi-v7a:armeabi',       '2.0',   720, 1600, 'QKQ1'),
+    ('Xiaomi',  'Redmi',   '22041219I',  '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2400, 'SKQ1'),
+    ('Xiaomi',  'Redmi',   'M2012K11G',  '11', 'arm64-v8a:armeabi-v7a',     '2.75', 1080, 2400, 'RKQ1'),
+    ('Xiaomi',  'Redmi',   '2109119DG',  '11', 'arm64-v8a:armeabi-v7a',     '2.75', 1080, 2400, 'RKQ1'),
+    ('Xiaomi',  'Redmi',   '2201116SR',  '12', 'arm64-v8a:armeabi-v7a',     '3.0',  1080, 2340, 'SKQ1'),
+    ('Xiaomi',  'Redmi',   '22101316UG', '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'SKQ1'),
+    ('Xiaomi',  'Redmi',   'M2010J19SY', '10', 'armeabi-v7a:armeabi',       '2.0',   720, 1600, 'QKQ1'),
+    ('Samsung', 'Samsung', 'SM-A125F',   '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
+    ('Samsung', 'Samsung', 'SM-A235F',   '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2408, 'SP1A'),
+    ('Samsung', 'Samsung', 'SM-A536B',   '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2408, 'SP1A'),
+    ('Samsung', 'Samsung', 'SM-A325F',   '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
+    ('Samsung', 'Samsung', 'SM-A515F',   '12', 'arm64-v8a:armeabi-v7a',     '2.625',1080, 2400, 'SP1A'),
+    ('Samsung', 'Samsung', 'SM-A135F',   '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'SP1A'),
+    ('Samsung', 'Samsung', 'SM-A037F',   '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
+    ('OPPO',    'OPPO',    'CPH2461',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
+    ('OPPO',    'OPPO',    'CPH2373',    '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'RP1A'),
+    ('OPPO',    'OPPO',    'CPH2389',    '11', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'RP1A'),
+    ('OPPO',    'OPPO',    'CPH2451',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
+    ('realme',  'realme',  'RMX3516',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
+    ('realme',  'realme',  'RMX3371',    '11', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'RP1A'),
+    ('realme',  'realme',  'RMX3241',    '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'RP1A'),
+    ('realme',  'realme',  'RMX3461',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
+    ('Infinix', 'Infinix', 'X6823',      '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'SP1A'),
+    ('Infinix', 'Infinix', 'X669C',      '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'RP1A'),
+    ('Infinix', 'Infinix', 'X683',       '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1560, 'RP1A'),
+    ('Infinix', 'Infinix', 'X6811',      '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'SP1A'),
+    ('vivo',    'vivo',    'V2109',      '11', 'arm64-v8a:armeabi-v7a',     '2.625',1080, 2408, 'RP1A'),
+    ('vivo',    'vivo',    'V2207',      '12', 'arm64-v8a:armeabi-v7a',     '2.625',1080, 2408, 'SP1A'),
+    ('vivo',    'vivo',    'V2041',      '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
+]
+
+_CHROME_VERSIONS = [
+    # (chrome_ver, chrome_build, chrome_patch, fb_bv,        fb_av)
+    ('109', '5414',  '86',  '443200018', '439.0.0.0.8'),
+    ('111', '5563',  '58',  '460030614', '451.0.0.0.14'),
+    ('112', '5615',  '63',  '468206716', '458.0.0.0.12'),
+    ('114', '5735', '154',  '478200230', '466.0.0.0.30'),
+    ('116', '5845',  '65',  '494036218', '477.0.0.0.6'),
+    ('117', '5938', '183',  '502141314', '483.0.0.0.24'),
+    ('119', '6045',  '66',  '516039218', '493.0.0.0.18'),
+    ('120', '6099', '117',  '526141914', '498.0.0.0.22'),
+]
+
+_BUILD_SUFFIXES = ['001', '002', '003', '011', '012', '014', '020', '021', '022']
+
+
+def make_device_profile():
+    """Generate a unique, consistent device fingerprint for one account.
+
+    Returns a dict used for ALL requests for that account so every account
+    looks like a different physical phone to Facebook's detection systems.
+    Call this ONCE per account creation attempt, then reuse the result
+    throughout registration and email confirmation.
+    """
+    mfr, board, model, android_ver, abi, density, width, height, build_pfx = random.choice(_DEVICE_POOL)
+    chrome_ver, chrome_build, chrome_patch, fb_bv, fb_av = random.choice(_CHROME_VERSIONS)
+    build_date   = random.randint(200000, 230000)
+    build_suffix = random.choice(_BUILD_SUFFIXES)
+    build_str    = f"{build_pfx}.{build_date}.{build_suffix}"
+
+    ua = (
+        f"Mozilla/5.0 (Linux; Android {android_ver}; {model} Build/{build_str}; wv) "
+        f"AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 "
+        f"Chrome/{chrome_ver}.0.{chrome_build}.{chrome_patch} Mobile Safari/537.36 "
+        f"[FBAN/FB4A;FBAV/{fb_av};FBBV/{fb_bv};"
+        f"FBDM/{{density={density},width={width},height={height}}};"
+        f"FBLC/en_US;FBRV/0;FBCR/;"
+        f"FBMF/{mfr};FBBD/{board};FBPN/com.facebook.lite;"
+        f"FBDV/{model};FBSV/{android_ver};FBOP/1;FBCA/{abi};]"
+    )
+    sec_ch_ua = (
+        f'"Android WebView";v="{chrome_ver}", '
+        f'"Chromium";v="{chrome_ver}", '
+        f'"Not_A Brand";v="24"'
+    )
+    return {
+        'ua':           ua,
+        'android_ver':  android_ver,
+        'model':        model,
+        'chrome_ver':   chrome_ver,
+        'manufacturer': mfr,
+        'board':        board,
+        'abi':          abi,
+        'density':      density,
+        'width':        width,
+        'height':       height,
+        'sec_ch_ua':    sec_ch_ua,
+        'viewport_width': str(width),
+    }
+
 
 def _extract_token(patterns, text):
     for p in patterns:
@@ -1592,7 +1686,7 @@ def save_result(uid, password, cookie):
         pass
 
 
-def confirm_id(mail, uid, otp, data, ses, password=''):
+def confirm_id(mail, uid, otp, data, ses, password='', device_profile=None):
     """Submit confirmation code to FB's confirmation_cliff endpoint."""
     try:
         src     = str(data)
@@ -1637,8 +1731,12 @@ def confirm_id(mail, uid, otp, data, ses, password=''):
             '__comet_req': '0',
             'action': 'confirm',
         }
+        _dp_ua          = device_profile['ua']          if device_profile else FB_LITE_UA
+        _dp_sec_ch_ua   = device_profile['sec_ch_ua']   if device_profile else '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"'
+        _dp_model       = device_profile['model']       if device_profile else '2201117TY'
+        _dp_android_ver = device_profile['android_ver'] if device_profile else '12'
         post_headers = {
-            'User-Agent': FB_LITE_UA,
+            'User-Agent': _dp_ua,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
             'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
@@ -1647,11 +1745,11 @@ def confirm_id(mail, uid, otp, data, ses, password=''):
             'Origin': 'https://m.facebook.com',
             'Referer': f'https://m.facebook.com/confirmemail.php?soft=hjk',
             'sec-ch-prefers-color-scheme': 'light',
-            'sec-ch-ua': '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+            'sec-ch-ua': _dp_sec_ch_ua,
             'sec-ch-ua-mobile': '?1',
-            'sec-ch-ua-model': '"2201117TY"',
+            'sec-ch-ua-model': f'"{_dp_model}"',
             'sec-ch-ua-platform': '"Android"',
-            'sec-ch-ua-platform-version': '"12"',
+            'sec-ch-ua-platform-version': f'"{_dp_android_ver}"',
             'sec-fetch-dest': 'document',
             'sec-fetch-mode': 'navigate',
             'sec-fetch-site': 'same-origin',
@@ -1735,7 +1833,7 @@ def _extract_fb_confirm_code(body):
     return None
 
 
-def trigger_email_confirmation(ses, email, uid):
+def trigger_email_confirmation(ses, email, uid, device_profile=None):
     """
     For custom domains: trigger FB to send the confirmation email.
     Strategy: POST the confirmemail form as-is (no injections) — this is
@@ -1754,8 +1852,9 @@ def trigger_email_confirmation(ses, email, uid):
         if domain in SECMAIL_DOMAINS:
             return
 
+        _ua = device_profile['ua'] if device_profile else FB_LITE_UA
         _ch = {
-            'User-Agent': FB_LITE_UA,
+            'User-Agent': _ua,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -1812,7 +1911,7 @@ def trigger_email_confirmation(ses, email, uid):
         pass
 
 
-def _full_email_confirm(ses, email, uid, password='', result_queue=None):
+def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_profile=None):
     """
     After account creation:
     - Custom domains (weyn.store etc): fire resend triggers so FB emails the inbox.
@@ -1833,8 +1932,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None):
     _is_tempmail_io   = _domain in _TEMPMAIL_IO_DOMAIN_SET
     _is_weyn_emails   = _domain in _WEYN_EMAILS_DOMAINS
 
+    _ua = device_profile['ua'] if device_profile else FB_LITE_UA
     _ch = {
-        'User-Agent': FB_LITE_UA,
+        'User-Agent': _ua,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
@@ -2861,8 +2961,9 @@ def createfb_method_1():
                     '__dyn': '', '__csr': '', '__req': 'q', '__a': '', '__user': '0',
                 }
 
+                _cli_dp = make_device_profile()
                 merged_headers = {
-                    'User-Agent': FB_LITE_UA,
+                    'User-Agent': _cli_dp['ua'],
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                     'Accept-Encoding': 'gzip, deflate, br',
                     'Accept-Language': 'en-US,en;q=0.9',
@@ -2870,16 +2971,18 @@ def createfb_method_1():
                     'Origin': 'https://m.facebook.com',
                     'Referer': 'https://m.facebook.com/reg/',
                     'sec-ch-prefers-color-scheme': 'light',
-                    'sec-ch-ua': '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+                    'sec-ch-ua': _cli_dp['sec_ch_ua'],
                     'sec-ch-ua-mobile': '?1',
+                    'sec-ch-ua-model': f'"{_cli_dp["model"]}"',
                     'sec-ch-ua-platform': '"Android"',
+                    'sec-ch-ua-platform-version': f'"{_cli_dp["android_ver"]}"',
                     'sec-fetch-dest': 'document',
                     'sec-fetch-mode': 'navigate',
                     'sec-fetch-site': 'same-origin',
                     'sec-fetch-user': '?1',
                     'upgrade-insecure-requests': '1',
                     'x-requested-with': 'com.facebook.lite',
-                    'viewport-width': '980',
+                    'viewport-width': _cli_dp['viewport_width'],
                 }
 
                 reg_submit = ses.post(_reg_url, data=payload, headers=merged_headers, timeout=20)
@@ -3042,8 +3145,9 @@ def register_account(domain_choice, name_option="1", gender_option="3", custom_p
                 '__dyn': '', '__csr': '', '__req': 'q', '__a': '', '__user': '0',
             }
 
+            _cli_dp2 = make_device_profile()
             headers = {
-                'User-Agent': FB_LITE_UA,
+                'User-Agent': _cli_dp2['ua'],
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'Accept-Language': 'en-US,en;q=0.9',
@@ -3051,9 +3155,11 @@ def register_account(domain_choice, name_option="1", gender_option="3", custom_p
                 'Origin': 'https://m.facebook.com',
                 'Referer': 'https://m.facebook.com/reg/',
                 'sec-ch-prefers-color-scheme': 'light',
-                'sec-ch-ua': '"Android WebView";v="109", "Chromium";v="109", "Not_A Brand";v="24"',
+                'sec-ch-ua': _cli_dp2['sec_ch_ua'],
                 'sec-ch-ua-mobile': '?1',
+                'sec-ch-ua-model': f'"{_cli_dp2["model"]}"',
                 'sec-ch-ua-platform': '"Android"',
+                'sec-ch-ua-platform-version': f'"{_cli_dp2["android_ver"]}"',
                 'sec-fetch-dest': 'document',
                 'sec-fetch-mode': 'navigate',
                 'sec-fetch-site': 'same-origin',
