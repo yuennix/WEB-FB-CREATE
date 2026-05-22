@@ -1698,10 +1698,11 @@ def make_device_profile():
     build_date    = random.randint(200000, 240000)
     build_suffix  = random.choice(_BUILD_SUFFIXES)
     build_str     = f"{build_pfx}.{build_date}.{build_suffix}"
-    locale        = random.choice(_LOCALE_BY_MFR.get(mfr, ['en-US,en;q=0.9']))
-    locale_prefix = locale[:2].lower()
-    fb_locale     = _FBLC_MAP.get(locale_prefix, 'en_US')
-    carrier       = random.choice(_CARRIERS_BY_LOCALE.get(locale_prefix, ['']))
+    # Locked to Philippines — locale must match the server IP country to avoid
+    # Facebook's "confirm you're a real person" checkpoint after email verification.
+    locale        = 'en-PH,en;q=0.9'
+    fb_locale     = 'en_US'
+    carrier       = random.choice(['Globe', 'Smart', 'DITO', 'TNT', 'Sun Cellular'])
     conn_type     = random.choice(_CONNECTION_TYPES)
 
     ua = (
