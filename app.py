@@ -316,6 +316,10 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 '__dyn': '', '__csr': '', '__req': 'q', '__a': '', '__user': '0',
             }
 
+            # Mimic a human spending time filling in the form (2-8 s).
+            # Bots that submit in <200ms are trivially detected.
+            time.sleep(_random.uniform(2.0, 8.0))
+
             merged_headers = {
                 'User-Agent':    _dp['ua'],
                 'Accept':        ('text/html,application/xhtml+xml,application/xml;q=0.9,'
@@ -338,6 +342,7 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 'sec-fetch-user':    '?1',
                 'upgrade-insecure-requests': '1',
                 'x-requested-with':  'com.facebook.lite',
+                'x-fb-connection-type': _dp['connection_type'],
                 'viewport-width':    _dp['viewport_width'],
             }
 

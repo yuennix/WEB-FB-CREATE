@@ -1445,90 +1445,244 @@ FB_LITE_UA = (
 # ── Per-account device fingerprint generator ──────────────────────────────────
 _DEVICE_POOL = [
     # (manufacturer, board, model, android_ver, abi, density, width, height, build_prefix)
-    ('Xiaomi',  'Redmi',   '2201117TY',  '12', 'armeabi-v7a:armeabi',       '2.75', 1080, 2280, 'SKQ1'),
-    ('Xiaomi',  'Redmi',   'M2004J19C',  '10', 'armeabi-v7a:armeabi',       '2.0',   720, 1600, 'QKQ1'),
-    ('Xiaomi',  'Redmi',   '22041219I',  '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2400, 'SKQ1'),
-    ('Xiaomi',  'Redmi',   'M2012K11G',  '11', 'arm64-v8a:armeabi-v7a',     '2.75', 1080, 2400, 'RKQ1'),
-    ('Xiaomi',  'Redmi',   '2109119DG',  '11', 'arm64-v8a:armeabi-v7a',     '2.75', 1080, 2400, 'RKQ1'),
-    ('Xiaomi',  'Redmi',   '2201116SR',  '12', 'arm64-v8a:armeabi-v7a',     '3.0',  1080, 2340, 'SKQ1'),
-    ('Xiaomi',  'Redmi',   '22101316UG', '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'SKQ1'),
-    ('Xiaomi',  'Redmi',   'M2010J19SY', '10', 'armeabi-v7a:armeabi',       '2.0',   720, 1600, 'QKQ1'),
-    ('Samsung', 'Samsung', 'SM-A125F',   '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
-    ('Samsung', 'Samsung', 'SM-A235F',   '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2408, 'SP1A'),
-    ('Samsung', 'Samsung', 'SM-A536B',   '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2408, 'SP1A'),
-    ('Samsung', 'Samsung', 'SM-A325F',   '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
-    ('Samsung', 'Samsung', 'SM-A515F',   '12', 'arm64-v8a:armeabi-v7a',     '2.625',1080, 2400, 'SP1A'),
-    ('Samsung', 'Samsung', 'SM-A135F',   '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'SP1A'),
-    ('Samsung', 'Samsung', 'SM-A037F',   '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
-    ('OPPO',    'OPPO',    'CPH2461',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
-    ('OPPO',    'OPPO',    'CPH2373',    '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'RP1A'),
-    ('OPPO',    'OPPO',    'CPH2389',    '11', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'RP1A'),
-    ('OPPO',    'OPPO',    'CPH2451',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
-    ('realme',  'realme',  'RMX3516',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
-    ('realme',  'realme',  'RMX3371',    '11', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'RP1A'),
-    ('realme',  'realme',  'RMX3241',    '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'RP1A'),
-    ('realme',  'realme',  'RMX3461',    '12', 'arm64-v8a:armeabi-v7a',     '2.4',  1080, 2412, 'SP1A'),
-    ('Infinix', 'Infinix', 'X6823',      '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'SP1A'),
-    ('Infinix', 'Infinix', 'X669C',      '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'RP1A'),
-    ('Infinix', 'Infinix', 'X683',       '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1560, 'RP1A'),
-    ('Infinix', 'Infinix', 'X6811',      '12', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1612, 'SP1A'),
-    ('vivo',    'vivo',    'V2109',      '11', 'arm64-v8a:armeabi-v7a',     '2.625',1080, 2408, 'RP1A'),
-    ('vivo',    'vivo',    'V2207',      '12', 'arm64-v8a:armeabi-v7a',     '2.625',1080, 2408, 'SP1A'),
-    ('vivo',    'vivo',    'V2041',      '11', 'arm64-v8a:armeabi-v7a',     '2.0',   720, 1600, 'RP1A'),
+    # ── Xiaomi / Redmi / POCO ────────────────────────────────────────────────
+    ('Xiaomi',    'Redmi',    '2201117TY',          '12', 'armeabi-v7a:armeabi',   '2.75', 1080, 2280, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    'M2004J19C',          '10', 'armeabi-v7a:armeabi',   '2.0',   720, 1600, 'QKQ1'),
+    ('Xiaomi',    'Redmi',    '22041219I',          '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    'M2012K11G',          '11', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'RKQ1'),
+    ('Xiaomi',    'Redmi',    '2109119DG',          '11', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'RKQ1'),
+    ('Xiaomi',    'Redmi',    '2201116SR',          '12', 'arm64-v8a:armeabi-v7a', '3.0',  1080, 2340, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    '22101316UG',         '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    'M2010J19SY',         '10', 'armeabi-v7a:armeabi',   '2.0',   720, 1600, 'QKQ1'),
+    ('Xiaomi',    'Redmi',    '2207117BPG',         '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    '2209116AG',          '12', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    '22111317I',          '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    '23021RAA2Y',         '12', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    '21061110AG',         '11', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'RKQ1'),
+    ('Xiaomi',    'Redmi',    '2106118C',           '11', 'arm64-v8a:armeabi-v7a', '3.0',  1080, 2400, 'RKQ1'),
+    ('Xiaomi',    'Redmi',    'M2007J20CG',         '10', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2340, 'QKQ1'),
+    ('Xiaomi',    'Redmi',    '22120RN86G',         '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1640, 'SKQ1'),
+    ('Xiaomi',    'Redmi',    '23028RN4DI',         '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'TKQ1'),
+    ('Xiaomi',    'Redmi',    '23106RN0DA',         '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1640, 'TKQ1'),
+    ('Xiaomi',    'POCO',     'M2105K81AC',         '11', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'RKQ1'),
+    ('Xiaomi',    'POCO',     '22031116BG',         '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SKQ1'),
+    ('Xiaomi',    'POCO',     '21091116I',          '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'RKQ1'),
+    ('Xiaomi',    'POCO',     '2107113SG',          '10', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1640, 'QKQ1'),
+    ('Xiaomi',    'POCO',     '22111317PI',         '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SKQ1'),
+    # ── Samsung ──────────────────────────────────────────────────────────────
+    ('Samsung',   'Samsung',  'SM-A125F',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-A235F',           '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A536B',           '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A325F',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-A515F',           '12', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2400, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A135F',           '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A037F',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-A025F',           '10', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'QP1A'),
+    ('Samsung',   'Samsung',  'SM-A035F',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-A055F',           '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'TP1A'),
+    ('Samsung',   'Samsung',  'SM-A155F',           '14', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2340, 'UP1A'),
+    ('Samsung',   'Samsung',  'SM-A245F',           '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2340, 'TP1A'),
+    ('Samsung',   'Samsung',  'SM-A346B',           '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2340, 'TP1A'),
+    ('Samsung',   'Samsung',  'SM-A526B',           '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A725F',           '11', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2400, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-M325F',           '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-M335F',           '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-M525F',           '11', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2400, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-A736B',           '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A035M',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Samsung',   'Samsung',  'SM-A145F',           '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('Samsung',   'Samsung',  'SM-A236B',           '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'TP1A'),
+    ('Samsung',   'Samsung',  'SM-M146B',           '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2408, 'TP1A'),
+    # ── OPPO ─────────────────────────────────────────────────────────────────
+    ('OPPO',      'OPPO',     'CPH2461',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2373',            '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('OPPO',      'OPPO',     'CPH2389',            '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'RP1A'),
+    ('OPPO',      'OPPO',     'CPH2451',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2269',            '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('OPPO',      'OPPO',     'CPH2325',            '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'RP1A'),
+    ('OPPO',      'OPPO',     'CPH2357',            '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2471',            '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2505',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2339',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2363',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SP1A'),
+    ('OPPO',      'OPPO',     'CPH2523',            '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'TP1A'),
+    ('OPPO',      'OPPO',     'CPH2333',            '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'RP1A'),
+    ('OPPO',      'OPPO',     'CPH2219',            '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'RP1A'),
+    ('OPPO',      'OPPO',     'CPH2579',            '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'TP1A'),
+    # ── realme ───────────────────────────────────────────────────────────────
+    ('realme',    'realme',   'RMX3516',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('realme',    'realme',   'RMX3371',            '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'RP1A'),
+    ('realme',    'realme',   'RMX3241',            '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('realme',    'realme',   'RMX3461',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('realme',    'realme',   'RMX3686',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('realme',    'realme',   'RMX3785',            '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'TP1A'),
+    ('realme',    'realme',   'RMX3830',            '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'TP1A'),
+    ('realme',    'realme',   'RMX3710',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('realme',    'realme',   'RMX3195',            '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'RP1A'),
+    ('realme',    'realme',   'RMX3081',            '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('realme',    'realme',   'RMX3261',            '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('realme',    'realme',   'RMX3430',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('realme',    'realme',   'RMX3392',            '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'SP1A'),
+    ('realme',    'realme',   'RMX3311',            '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('realme',    'realme',   'RMX3888',            '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2412, 'TP1A'),
+    # ── Infinix ──────────────────────────────────────────────────────────────
+    ('Infinix',   'Infinix',  'X6823',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Infinix',   'Infinix',  'X669C',              '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('Infinix',   'Infinix',  'X683',               '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1560, 'RP1A'),
+    ('Infinix',   'Infinix',  'X6811',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Infinix',   'Infinix',  'X6816',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Infinix',   'Infinix',  'X6819',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Infinix',   'Infinix',  'X678B',              '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('Infinix',   'Infinix',  'X6833B',             '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'TP1A'),
+    ('Infinix',   'Infinix',  'X669',               '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('Infinix',   'Infinix',  'X6525',              '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'SP1A'),
+    ('Infinix',   'Infinix',  'X6739',              '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'SP1A'),
+    ('Infinix',   'Infinix',  'X655',               '10', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'QP1A'),
+    ('Infinix',   'Infinix',  'X6526',              '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'SP1A'),
+    ('Infinix',   'Infinix',  'X6835',              '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'TP1A'),
+    ('Infinix',   'Infinix',  'X6831',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Infinix',   'Infinix',  'X6858',              '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'TP1A'),
+    # ── vivo ─────────────────────────────────────────────────────────────────
+    ('vivo',      'vivo',     'V2109',              '11', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'RP1A'),
+    ('vivo',      'vivo',     'V2207',              '12', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'SP1A'),
+    ('vivo',      'vivo',     'V2041',              '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('vivo',      'vivo',     'V2129',              '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('vivo',      'vivo',     'V2130',              '11', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'RP1A'),
+    ('vivo',      'vivo',     'V2219',              '12', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'SP1A'),
+    ('vivo',      'vivo',     'V2203',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('vivo',      'vivo',     'V2166',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('vivo',      'vivo',     'V2147',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('vivo',      'vivo',     'V2208',              '12', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'SP1A'),
+    ('vivo',      'vivo',     'V2250',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('vivo',      'vivo',     'V2253',              '12', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'SP1A'),
+    ('vivo',      'vivo',     'V2258',              '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('vivo',      'vivo',     'V2317',              '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'TP1A'),
+    ('vivo',      'vivo',     'V2349',              '13', 'arm64-v8a:armeabi-v7a', '2.625',1080, 2408, 'TP1A'),
+    # ── Tecno ────────────────────────────────────────────────────────────────
+    ('Tecno',     'Tecno',    'LE7',                '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Tecno',     'Tecno',    'KH7',                '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('Tecno',     'Tecno',    'LG6',                '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Tecno',     'Tecno',    'KF8',                '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('Tecno',     'Tecno',    'KI5k',               '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'RP1A'),
+    ('Tecno',     'Tecno',    'BG8',                '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'SP1A'),
+    ('Tecno',     'Tecno',    'CD8',                '13', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'TP1A'),
+    ('Tecno',     'Tecno',    'LE6n',               '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Tecno',     'Tecno',    'PH7n',               '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'SP1A'),
+    ('Tecno',     'Tecno',    'LH8n',               '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'TP1A'),
+    ('Tecno',     'Tecno',    'CK6',                '11', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2460, 'RP1A'),
+    ('Tecno',     'Tecno',    'LG7n',               '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1612, 'TP1A'),
+    # ── Motorola ─────────────────────────────────────────────────────────────
+    ('motorola',  'motorola', 'moto g22',           '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('motorola',  'motorola', 'moto g42',           '12', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'SP1A'),
+    ('motorola',  'motorola', 'moto g52',           '12', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'SP1A'),
+    ('motorola',  'motorola', 'moto g62 5G',        '12', 'arm64-v8a:armeabi-v7a', '2.4',  1080, 2400, 'SP1A'),
+    ('motorola',  'motorola', 'moto e32',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('motorola',  'motorola', 'moto g31',           '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1560, 'RP1A'),
+    ('motorola',  'motorola', 'moto g82 5G',        '12', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'SP1A'),
+    ('motorola',  'motorola', 'moto g73 5G',        '13', 'arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'TP1A'),
+    ('motorola',  'motorola', 'motorola edge 40 neo','13','arm64-v8a:armeabi-v7a', '2.75', 1080, 2400, 'TP1A'),
+    ('motorola',  'motorola', 'moto g14',           '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'TP1A'),
+    # ── Nokia ────────────────────────────────────────────────────────────────
+    ('Nokia',     'Nokia',    'Nokia G21',          '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('Nokia',     'Nokia',    'Nokia G11',          '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Nokia',     'Nokia',    'Nokia C21',          '11', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'RP1A'),
+    ('Nokia',     'Nokia',    'Nokia G22',          '12', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'SP1A'),
+    ('Nokia',     'Nokia',    'Nokia C32',          '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'TP1A'),
+    ('Nokia',     'Nokia',    'Nokia G42 5G',       '13', 'arm64-v8a:armeabi-v7a', '2.0',   720, 1600, 'TP1A'),
 ]
 
 _CHROME_VERSIONS = [
-    # (chrome_ver, chrome_build, chrome_patch, fb_bv,        fb_av)
-    ('109', '5414',  '86',  '443200018', '439.0.0.0.8'),
-    ('111', '5563',  '58',  '460030614', '451.0.0.0.14'),
-    ('112', '5615',  '63',  '468206716', '458.0.0.0.12'),
-    ('114', '5735', '154',  '478200230', '466.0.0.0.30'),
-    ('116', '5845',  '65',  '494036218', '477.0.0.0.6'),
-    ('117', '5938', '183',  '502141314', '483.0.0.0.24'),
-    ('119', '6045',  '66',  '516039218', '493.0.0.0.18'),
-    ('120', '6099', '117',  '526141914', '498.0.0.0.22'),
+    # (chrome_ver, chrome_build, chrome_patch, fb_bv,          fb_av)
+    ('109', '5414',  '86',  '443200018',  '439.0.0.0.8'),
+    ('111', '5563',  '58',  '460030614',  '451.0.0.0.14'),
+    ('112', '5615',  '63',  '468206716',  '458.0.0.0.12'),
+    ('114', '5735', '154',  '478200230',  '466.0.0.0.30'),
+    ('116', '5845',  '65',  '494036218',  '477.0.0.0.6'),
+    ('117', '5938', '183',  '502141314',  '483.0.0.0.24'),
+    ('119', '6045',  '66',  '516039218',  '493.0.0.0.18'),
+    ('120', '6099', '117',  '526141914',  '498.0.0.0.22'),
+    ('121', '6167',  '58',  '533011314',  '506.0.0.0.8'),
+    ('122', '6261',  '39',  '542050618',  '513.0.0.0.16'),
+    ('123', '6312',  '49',  '549004226',  '519.0.0.0.22'),
+    ('124', '6367', '113',  '558221414',  '527.0.0.0.14'),
 ]
 
-_BUILD_SUFFIXES = ['001', '002', '003', '011', '012', '014', '020', '021', '022']
+_BUILD_SUFFIXES = [
+    '001', '002', '003', '004', '005',
+    '011', '012', '013', '014',
+    '020', '021', '022', '023',
+    '030', '031', '032',
+]
 
 
 # Locale pool per manufacturer — reflects real-world market distribution.
-# Each account picks one locale and keeps it for all requests so the
-# Accept-Language header is consistent throughout the session.
 _LOCALE_BY_MFR = {
-    'Xiaomi':  [
-        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-        'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-        'en-PH,en;q=0.9',
-        'ms-MY,ms;q=0.9,en-US;q=0.8',
-    ],
-    'Samsung': [
-        'ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7',
-        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-        'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-        'th-TH,th;q=0.9,en-US;q=0.8',
-    ],
-    'OPPO':    [
-        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-        'th-TH,th;q=0.9,en-US;q=0.8',
-        'en-PH,en;q=0.9',
-    ],
-    'realme':  [
-        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-        'en-IN,hi;q=0.9,en;q=0.8',
-        'ms-MY,ms;q=0.9,en-US;q=0.8',
-    ],
-    'Infinix': [
-        'en-NG,en;q=0.9',
-        'fr-CI,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-        'ar-EG,ar;q=0.9,en-US;q=0.8',
-    ],
-    'vivo':    [
-        'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-        'my-MM,my;q=0.9,en-US;q=0.8',
-        'th-TH,th;q=0.9,en-US;q=0.8',
-    ],
+    'Xiaomi':    ['id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'en-PH,en;q=0.9',
+                  'ms-MY,ms;q=0.9,en-US;q=0.8'],
+    'Samsung':   ['ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'th-TH,th;q=0.9,en-US;q=0.8'],
+    'OPPO':      ['id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'th-TH,th;q=0.9,en-US;q=0.8',
+                  'en-PH,en;q=0.9',
+                  'ms-MY,ms;q=0.9,en-US;q=0.8'],
+    'realme':    ['id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'en-IN,hi;q=0.9,en;q=0.8',
+                  'ms-MY,ms;q=0.9,en-US;q=0.8',
+                  'en-PH,en;q=0.9'],
+    'Infinix':   ['en-NG,en;q=0.9',
+                  'fr-CI,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'ar-EG,ar;q=0.9,en-US;q=0.8',
+                  'sw-KE,sw;q=0.9,en-US;q=0.8'],
+    'vivo':      ['id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'my-MM,my;q=0.9,en-US;q=0.8',
+                  'th-TH,th;q=0.9,en-US;q=0.8',
+                  'en-PH,en;q=0.9'],
+    'Tecno':     ['en-NG,en;q=0.9',
+                  'fr-CI,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'ar-EG,ar;q=0.9,en-US;q=0.8',
+                  'sw-KE,sw;q=0.9,en-US;q=0.8'],
+    'motorola':  ['id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'en-US,en;q=0.9'],
+    'Nokia':     ['id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7',
+                  'en-NG,en;q=0.9',
+                  'en-US,en;q=0.9'],
 }
+
+# Maps the Accept-Language prefix to the FB in-UA locale code (FBLC).
+_FBLC_MAP = {
+    'id': 'id_ID', 'tr': 'tr_TR', 'en': 'en_US', 'ms': 'ms_MY',
+    'ar': 'ar_AR', 'th': 'th_TH', 'hi': 'hi_IN', 'fr': 'fr_FR',
+    'my': 'my_MM', 'sw': 'sw_KE',
+}
+
+# Realistic carrier names per locale prefix (used in FBCR field of UA).
+_CARRIERS_BY_LOCALE = {
+    'id': ['Telkomsel', 'Indosat', 'XL Axiata', 'Hutchison', 'Smartfren'],
+    'tr': ['Turkcell', 'Vodafone TR', 'Turk Telekom'],
+    'en': ['Globe', 'Smart', 'MTN', 'Airtel', 'Glo', 'T-Mobile', ''],
+    'ms': ['Celcom', 'Maxis', 'Digi', 'U Mobile'],
+    'ar': ['STC', 'Mobily', 'Zain', 'Vodafone EG', 'Orange EG'],
+    'th': ['AIS', 'DTAC', 'TrueMove H'],
+    'hi': ['Jio', 'Airtel', 'Vi'],
+    'fr': ['Orange CI', 'MTN CI', 'Moov Africa'],
+    'my': ['MPT', 'Ooredoo', 'Telenor'],
+    'sw': ['Safaricom', 'Airtel KE', 'Telkom KE'],
+}
+
+# Connection types — WiFi is most common, then LTE/4G, rarely 3G.
+_CONNECTION_TYPES = [
+    'WIFI', 'WIFI', 'WIFI',
+    'MOBILE_LTE', 'MOBILE_LTE',
+    'MOBILE_4G',
+    'MOBILE_3G',
+]
 
 
 def make_device_profile():
@@ -1541,10 +1695,14 @@ def make_device_profile():
     """
     mfr, board, model, android_ver, abi, density, width, height, build_pfx = random.choice(_DEVICE_POOL)
     chrome_ver, chrome_build, chrome_patch, fb_bv, fb_av = random.choice(_CHROME_VERSIONS)
-    build_date   = random.randint(200000, 230000)
-    build_suffix = random.choice(_BUILD_SUFFIXES)
-    build_str    = f"{build_pfx}.{build_date}.{build_suffix}"
-    locale       = random.choice(_LOCALE_BY_MFR.get(mfr, ['en-US,en;q=0.9']))
+    build_date    = random.randint(200000, 240000)
+    build_suffix  = random.choice(_BUILD_SUFFIXES)
+    build_str     = f"{build_pfx}.{build_date}.{build_suffix}"
+    locale        = random.choice(_LOCALE_BY_MFR.get(mfr, ['en-US,en;q=0.9']))
+    locale_prefix = locale[:2].lower()
+    fb_locale     = _FBLC_MAP.get(locale_prefix, 'en_US')
+    carrier       = random.choice(_CARRIERS_BY_LOCALE.get(locale_prefix, ['']))
+    conn_type     = random.choice(_CONNECTION_TYPES)
 
     ua = (
         f"Mozilla/5.0 (Linux; Android {android_ver}; {model} Build/{build_str}; wv) "
@@ -1552,7 +1710,7 @@ def make_device_profile():
         f"Chrome/{chrome_ver}.0.{chrome_build}.{chrome_patch} Mobile Safari/537.36 "
         f"[FBAN/FB4A;FBAV/{fb_av};FBBV/{fb_bv};"
         f"FBDM/{{density={density},width={width},height={height}}};"
-        f"FBLC/en_US;FBRV/0;FBCR/;"
+        f"FBLC/{fb_locale};FBRV/0;FBCR/{carrier};"
         f"FBMF/{mfr};FBBD/{board};FBPN/com.facebook.lite;"
         f"FBDV/{model};FBSV/{android_ver};FBOP/1;FBCA/{abi};]"
     )
@@ -1562,19 +1720,22 @@ def make_device_profile():
         f'"Not_A Brand";v="24"'
     )
     return {
-        'ua':           ua,
-        'locale':       locale,
-        'android_ver':  android_ver,
-        'model':        model,
-        'chrome_ver':   chrome_ver,
-        'manufacturer': mfr,
-        'board':        board,
-        'abi':          abi,
-        'density':      density,
-        'width':        width,
-        'height':       height,
-        'sec_ch_ua':    sec_ch_ua,
-        'viewport_width': str(width),
+        'ua':              ua,
+        'locale':          locale,
+        'fb_locale':       fb_locale,
+        'carrier':         carrier,
+        'connection_type': conn_type,
+        'android_ver':     android_ver,
+        'model':           model,
+        'chrome_ver':      chrome_ver,
+        'manufacturer':    mfr,
+        'board':           board,
+        'abi':             abi,
+        'density':         density,
+        'width':           width,
+        'height':          height,
+        'sec_ch_ua':       sec_ch_ua,
+        'viewport_width':  str(width),
     }
 
 
