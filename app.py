@@ -316,9 +316,10 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
                 '__dyn': '', '__csr': '', '__req': 'q', '__a': '', '__user': '0',
             }
 
-            # Mimic a human spending time filling in the form (2-8 s).
-            # Bots that submit in <200ms are trivially detected.
-            time.sleep(_random.uniform(2.0, 8.0))
+            # Mimic a human spending time filling in the form (0.3-1.5 s).
+            # Bots that submit in <200ms are trivially detected; longer delays
+            # hurt bulk throughput so keep this in the sub-2-second range.
+            time.sleep(_random.uniform(0.3, 1.5))
 
             merged_headers = {
                 'User-Agent':    _dp['ua'],
