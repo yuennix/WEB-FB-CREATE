@@ -107,7 +107,7 @@ def _load():
 
 
 def _save(data):
-    storage.save('domains', data)
+    return storage.save('domains', data)
 
 
 def get_domain_password():
@@ -150,7 +150,9 @@ def add_temp_domain(domain):
         data = _load()
         if domain not in data['temp']:
             data['temp'].append(domain)
-            _save(data)
+            ok = _save(data)
+            if ok is False:
+                return None  # save failed
             return True
     return False
 

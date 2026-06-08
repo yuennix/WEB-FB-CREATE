@@ -993,6 +993,8 @@ async function addUserDomain() {
       if ([..._sel.options].some(o => o.value === domain)) {
         _sel.value = domain;
         onDomainChange();
+      } else {
+        _addDomainToDropdown(domain);
       }
     } else if (d.status === 'exists') {
       msg.style.display = 'block';

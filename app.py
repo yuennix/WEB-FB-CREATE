@@ -612,6 +612,8 @@ def user_add_domain():
     if not domain or '.' not in domain:
         return jsonify({'error': 'Enter a valid domain (e.g. mail.example.com)'}), 400
     ok = dm.add_temp_domain(domain)
+    if ok is None:
+        return jsonify({'error': 'Failed to save domain, please try again'}), 500
     return jsonify({'status': 'added' if ok else 'exists'})
 
 
@@ -1079,6 +1081,8 @@ def admin_add_temp():
     if not domain:
         return jsonify({'error': 'Domain is required'}), 400
     ok = dm.add_temp_domain(domain)
+    if ok is None:
+        return jsonify({'error': 'Failed to save domain, please try again'}), 500
     return jsonify({'status': 'added' if ok else 'exists'})
 
 @app.route('/admin/api/domains/add-custom', methods=['POST'])
