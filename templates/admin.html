@@ -1159,7 +1159,7 @@ function _cStopTicker() {
 
 async function cLoadDomains() {
   try {
-    const r = await fetch('/api/domains');
+    const r = await fetch('/api/domains', { cache: 'no-store' });
     if (!r.ok) return;
     const d = await r.json();
     _cCustomDomains = d.custom || [];

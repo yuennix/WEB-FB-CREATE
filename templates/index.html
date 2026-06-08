@@ -988,8 +988,12 @@ async function addUserDomain() {
       msg.style.color = '#00e676';
       msg.textContent = '✓ ' + domain + ' added';
       input.value = '';
-      _addDomainToDropdown(domain);
-      loadDomains();
+      await loadDomains();
+      const _sel = document.getElementById('emailDomain');
+      if ([..._sel.options].some(o => o.value === domain)) {
+        _sel.value = domain;
+        onDomainChange();
+      }
     } else if (d.status === 'exists') {
       msg.style.display = 'block';
       msg.style.background = 'rgba(251,191,36,0.1)';
