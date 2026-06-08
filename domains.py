@@ -68,18 +68,18 @@ def sync_weyn_email_domains():
 _DEFAULT = {
     "domain_password": "yuennix",
     "temp": [
-        "1secmail.com", "harakirimail.com",
-        "cunt.abrdns.com", "jinbilowg.cloud-ip.cc", "yuennix.work.gd",
-        "yuennix.cc.cd",
+        "harakirimail.com",
     ],
-    "custom": [
-        {"domain": "weyn.store",    "imap_host": "mail.weyn.store",    "imap_user": "admin@weyn.store",    "imap_pass": "yuennix"},
-        {"domain": "jhames.shop",   "imap_host": "mail.jhames.shop",   "imap_user": "admin@jhames.shop",   "imap_pass": "yuennix"},
-        {"domain": "jakulan.site",  "imap_host": "mail.jakulan.site",  "imap_user": "admin@jakulan.site",  "imap_pass": "yuennix"},
-    ]
+    "custom": []
 }
 
 _BAD_PLACEHOLDERS = {"tempmail.io"}
+
+_REMOVED_DOMAINS = {
+    "1secmail.com", "cunt.abrdns.com", "jinbilowg.cloud-ip.cc",
+    "yuennix.work.gd", "yuennix.cc.cd", "weyn.store",
+    "jhames.shop", "jakulan.site",
+}
 
 
 def _load():
@@ -88,13 +88,20 @@ def _load():
         return json.loads(json.dumps(_DEFAULT))
     changed = False
     temp = data.get('temp', [])
-    temp = [d for d in temp if d not in _BAD_PLACEHOLDERS]
+    temp = [d for d in temp if d not in _BAD_PLACEHOLDERS and d not in _REMOVED_DOMAINS]
     for dom in _DEFAULT['temp']:
         if dom not in temp:
             temp.append(dom)
             changed = True
     if len(temp) != len(data.get('temp', [])) or changed:
         data['temp'] = temp
+        changed = True
+    custom = data.get('custom', [])
+    custom = [e for e in custom if e.get('domain') not in _REMOVED_DOMAINS]
+    if len(custom) != len(data.get('custom', [])):
+        data['custom'] = custom
+        changed = True
+    if changed:
         storage.save('domains', data)
     return data
 

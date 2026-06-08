@@ -590,6 +590,29 @@ def api_domains():
     })
 
 
+@app.route('/api/key-info')
+def api_key_info():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    key = request.cookies.get('access_key', '')
+    if not key:
+        return jsonify({'expires_at': None})
+    _, entry = auth.check_key(key)
+    expires_at = entry.get('expires_at') if entry else None
+    return jsonify({'expires_at': expires_at})
+
+
+@app.route('/api/user/add-domain', methods=['POST'])
+def user_add_domain():
+    if not _require_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    domain = ((request.json or {}).get('domain') or '').strip().lower()
+    if not domain or '.' not in domain:
+        return jsonify({'error': 'Enter a valid domain (e.g. mail.example.com)'}), 400
+    ok = dm.add_temp_domain(domain)
+    return jsonify({'status': 'added' if ok else 'exists'})
+
+
 @app.route('/download')
 def download():
     if not _require_auth():

@@ -98,6 +98,32 @@
     font-weight: 500;
   }
 
+  .expiry-chip {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,230,118,0.2);
+    background: rgba(0,230,118,0.07);
+    color: #00e676;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .expiry-chip.show { display: inline-flex; }
+  .expiry-chip.warning {
+    border-color: rgba(251,191,36,0.3);
+    background: rgba(251,191,36,0.08);
+    color: #fbbf24;
+  }
+  .expiry-chip.critical {
+    border-color: rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.08);
+    color: #f87171;
+    animation: fadepulse 1.5s ease-in-out infinite;
+  }
+
   .btn-header {
     padding: 6px 14px;
     border-radius: 8px;
@@ -652,6 +678,9 @@
   </span>
   <div class="header-right">
     <span class="user-chip" id="userNameBadge"></span>
+    <span class="expiry-chip" id="expiryChip">
+      <span>⏱</span><span id="expiryLabel">—</span>
+    </span>
     <button class="btn-header" onclick="window.location.href='/admin'">Admin Panel</button>
     <div class="status-dot idle" id="statusDot"></div>
   </div>
@@ -712,6 +741,22 @@
           <input type="number" id="count" value="5" min="1" max="200">
         </div>
 
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Add Domain</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="form-group">
+          <label class="field-label">Domain Name</label>
+          <input type="text" id="newDomainInput" placeholder="e.g. mail.example.com"
+                 style="font-size:12px;"
+                 onkeydown="if(event.key==='Enter') addUserDomain()">
+        </div>
+        <button class="btn" id="btnAddDomain"
+                style="background:rgba(0,230,118,0.09);border:1px solid rgba(0,230,118,0.2);color:#00e676;font-size:12px;padding:8px 12px;"
+                onclick="addUserDomain()">+ Add Domain</button>
+        <div id="addDomainMsg" style="display:none;font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;text-align:center;"></div>
       </div>
     </div>
 
@@ -848,7 +893,110 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('userNameBadge').textContent = _userName;
   }
   loadDomains();
+  loadKeyInfo();
 });
+
+// ── Key expiry countdown ───────────────────────────────────────────────────
+let _expiryAt = null;
+let _expiryTick = null;
+
+function _fmtExpiry(secsLeft) {
+  if (secsLeft <= 0) return 'EXPIRED';
+  const d = Math.floor(secsLeft / 86400);
+  const h = Math.floor((secsLeft % 86400) / 3600);
+  const m = Math.floor((secsLeft % 3600) / 60);
+  const s = secsLeft % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m ${s}s`;
+}
+
+function _tickExpiry() {
+  if (!_expiryAt) return;
+  const chip  = document.getElementById('expiryChip');
+  const label = document.getElementById('expiryLabel');
+  const left  = Math.max(0, Math.floor(_expiryAt - Date.now() / 1000));
+  label.textContent = _fmtExpiry(left);
+  chip.className = 'expiry-chip show';
+  if (left <= 0) {
+    chip.classList.add('critical');
+  } else if (left <= 3600) {
+    chip.classList.add('critical');
+    chip.classList.remove('warning');
+  } else if (left <= 86400) {
+    chip.classList.add('warning');
+    chip.classList.remove('critical');
+  }
+}
+
+async function loadKeyInfo() {
+  try {
+    const r = await fetch('/api/key-info');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.expires_at) {
+      _expiryAt = d.expires_at;
+      _tickExpiry();
+      if (_expiryTick) clearInterval(_expiryTick);
+      _expiryTick = setInterval(_tickExpiry, 1000);
+    }
+  } catch(e) {}
+}
+
+// ── User domain add ────────────────────────────────────────────────────────
+async function addUserDomain() {
+  const input = document.getElementById('newDomainInput');
+  const btn   = document.getElementById('btnAddDomain');
+  const msg   = document.getElementById('addDomainMsg');
+  const domain = (input.value || '').trim().toLowerCase();
+  if (!domain || !domain.includes('.')) {
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(239,68,68,0.1)';
+    msg.style.border = '1px solid rgba(239,68,68,0.2)';
+    msg.style.color = '#f87171';
+    msg.textContent = 'Enter a valid domain';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const r = await fetch('/api/user/add-domain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain }),
+    });
+    const d = await r.json();
+    if (d.status === 'added') {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(0,230,118,0.1)';
+      msg.style.border = '1px solid rgba(0,230,118,0.2)';
+      msg.style.color = '#00e676';
+      msg.textContent = '✓ ' + domain + ' added';
+      input.value = '';
+      await loadDomains();
+    } else if (d.status === 'exists') {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(251,191,36,0.1)';
+      msg.style.border = '1px solid rgba(251,191,36,0.2)';
+      msg.style.color = '#fbbf24';
+      msg.textContent = 'Domain already exists';
+    } else {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(239,68,68,0.1)';
+      msg.style.border = '1px solid rgba(239,68,68,0.2)';
+      msg.style.color = '#f87171';
+      msg.textContent = d.error || 'Failed to add domain';
+    }
+  } catch(e) {
+    msg.style.display = 'block';
+    msg.style.color = '#f87171';
+    msg.textContent = 'Network error';
+  }
+  btn.disabled = false;
+  btn.textContent = '+ Add Domain';
+  setTimeout(() => { msg.style.display = 'none'; }, 3000);
+}
 
 function onPassTypeChange() {
   const v = document.getElementById('passwordType').value;
