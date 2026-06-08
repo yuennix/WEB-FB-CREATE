@@ -714,7 +714,6 @@
         <div class="form-group">
           <label class="field-label">Email Domain</label>
           <select id="emailDomain" onchange="onDomainChange()">
-            <option value="1secmail.com">1secmail.com</option>
           </select>
         </div>
 
@@ -975,6 +974,9 @@ async function addUserDomain() {
       msg.textContent = '✓ ' + domain + ' added';
       input.value = '';
       await loadDomains();
+      const sel = document.getElementById('emailDomain');
+      if ([...sel.options].some(o => o.value === domain)) sel.value = domain;
+      onDomainChange();
     } else if (d.status === 'exists') {
       msg.style.display = 'block';
       msg.style.background = 'rgba(251,191,36,0.1)';
