@@ -584,10 +584,12 @@ def api_domains():
     if not _require_auth():
         return jsonify({'error': 'Unauthorized'}), 401
     info = dm.get_all_info()
-    return jsonify({
+    resp = jsonify({
         'temp':   info.get('temp', []),
         'custom': [e['domain'] for e in info.get('custom', [])],
     })
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 @app.route('/api/key-info')
