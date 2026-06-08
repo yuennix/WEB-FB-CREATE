@@ -856,7 +856,7 @@ function _stopTicker() {
 async function loadDomains() {
   try {
     const r = await fetch('/api/domains', { cache: 'no-store' });
-    if (!r.ok) return;
+    if (!r.ok) { console.warn('[loadDomains] non-OK status', r.status); return; }
     const d = await r.json();
     _customDomains = d.custom || [];
     const sel = document.getElementById('emailDomain');
@@ -877,7 +877,22 @@ async function loadDomains() {
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
     onDomainChange();
-  } catch(e) {}
+  } catch(e) { console.error('[loadDomains error]', e); }
+}
+
+function _addDomainToDropdown(domain) {
+  const sel = document.getElementById('emailDomain');
+  if ([...sel.options].some(o => o.value === domain)) {
+    sel.value = domain;
+    onDomainChange();
+    return;
+  }
+  const o = document.createElement('option');
+  o.value = domain;
+  o.textContent = domain + ' (w/code)';
+  sel.appendChild(o);
+  sel.value = domain;
+  onDomainChange();
 }
 
 function onDomainChange() {
@@ -973,16 +988,15 @@ async function addUserDomain() {
       msg.style.color = '#00e676';
       msg.textContent = '✓ ' + domain + ' added';
       input.value = '';
-      await loadDomains();
-      const sel = document.getElementById('emailDomain');
-      if ([...sel.options].some(o => o.value === domain)) sel.value = domain;
-      onDomainChange();
+      _addDomainToDropdown(domain);
+      loadDomains();
     } else if (d.status === 'exists') {
       msg.style.display = 'block';
       msg.style.background = 'rgba(251,191,36,0.1)';
       msg.style.border = '1px solid rgba(251,191,36,0.2)';
       msg.style.color = '#fbbf24';
       msg.textContent = 'Domain already exists';
+      _addDomainToDropdown(domain);
     } else {
       msg.style.display = 'block';
       msg.style.background = 'rgba(239,68,68,0.1)';
