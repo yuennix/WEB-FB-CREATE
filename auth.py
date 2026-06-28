@@ -101,6 +101,12 @@ def check_key(key, ip=None):
             expires_at = entry.get('expires_at')
             if expires_at and time.time() > expires_at:
                 return 'expired', entry
+            # Enforce IP lock for consumed keys — blocks any other device
+            # from re-using the same key even if they have the cookie value.
+            if ip:
+                locked_ip = entry.get('locked_ip')
+                if locked_ip and locked_ip != ip:
+                    return 'already_used', entry
             return 'consumed', entry
         if entry.get('status') == 'approved':
             expires_at = entry.get('expires_at')

@@ -315,3 +315,162 @@ def count_accounts():
                 )
         except Exception:
             return 0
+
+
+# ── Job event persistence (for autoscale cross-instance SSE) ──────────────────
+
+def _ensure_job_tables():
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id     TEXT PRIMARY KEY,
+                running    BOOLEAN DEFAULT TRUE,
+                done_count INTEGER DEFAULT 0,
+                cp_count   INTEGER DEFAULT 0,
+                final_data TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                completed_at TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS job_events (
+                id         BIGSERIAL PRIMARY KEY,
+                job_id     TEXT NOT NULL,
+                event_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS job_events_job_id_idx
+                ON job_events (job_id, id)
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f'[storage] job tables init error: {e}')
+
+
+_job_tables_ready = False
+_job_tables_lock  = threading.Lock()
+
+def _init_job_tables():
+    global _job_tables_ready
+    if _job_tables_ready or not _DB_URL:
+        return
+    with _job_tables_lock:
+        if not _job_tables_ready:
+            _ensure_job_tables()
+            _job_tables_ready = True
+
+
+def create_job(job_id):
+    """Insert a new job record into the DB."""
+    _init_job_tables()
+    if not _DB_URL:
+        return
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "INSERT INTO jobs (job_id, running) VALUES (%s, TRUE) ON CONFLICT (job_id) DO NOTHING",
+            (job_id,)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f'[storage] create_job error: {e}')
+
+
+def append_job_event(job_id, event_data):
+    """Append a single event to the job_events table (non-blocking best-effort)."""
+    if not _DB_URL:
+        return
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "INSERT INTO job_events (job_id, event_data) VALUES (%s, %s)",
+            (job_id, json.dumps(event_data))
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f'[storage] append_job_event error: {e}')
+
+
+def get_job_events_since(job_id, after_id=0):
+    """Return (list_of_events, max_event_id) for events newer than after_id."""
+    if not _DB_URL:
+        return [], after_id
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT id, event_data FROM job_events WHERE job_id=%s AND id>%s ORDER BY id ASC LIMIT 200",
+            (job_id, after_id)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        if rows:
+            return [json.loads(r[1]) for r in rows], rows[-1][0]
+    except Exception as e:
+        print(f'[storage] get_job_events_since error: {e}')
+    return [], after_id
+
+
+def get_job_state(job_id):
+    """Return {'running', 'done_count', 'cp_count', 'final'} or None."""
+    if not _DB_URL:
+        return None
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT running, done_count, cp_count, final_data FROM jobs WHERE job_id=%s",
+            (job_id,)
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row:
+            return {
+                'running':    row[0],
+                'done_count': row[1],
+                'cp_count':   row[2],
+                'final':      json.loads(row[3]) if row[3] else None,
+            }
+    except Exception as e:
+        print(f'[storage] get_job_state error: {e}')
+    return None
+
+
+def update_job_state(job_id, running, done_count=0, cp_count=0, final_data=None):
+    """Update the job record (called when the job finishes)."""
+    if not _DB_URL:
+        return
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        if final_data is not None:
+            cur.execute("""
+                UPDATE jobs
+                SET running=%s, done_count=%s, cp_count=%s,
+                    final_data=%s, completed_at=NOW()
+                WHERE job_id=%s
+            """, (running, done_count, cp_count, json.dumps(final_data), job_id))
+        else:
+            cur.execute(
+                "UPDATE jobs SET running=%s, done_count=%s, cp_count=%s WHERE job_id=%s",
+                (running, done_count, cp_count, job_id)
+            )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f'[storage] update_job_state error: {e}')

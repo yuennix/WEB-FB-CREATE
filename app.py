@@ -64,9 +64,39 @@ _jobs      = {}          # job_id -> job state dict
 _jobs_lock = threading.Lock()
 
 
+class _JobQueue:
+    """Drop-in queue replacement that also persists events to the DB.
+
+    This makes every event visible to any autoscale instance that needs to
+    serve the SSE stream, even if the job was started on a different instance.
+    DB writes happen in a daemon thread so they never block the worker.
+    Ping events are NOT persisted (they carry no information).
+    """
+
+    def __init__(self, job_id=''):
+        self._q      = queue.Queue()
+        self.job_id  = job_id
+
+    def put(self, item):
+        self._q.put(item)
+        if self.job_id and item.get('type') != 'ping':
+            jid = self.job_id
+            def _persist():
+                try:
+                    _sto.append_job_event(jid, item)
+                except Exception:
+                    pass
+            threading.Thread(target=_persist, daemon=True).start()
+
+    def get(self, timeout=None):
+        if timeout is not None:
+            return self._q.get(timeout=timeout)
+        return self._q.get()
+
+
 def _new_job_state():
     return {
-        'task_queue':   queue.Queue(),
+        'task_queue':   _JobQueue(),   # job_id wired in run_creation
         'result_store': [],
         'running':      True,
         'lock':         threading.Lock(),
@@ -84,18 +114,18 @@ WORKERS = 2000  # parallel workers per job
 
 @app.route('/')
 def index():
+    from flask import make_response
     key = request.cookies.get('access_key', '')
     if key:
-        status, entry = auth.check_key(key)
+        ip = _get_client_ip()
+        status, entry = auth.check_key(key, ip=ip)
         if status in ('approved', 'consumed'):
             auth.touch_key(key)
             return render_template('index.html', user_name=entry.get('name', ''))
-        if status == 'expired':
-            resp = render_template('login.html')
-            from flask import make_response
-            r = make_response(resp)
-            r.delete_cookie('access_key')
-            return r
+        # Clear stale/invalid/stolen cookie so the user sees the login page cleanly
+        r = make_response(render_template('login.html'))
+        r.delete_cookie('access_key')
+        return r
     return render_template('login.html')
 
 
@@ -189,7 +219,7 @@ def _require_auth():
         return False
     ip = _get_client_ip()
     status, _ = auth.check_key(key, ip=ip)
-    if status == 'expired':
+    if status in ('expired', 'already_used', 'ip_mismatch', 'invalid'):
         return False
     return status in ('approved', 'consumed')
 
@@ -451,6 +481,8 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
 
     job['job_id'] = job_id
     jq = job['task_queue']
+    jq.job_id = job_id          # wire job_id into the queue so it can persist events
+    _sto.create_job(job_id)     # register job in DB for cross-instance SSE
 
     _sto.save_session(session_id, count, email_domain)
 
@@ -483,6 +515,14 @@ def run_creation(name_type, email_domain, count, password_type, custom_password,
                            + (f', {job["cp_count"][0]} checkpointed' if job['cp_count'][0] else '') + '.'),
         }
         jq.put(job['final'])
+        # Persist final state to DB so any instance can serve a reconnecting SSE client
+        _sto.update_job_state(
+            job_id,
+            running=False,
+            done_count=job['done_count'][0],
+            cp_count=job['cp_count'][0],
+            final_data=job['final'],
+        )
         # Keep job in registry for 30 min so reconnecting SSE clients get a clean done event
         def _expire_job(jid):
             time.sleep(1800)
@@ -501,43 +541,71 @@ def stream():
     job_id = request.args.get('job_id', '')
     with _jobs_lock:
         job = _jobs.get(job_id)
-    if not job:
-        # Job not found — send a done event so the client stops retrying
-        def _gen_not_found():
+
+    if job:
+        # ── Fast path: job lives in this instance's memory ────────────────
+        jq = job['task_queue']
+
+        def generate_local():
             yield 'retry: 3000\n\n'
-            yield f'data: {json.dumps({"type": "done", "msg": "Job not found or expired.", "created": 0, "total": 0, "checkpoint": 0})}\n\n'
+            if not job.get('running') and job.get('final'):
+                yield f'data: {json.dumps(job["final"])}\n\n'
+                return
+            empty = 0
+            while empty < 38:
+                try:
+                    item = jq.get(timeout=8)
+                    empty = 0
+                    yield f'data: {json.dumps(item)}\n\n'
+                    if item.get('type') == 'done':
+                        return
+                except queue.Empty:
+                    empty += 1
+                    yield f'data: {json.dumps({"type": "ping"})}\n\n'
+                    if not job.get('running') and job.get('final'):
+                        yield f'data: {json.dumps(job["final"])}\n\n'
+                        return
+
         return Response(
-            _gen_not_found(),
+            generate_local(),
             mimetype='text/event-stream',
             headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
         )
 
-    jq = job['task_queue']
-
-    def generate():
+    # ── Fallback path: job is on a different autoscale instance, poll DB ──
+    def generate_db():
         yield 'retry: 3000\n\n'
-        # If job already finished, send the final event immediately
-        if not job.get('running') and job.get('final'):
-            yield f'data: {json.dumps(job["final"])}\n\n'
+        last_id   = 0
+        misses    = 0
+        # Check DB exists for this job_id first
+        state = _sto.get_job_state(job_id)
+        if state is None:
+            yield f'data: {json.dumps({"type": "done", "msg": "Job not found or expired.", "created": 0, "total": 0, "checkpoint": 0})}\n\n'
             return
-        empty = 0
-        while empty < 38:
-            try:
-                item = jq.get(timeout=8)
-                empty = 0
-                yield f'data: {json.dumps(item)}\n\n'
-                if item.get('type') == 'done':
-                    return
-            except queue.Empty:
-                empty += 1
+        while misses < 40:
+            events, last_id = _sto.get_job_events_since(job_id, last_id)
+            if events:
+                misses = 0
+                for ev in events:
+                    yield f'data: {json.dumps(ev)}\n\n'
+                    if ev.get('type') == 'done':
+                        return
+            else:
+                misses += 1
                 yield f'data: {json.dumps({"type": "ping"})}\n\n'
-                # If job finished while we were waiting, send final and exit
-                if not job.get('running') and job.get('final'):
-                    yield f'data: {json.dumps(job["final"])}\n\n'
+                # Check if job finished while we were idle
+                state = _sto.get_job_state(job_id)
+                if state and not state['running'] and state['final']:
+                    # Emit any remaining events, then the final
+                    events, last_id = _sto.get_job_events_since(job_id, last_id)
+                    for ev in events:
+                        yield f'data: {json.dumps(ev)}\n\n'
+                    yield f'data: {json.dumps(state["final"])}\n\n'
                     return
+            time.sleep(2)
 
     return Response(
-        generate(),
+        generate_db(),
         mimetype='text/event-stream',
         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
     )
@@ -1307,6 +1375,15 @@ def webhook_email():
         'uid':    uid or 'not_found',
         'code':   code or ('link' if fb_link else None),
     })
+
+
+@app.route('/favicon.ico')
+def favicon():
+    import os as _os
+    ico = _os.path.join(app.root_path, 'static', 'favicon.ico')
+    if _os.path.exists(ico):
+        return send_file(ico, mimetype='image/vnd.microsoft.icon')
+    return '', 204
 
 
 if __name__ == '__main__':
