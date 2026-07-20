@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEYN — Access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #060a12;
+    color: #e2e8f0;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% -5%, rgba(0,230,118,0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 40% at 85% 85%, rgba(0,180,255,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 15% 70%, rgba(0,230,118,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+  }
+
+  .card {
+    background: linear-gradient(160deg, rgba(13,19,36,0.96) 0%, rgba(8,12,22,0.96) 100%);
+    backdrop-filter: blur(32px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 44px 40px;
+    width: 100%;
+    max-width: 448px;
+    position: relative;
+    box-shadow: 0 32px 72px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,230,118,0.06);
+  }
+
+  .logo {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+
+  .logo-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #00e676, #00b84c);
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+    box-shadow: 0 0 0 8px rgba(0,230,118,0.08), 0 12px 32px rgba(0,230,118,0.35);
+  }
+
+  .logo-name {
+    font-size: 26px;
+    font-weight: 800;
+    color: #f1f5f9;
+    letter-spacing: -0.8px;
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 5px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+  }
+
+  .tabs {
+    display: flex;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 28px;
+    gap: 2px;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    border-radius: 9px;
+    transition: all .2s;
+    user-select: none;
+    letter-spacing: 0.1px;
+  }
+
+  .tab.active {
+    background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,200,100,0.08));
+    color: #00e676;
+    box-shadow: inset 0 0 0 1px rgba(0,230,118,0.25), 0 2px 8px rgba(0,230,118,0.1);
+  }
+
+  .tab:hover:not(.active) { color: #94a3b8; background: rgba(255,255,255,0.03); }
+
+  .tab.admin-tab { color: rgba(245,158,11,0.5); }
+  .tab.admin-tab:hover { color: #f59e0b; }
+
+  .panel { display: none; flex-direction: column; gap: 16px; }
+  .panel.active { display: flex; }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    display: block;
+    margin-bottom: 6px;
+    letter-spacing: 0;
+  }
+
+  input[type="text"], textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    color: #e2e8f0;
+    padding: 13px 16px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+    resize: none;
+  }
+
+  input:focus, textarea:focus {
+    border-color: rgba(0,230,118,0.45);
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.08);
+    background: rgba(0,230,118,0.02);
+  }
+
+  input::placeholder, textarea::placeholder { color: #2d3f55; font-weight: 400; }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: -0.1px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #00e676 0%, #00c050 100%);
+    color: #000;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 4px 20px rgba(0,230,118,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+    letter-spacing: 0.1px;
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(0,230,118,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-primary:disabled {
+    background: rgba(0,230,118,0.1);
+    color: rgba(0,230,118,0.3);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #64748b;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    border-color: rgba(255,255,255,0.15);
+    color: #94a3b8;
+    background: rgba(255,255,255,0.04);
+  }
+  .btn-ghost:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .msg {
+    font-size: 13px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    display: none;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+  .msg.show { display: block; }
+  .msg-success { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); color: #00e676; }
+  .msg-error   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f87171; }
+  .msg-warn    { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); color: #fbbf24; }
+  .msg-info    { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #60a5fa; }
+
+  .key-reveal {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(0,230,118,0.04);
+    border: 1px solid rgba(0,230,118,0.15);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .key-reveal.show { display: flex; }
+
+  .key-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .key-value {
+    font-size: 15px;
+    color: #00e676;
+    letter-spacing: 1px;
+    word-break: break-all;
+    text-align: center;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 6px 0;
+    transition: opacity .2s;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .key-value:hover { opacity: 0.8; }
+
+  .key-uid {
+    font-size: 11px;
+    color: #334155;
+    text-align: center;
+    font-family: monospace;
+  }
+
+  .copy-hint {
+    font-size: 11px;
+    color: #1e293b;
+    text-align: center;
+  }
+
+  .steps {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    gap: 0;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+    position: relative;
+  }
+
+  .step-num {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1.5px solid rgba(255,255,255,0.08);
+    color: #334155;
+    background: rgba(255,255,255,0.03);
+    transition: all .3s;
+    position: relative;
+    z-index: 1;
+  }
+  .step.active .step-num {
+    border-color: #00e676;
+    color: #00e676;
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.1);
+  }
+  .step.done .step-num {
+    border-color: #00e676;
+    background: #00e676;
+    color: #000;
+  }
+
+  .step-lbl {
+    font-size: 10px;
+    font-weight: 500;
+    color: #1e293b;
+    text-align: center;
+    transition: color .3s;
+  }
+  .step.active .step-lbl, .step.done .step-lbl { color: rgba(0,230,118,0.6); }
+
+  .step-line {
+    flex: 1;
+    height: 1.5px;
+    background: rgba(255,255,255,0.06);
+    margin-top: -16px;
+    transition: background .3s;
+  }
+  .step-line.done { background: rgba(0,230,118,0.4); }
+
+  .spinner {
+    width: 15px;
+    height: 15px;
+    border: 2px solid transparent;
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+  .spinner-green {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(0,230,118,0.2);
+    border-top-color: #00e676;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+    display: none;
+  }
+  .spinner-green.show { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hint {
+    font-size: 12px;
+    color: #334155;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.05); }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">W</div>
+    <div class="logo-name">WEYN</div>
+    <div class="logo-sub">Facebook Account Creator</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-request" onclick="switchTab('request')">Get Access</div>
+    <div class="tab" id="tab-login" onclick="switchTab('login')">I Have a Key</div>
+    <div class="tab admin-tab" onclick="window.location.href='/admin'">Admin</div>
+  </div>
+
+  <div class="panel active" id="panel-request">
+
+    <div class="steps" id="stepIndicator">
+      <div class="step active" id="step1">
+        <div class="step-num">1</div>
+        <div class="step-lbl">Generate Key</div>
+      </div>
+      <div class="step-line" id="stepLine"></div>
+      <div class="step" id="step2">
+        <div class="step-num">2</div>
+        <div class="step-lbl">Send to Admin</div>
+      </div>
+    </div>
+
+    <div id="formArea">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label class="field-label">Your Name</label>
+          <input type="text" id="reqName" placeholder="e.g. Juan Dela Cruz"
+                 onkeydown="if(event.key==='Enter') generateKey()">
+        </div>
+        <div>
+          <label class="field-label">Reason <span style="color:#1e293b;font-weight:400;">(optional)</span></label>
+          <textarea id="reqReason" rows="2" placeholder="Why do you need access?"></textarea>
+        </div>
+        <div id="genMsg" class="msg"></div>
+        <button class="btn btn-primary" id="btnGenerate" onclick="generateKey()">
+          <span class="spinner" id="genSpinner" style="display:none"></span>
+          Generate My Key
+        </button>
+        <div class="hint">A unique access key will be created for you.</div>
+      </div>
+    </div>
+
+    <div id="keyArea" style="display:none;flex-direction:column;gap:14px;">
+
+      <div class="key-reveal show" id="keyReveal">
+        <div class="key-label">Your Access Key — Save This!</div>
+        <div class="key-value" id="genKey" onclick="copyKey()" title="Click to copy"></div>
+        <div class="key-uid" id="genUid"></div>
+        <div class="copy-hint">↑ Click key to copy</div>
+      </div>
+
+      <div id="sendMsg" class="msg"></div>
+
+      <button class="btn btn-primary" id="btnSend" onclick="sendToAdmin()">
+        <span class="spinner" id="sendSpinner" style="display:none"></span>
+        Send to Admin
+      </button>
+
+      <button class="btn btn-ghost" onclick="resetForm()">← Start Over</button>
+
+      <div id="waitArea" style="display:none;flex-direction:column;gap:10px;">
+        <div class="divider"></div>
+        <div id="waitMsg" class="msg msg-info show">
+          <span class="spinner-green show" style="vertical-align:middle;margin-right:6px;"></span>
+          Waiting for admin approval via Telegram…
+        </div>
+        <div class="hint">Keep this page open. You'll be logged in automatically once approved.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="panel" id="panel-login">
+    <div>
+      <label class="field-label">Access Key</label>
+      <input type="text" id="keyInput" placeholder="WEYN-XXXX-XXXX-XXXX-XXXX"
+             oninput="this.value=this.value.toUpperCase()"
+             onkeydown="if(event.key==='Enter') verifyKey()">
+    </div>
+    <div id="loginMsg" class="msg"></div>
+    <button class="btn btn-primary" id="btnVerify" onclick="verifyKey()">
+      <span class="spinner" id="verifySpinner" style="display:none"></span>
+      Enter
+    </button>
+    <div class="hint">Don't have a key yet? Switch to "Get Access"</div>
+  </div>
+</div>
+
+<script>
+let pollInterval = null;
+let pendingKey   = '';
+
+function switchTab(name) {
+  document.getElementById('tab-login').classList.toggle('active', name === 'login');
+  document.getElementById('tab-request').classList.toggle('active', name === 'request');
+  document.getElementById('panel-login').classList.toggle('active', name === 'login');
+  document.getElementById('panel-request').classList.toggle('active', name === 'request');
+}
+
+function showMsg(id, text, type) {
+  const el = document.getElementById(id);
+  el.className = `msg msg-${type} show`;
+  el.innerHTML = text;
+}
+
+function hideMsg(id) {
+  document.getElementById(id).className = 'msg';
+}
+
+async function generateKey() {
+  const name   = document.getElementById('reqName').value.trim();
+  const reason = document.getElementById('reqReason').value.trim();
+  if (!name) { showMsg('genMsg', 'Please enter your name.', 'error'); return; }
+
+  const btn = document.getElementById('btnGenerate');
+  const sp  = document.getElementById('genSpinner');
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+  hideMsg('genMsg');
+
+  try {
+    const r = await fetch('/generate-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, reason }),
+    });
+    const d = await r.json();
+
+    if (d.key) {
+      pendingKey = d.key;
+      document.getElementById('genKey').textContent = d.key;
+      document.getElementById('genUid').textContent = `User ID: ${d.user_id}`;
+
+      document.getElementById('formArea').style.display = 'none';
+      document.getElementById('keyArea').style.display  = 'flex';
+
+      document.getElementById('step1').classList.remove('active');
+      document.getElementById('step1').classList.add('done');
+      document.getElementById('step1').querySelector('.step-num').textContent = '✓';
+      document.getElementById('stepLine').classList.add('done');
+      document.getElementById('step2').classList.add('active');
+    } else {
+      showMsg('genMsg', d.error || 'Failed to generate key. Try again.', 'error');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showMsg('genMsg', 'Connection error. Try again.', 'error');
+    btn.disabled = false;
+  }
+
+  sp.style.display = 'none';
+}
+
+async function sendToAdmin() {
+  if (!pendingKey) return;
+
+  const btn = document.getElementById('btnSend');
+  const sp  = document.getElementById('sendSpinner');
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+  hideMsg('sendMsg');
+
+  try {
+    const r = await fetch('/notify-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: pendingKey }),
+    });
+    const d = await r.json();
+
+    if (d.status === 'sent') {
+      showMsg('sendMsg', '✓ Sent! The admin has been notified on Telegram.', 'success');
+      btn.style.display = 'none';
+      document.getElementById('waitArea').style.display = 'flex';
+
+      document.getElementById('step2').classList.remove('active');
+      document.getElementById('step2').classList.add('done');
+      document.getElementById('step2').querySelector('.step-num').textContent = '✓';
+
+      startPolling(pendingKey);
+    } else {
+      showMsg('sendMsg', d.error || 'Failed to notify admin. Try again.', 'error');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showMsg('sendMsg', 'Connection error. Try again.', 'error');
+    btn.disabled = false;
+  }
+
+  sp.style.display = 'none';
+}
+
+function startPolling(key) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/key-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const d = await r.json();
+
+      if (d.status === 'approved') {
+        clearInterval(pollInterval);
+        const wm = document.getElementById('waitMsg');
+        wm.className = 'msg msg-success show';
+        wm.textContent = '✅ Approved! Logging you in…';
+        setTimeout(async () => {
+          const vr = await fetch('/verify-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key }),
+          });
+          const vd = await vr.json();
+          if (vd.status === 'approved') {
+            localStorage.setItem('weyn_key', key);
+            window.location.href = '/';
+          } else {
+            wm.className = 'msg msg-error show';
+            wm.textContent = '⚠️ Login failed unexpectedly. Please contact admin.';
+          }
+        }, 1200);
+      } else if (d.status === 'rejected') {
+        clearInterval(pollInterval);
+        const wm = document.getElementById('waitMsg');
+        wm.className = 'msg msg-error show';
+        wm.textContent = '❌ Request rejected by admin.';
+      }
+    } catch(e) {}
+  }, 4000);
+}
+
+function resetForm() {
+  if (pollInterval) clearInterval(pollInterval);
+  pendingKey = '';
+  document.getElementById('formArea').style.display = '';
+  document.getElementById('keyArea').style.display  = 'none';
+  document.getElementById('waitArea').style.display = 'none';
+  document.getElementById('btnGenerate').disabled   = false;
+  document.getElementById('btnSend').disabled       = false;
+  document.getElementById('btnSend').style.display  = '';
+  hideMsg('genMsg'); hideMsg('sendMsg');
+
+  document.getElementById('step1').className = 'step active';
+  document.getElementById('step1').querySelector('.step-num').textContent = '1';
+  document.getElementById('step2').className = 'step';
+  document.getElementById('step2').querySelector('.step-num').textContent = '2';
+  document.getElementById('stepLine').classList.remove('done');
+}
+
+function copyKey() {
+  const key = document.getElementById('genKey').textContent;
+  navigator.clipboard.writeText(key).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = key;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  const box = document.getElementById('genKey');
+  const orig = box.textContent;
+  box.textContent = 'Copied!';
+  setTimeout(() => box.textContent = orig, 1200);
+}
+
+async function _tryAutoLogin() {
+  const saved = localStorage.getItem('weyn_key');
+  if (!saved) return;
+  try {
+    const r = await fetch('/verify-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: saved }),
+    });
+    const d = await r.json();
+    if (d.status === 'approved') {
+      window.location.href = '/';
+    } else if (d.status === 'already_used') {
+      localStorage.removeItem('weyn_key');
+    } else if (d.status === 'ip_mismatch') {
+      localStorage.removeItem('weyn_key');
+      switchTab('login');
+      showMsg('loginMsg', '🔒 This key is locked to another device/IP. Contact admin to reset it.', 'error');
+    } else if (d.status === 'rejected' || d.status === 'revoked' || d.status === 'invalid') {
+      localStorage.removeItem('weyn_key');
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', _tryAutoLogin);
+
+async function verifyKey() {
+  const key = document.getElementById('keyInput').value.trim();
+  if (!key) { showMsg('loginMsg', 'Please enter your access key.', 'error'); return; }
+
+  const btn = document.getElementById('btnVerify');
+  const sp  = document.getElementById('verifySpinner');
+  btn.disabled = true;
+  sp.style.display = 'inline-block';
+
+  try {
+    const r = await fetch('/verify-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const d = await r.json();
+
+    if (d.status === 'approved') {
+      localStorage.setItem('weyn_key', key);
+      showMsg('loginMsg', `✓ Welcome, ${d.name}!`, 'success');
+      setTimeout(() => window.location.href = '/', 800);
+    } else if (d.status === 'already_used') {
+      localStorage.removeItem('weyn_key');
+      showMsg('loginMsg', '🔒 This key has already been used on another device and cannot be reused. Contact admin for a new key.', 'error');
+    } else if (d.status === 'pending') {
+      showMsg('loginMsg', '⏳ Your key is still pending admin approval.', 'warn');
+    } else if (d.status === 'rejected') {
+      localStorage.removeItem('weyn_key');
+      showMsg('loginMsg', '❌ This key has been rejected. Contact admin.', 'error');
+    } else if (d.status === 'revoked') {
+      localStorage.removeItem('weyn_key');
+      showMsg('loginMsg', '🚫 This key has been revoked. Contact admin.', 'error');
+    } else if (d.status === 'ip_mismatch') {
+      showMsg('loginMsg', '🔒 This key is already locked to another device/IP. Contact admin to reset it.', 'error');
+    } else {
+      showMsg('loginMsg', 'Invalid key. Check and try again.', 'error');
+    }
+  } catch(e) {
+    showMsg('loginMsg', 'Connection error. Try again.', 'error');
+  }
+
+  btn.disabled = false;
+  sp.style.display = 'none';
+}
+</script>
+</body>
+</html>

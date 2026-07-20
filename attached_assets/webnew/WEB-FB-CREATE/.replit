@@ -1,0 +1,44 @@
+modules = ["python-3.11", "web", "nix"]
+[agent]
+expertMode = true
+stack = "FLASK_VANILLA_JS"
+
+[nix]
+channel = "stable-25_05"
+packages = ["libev", "openssl", "postgresql"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m gunicorn --bind 0.0.0.0:5000 --worker-class gevent --workers 1 --worker-connections 1000 --timeout 300 app:app"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--worker-class=gevent", "--workers=1", "--worker-connections=1000", "--timeout=300", "app:app"]

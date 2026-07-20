@@ -1,0 +1,1 @@
+- [Facebook brotli encoding](facebook-brotli-encoding.md) — never use br in Accept-Encoding with requests; FB sends brotli which requests can't decode, causing silent token failures.

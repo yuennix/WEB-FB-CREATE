@@ -1,0 +1,953 @@
+
+// Yuen Dispo Mail - Disposable Email Generator
+class YuenDispoMail {
+    constructor() {
+        this.currentEmail = null;
+        this.autoRefreshInterval = null;
+        this.availableDomains = [];
+        this.emails = [];
+        this.sessionToken = null;
+        this.emailHistory = new Map();
+
+        // Working temp mail APIs with proper endpoints
+        this.tempMailAPIs = [
+            {
+                name: 'HarakiriMail',
+                baseUrl: 'https://harakirimail.com/api/',
+                generateEmail: () => this.generateHarakiriEmail(),
+                getEmails: (email) => this.getHarakiriEmails(email)
+            }
+        ];
+
+        this.currentAPIIndex = 0;
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadDarkModePreference();
+        this.loadAvailableDomains();
+        this.moveAccessInboxToTop();
+    }
+
+    moveAccessInboxToTop() {
+        const emailSearch = document.querySelector('.email-search');
+        const emailGenerator = document.querySelector('.email-generator');
+        const parent = emailGenerator.parentNode;
+        parent.insertBefore(emailSearch, emailGenerator);
+    }
+
+    setupEventListeners() {
+        document.getElementById('darkModeToggle').addEventListener('click', () => {
+            this.toggleDarkMode();
+        });
+
+        document.getElementById('generateBtn').addEventListener('click', () => {
+            this.generateEmail();
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            this.refreshEmails();
+        });
+
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            this.copyEmail();
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            this.searchEmail();
+        });
+
+        document.getElementById('searchEmail').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.searchEmail();
+            }
+        });
+
+        document.getElementById('autoRefresh').addEventListener('change', (e) => {
+            this.toggleAutoRefresh(e.target.checked);
+        });
+
+        document.querySelector('.close').addEventListener('click', () => {
+            this.closeModal();
+        });
+
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('emailModal');
+            if (e.target === modal) {
+                this.closeModal();
+            }
+        });
+    }
+
+    toggleDarkMode() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        const icon = document.querySelector('.dark-mode-btn i');
+        icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
+    loadDarkModePreference() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        const icon = document.querySelector('.dark-mode-btn i');
+        icon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
+    loadAvailableDomains() {
+        this.availableDomains = [
+            'harakirimail.com'
+        ];
+
+        const domainSelect = document.getElementById('domainSelect');
+        domainSelect.innerHTML = '';
+
+        this.availableDomains.forEach(domain => {
+            const option = document.createElement('option');
+            option.value = domain;
+            option.textContent = domain;
+            domainSelect.appendChild(option);
+        });
+    }
+
+    async generateEmail() {
+        const btn = document.getElementById('generateBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<div class="loading"></div> Generating...';
+        btn.disabled = true;
+
+        try {
+            const selectedDomain = document.getElementById('domainSelect').value;
+            let email = null;
+
+            if (selectedDomain) {
+                // If a domain is selected, generate based on that domain
+                const username = this.generateRandomString(8) + Math.floor(Math.random() * 1000);
+                email = `${username}@${selectedDomain}`;
+            } else {
+                // Try HarakiriMail first
+                email = await this.generateHarakiriEmail();
+
+                if (!email) {
+                    // Try TMailor
+                    email = await this.generateTMailorEmail();
+                }
+
+                if (!email) {
+                    // Try MailCX
+                    email = await this.generateMailCXEmail();
+                }
+
+                if (!email) {
+                    // Try TempMailIO
+                    email = await this.generateTempMailIOEmail();
+                }
+
+                if (!email) {
+                    // Try GuerillaMail
+                    email = await this.generateGuerrillaEmail();
+                }
+
+                if (!email) {
+                    // Fallback to random email with working domain
+                    email = this.generateRandomEmail();
+                }
+            }
+
+            this.currentEmail = email;
+            this.displayCurrentEmail(email);
+            this.showNotification('Email generated successfully!', 'success');
+
+            // Start auto refresh immediately
+            this.toggleAutoRefresh(true);
+            document.getElementById('autoRefresh').checked = true;
+
+            // Clear previous emails
+            this.emails = [];
+            this.displayEmails([]);
+
+        } catch (error) {
+            console.error('Error generating email:', error);
+            // Fallback: generate random email
+            this.currentEmail = this.generateRandomEmail();
+            this.displayCurrentEmail(this.currentEmail);
+            this.showNotification('Email generated successfully!', 'success');
+
+            // Start auto refresh
+            this.toggleAutoRefresh(true);
+            document.getElementById('autoRefresh').checked = true;
+
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    generateRandomEmail() {
+        return `${this.generateRandomString(8)}${Math.floor(Math.random() * 1000)}@harakirimail.com`;
+    }
+
+    generateRandomString(length) {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    }
+
+    displayCurrentEmail(email) {
+        const div = document.getElementById('currentEmailDiv');
+        document.getElementById('currentEmail').textContent = email;
+        div.style.display = 'block';
+
+        // Remove and re-add class to trigger animation if needed
+        div.classList.remove('fade-in');
+        void div.offsetWidth; // trigger reflow
+        div.classList.add('fade-in');
+    }
+
+    copyEmail() {
+        const email = document.getElementById('currentEmail').textContent;
+        if (email) {
+            navigator.clipboard.writeText(email).then(() => {
+                this.showNotification('Email copied to clipboard!', 'success');
+            }).catch(() => {
+                const textArea = document.createElement('textarea');
+                textArea.value = email;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                this.showNotification('Email copied to clipboard!', 'success');
+            });
+        }
+    }
+
+    async searchEmail() {
+        const email = document.getElementById('searchEmail').value.trim();
+        if (!email) {
+            this.showNotification('Please enter an email address', 'warning');
+            return;
+        }
+
+        if (!this.isValidEmail(email)) {
+            this.showNotification('Please enter a valid email address', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('searchBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<div class="loading"></div> Accessing...';
+        btn.disabled = true;
+
+        try {
+            this.currentEmail = email;
+            this.displayCurrentEmail(email);
+            await this.refreshEmails();
+            this.showNotification('Email inbox accessed!', 'success');
+
+            this.toggleAutoRefresh(true);
+            document.getElementById('autoRefresh').checked = true;
+
+        } catch (error) {
+            console.error('Error accessing email:', error);
+            this.showNotification('Failed to access email', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    async refreshEmails() {
+        if (!this.currentEmail) {
+            this.showNotification('No email selected', 'warning');
+            return;
+        }
+
+        try {
+            const emails = await this.fetchEmails(this.currentEmail);
+            this.checkForNewEmails(emails);
+            this.displayEmails(emails);
+
+            // Auto-detect verification codes for HarakiriMail
+            if (this.currentEmail.includes('harakirimail.com')) {
+                await this.fetchHarakiriCodesDirectly(this.currentEmail);
+            }
+
+            if (emails.length > 0) {
+                this.showNotification(`${emails.length} emails found`, 'success');
+            }
+        } catch (error) {
+            console.error('Error refreshing emails:', error);
+        }
+    }
+
+    async fetchHarakiriCodesDirectly(email) {
+        try {
+            const [login] = email.split('@');
+
+            // Try multiple approaches to get HarakiriMail inbox
+            const approaches = [
+                `https://harakirimail.com/inbox/${login}`,
+                `https://harakirimail.com/${login}`,
+                `https://harakirimail.com/check/${login}`
+            ];
+
+            for (const url of approaches) {
+                try {
+                    // Use a CORS proxy service
+                    const proxyResponse = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`);
+
+                    if (proxyResponse.ok) {
+                        const html = await proxyResponse.text();
+
+                        // Extract verification codes from HTML
+                        const codes = this.extractVerificationCodes(html);
+
+                        if (codes.length > 0) {
+                            // Create a synthetic email with the codes
+                            const codeEmail = {
+                                id: `harakiri_codes_${Date.now()}`,
+                                from: 'Auto-detected',
+                                subject: 'Verification Codes Found',
+                                content: `Codes detected: ${codes.join(', ')}`,
+                                time: new Date(),
+                                read: false
+                            };
+
+                            this.showEmailPopup(codeEmail);
+                            break;
+                        }
+                    }
+                } catch (proxyError) {
+                    continue; // Try next approach
+                }
+            }
+        } catch (error) {
+            console.error('HarakiriMail direct fetch error:', error);
+        }
+    }
+
+    checkForNewEmails(newEmails) {
+        const currentEmailKey = this.currentEmail;
+        this.emailHistory.set(currentEmailKey, newEmails);
+    }
+
+    showEmailPopup(email) {
+        // Function disabled: User requested no popup notifications
+        return;
+    }
+
+    extractVerificationCodes(text) {
+        const codes = [];
+
+        // Enhanced patterns for better code detection
+        const patterns = [
+            /\b\d{4,8}\b/g,                                    // Basic numeric codes
+            /\b[A-Z0-9]{4,8}\b/g,                              // Alphanumeric codes
+            /code[:\s]+([A-Z0-9]{4,8})/gi,                     // "code: 1234"
+            /verification[:\s]+([A-Z0-9]{4,8})/gi,             // "verification: 1234"
+            /pin[:\s]+(\d{4,6})/gi,                            // "pin: 1234"
+            /token[:\s]+([A-Z0-9]{4,8})/gi,                    // "token: abcd1234"
+            /confirm[:\s]+([A-Z0-9]{4,8})/gi,                  // "confirm: 1234"
+            /activate[:\s]+([A-Z0-9]{4,8})/gi,                 // "activate: 1234"
+            /otp[:\s]+([A-Z0-9]{4,8})/gi,                      // "otp: 1234"
+            /(?:is|code|otp|pin|verify|confirmation)[:\s]*([A-Z0-9]{4,8})/gi, // Multiple keywords
+            /\b([A-Z0-9]{4}[\s-]?[A-Z0-9]{4})\b/g,             // Format: ABCD-1234 or ABCD 1234
+            /facebook[^>]*?(\d{4,8})/gi,                       // Facebook specific codes
+            /instagram[^>]*?(\d{4,8})/gi,                      // Instagram specific codes
+            /twitter[^>]*?(\d{4,8})/gi,                        // Twitter specific codes
+            /gmail[^>]*?(\d{4,8})/gi,                          // Gmail specific codes
+        ];
+
+        patterns.forEach(pattern => {
+            const matches = text.match(pattern);
+            if (matches) {
+                matches.forEach(match => {
+                    // Clean the match
+                    let cleanCode = match.replace(/^(code|verification|pin|token|confirm|activate|otp|is|verify|confirmation|facebook|instagram|twitter|gmail)[:\s]*/gi, '').trim();
+                    cleanCode = cleanCode.replace(/[\s-]/g, ''); // Remove spaces and dashes
+
+                    // Validate code length and format
+                    if (cleanCode.length >= 4 && cleanCode.length <= 8 && /^[A-Z0-9]+$/i.test(cleanCode)) {
+                        // Filter out common false positives
+                        const falsePositives = ['HTML', 'HTTP', 'HTTPS', 'POST', 'HEAD', 'BODY', 'FORM', 'EMAIL', 'USER', 'PASS'];
+                        if (!falsePositives.includes(cleanCode.toUpperCase())) {
+                            codes.push(cleanCode.toUpperCase());
+                        }
+                    }
+                });
+            }
+        });
+
+        return [...new Set(codes)];
+    }
+
+    async fetchEmails(email) {
+        if (!email) return [];
+
+        const domain = email.split('@')[1];
+
+        try {
+            if (domain.includes('harakirimail.com')) {
+                return await this.getHarakiriEmails(email);
+            } else if (domain.includes('tmailor.com')) {
+                return await this.getTMailorEmails(email);
+            } else if (domain.includes('mail.cx')) {
+                return await this.getMailCXEmails(email);
+            } else if (domain.includes('tempmail.io')) {
+                return await this.getTempMailIOEmails(email);
+            } else if (domain.includes('guerrillamail')) {
+                return await this.getGuerrillaEmails(email);
+            } else {
+                // Fallback to guerrilla mail which works with most domains
+                return await this.getGuerrillaEmails(email);
+            }
+        } catch (error) {
+            console.error('Error fetching emails:', error);
+            return [];
+        }
+    }
+
+    // HarakiriMail Implementation
+    async generateHarakiriEmail() {
+        try {
+            // HarakiriMail doesn't have a direct API, so we generate a random email
+            const username = this.generateRandomString(8) + Math.floor(Math.random() * 999);
+            return `${username}@harakirimail.com`;
+        } catch (error) {
+            const username = this.generateRandomString(8) + Math.floor(Math.random() * 999);
+            return `${username}@harakirimail.com`;
+        }
+    }
+
+    async getHarakiriEmails(email) {
+        try {
+            const [login] = email.split('@');
+
+            // Use a more reliable CORS proxy
+            const targetUrl = `https://harakirimail.com/inbox/${login}`;
+            const proxyUrls = [
+                `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+                `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`
+            ];
+
+            for (const url of proxyUrls) {
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        // allorigins returns content in 'contents', codetabs returns raw text
+                        const html = typeof data === 'string' ? data : data.contents;
+
+                        if (!html) continue;
+
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const emails = [];
+
+                        // HarakiriMail structure often uses a table or list of messages
+                        const rows = doc.querySelectorAll('table tr, .email-item, .message-row');
+
+                        rows.forEach((row, index) => {
+                            // Skip header rows if present
+                            if (row.querySelector('th')) return;
+
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length >= 2) {
+                                const from = cells[0].textContent.trim();
+                                const subject = cells[1].textContent.trim();
+                                const timeStr = cells[2] ? cells[2].textContent.trim() : 'Just now';
+
+                                // Try to get the message ID from a link if available
+                                const link = row.querySelector('a');
+                                const id = link ? link.getAttribute('href') : `harakiri_${Date.now()}_${index}`;
+
+                                emails.push({
+                                    id: id,
+                                    from: from || 'Unknown Sender',
+                                    subject: subject || '(No Subject)',
+                                    content: `Subject: ${subject}. From: ${from}. Received: ${timeStr}. (Open HarakiriMail website for full HTML view if needed)`,
+                                    time: new Date(),
+                                    read: false
+                                });
+                            }
+                        });
+
+                        if (emails.length > 0) return emails;
+                    }
+                } catch (e) {
+                    console.warn(`Proxy ${url} failed`, e);
+                }
+            }
+            return [];
+        } catch (error) {
+            console.error('HarakiriMail fetch error:', error);
+            return [];
+        }
+    }
+
+    // TMailor API Implementation
+    async generateTMailorEmail() {
+        try {
+            const response = await fetch('https://tmailor.com/api/v1/email/new', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.email;
+            }
+
+            // Fallback generation
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@tmailor.com`;
+        } catch (error) {
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@tmailor.com`;
+        }
+    }
+
+    async getTMailorEmails(email) {
+        try {
+            const response = await fetch(`https://tmailor.com/api/v1/email/${email}/messages`);
+
+            if (response.ok) {
+                const data = await response.json();
+                return (data.messages || []).map(msg => ({
+                    id: `tmailor_${msg.id}`,
+                    from: msg.from,
+                    subject: msg.subject,
+                    content: msg.body || msg.text || 'No content',
+                    time: new Date(msg.date || Date.now()),
+                    read: false
+                }));
+            }
+            return [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    // MailCX API Implementation
+    async generateMailCXEmail() {
+        try {
+            const response = await fetch('https://api.mail.cx/api/v1/mailbox/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.email;
+            }
+
+            // Fallback generation
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@mail.cx`;
+        } catch (error) {
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@mail.cx`;
+        }
+    }
+
+    async getMailCXEmails(email) {
+        try {
+            const [login] = email.split('@');
+            const response = await fetch(`https://api.mail.cx/api/v1/mailbox/${login}/messages`);
+
+            if (response.ok) {
+                const data = await response.json();
+                return (data.messages || []).map(msg => ({
+                    id: `mailcx_${msg.id}`,
+                    from: msg.from,
+                    subject: msg.subject,
+                    content: msg.body || msg.text || 'No content',
+                    time: new Date(msg.created_at || Date.now()),
+                    read: false
+                }));
+            }
+            return [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    // TempMailIO API Implementation
+    async generateTempMailIOEmail() {
+        try {
+            const response = await fetch('https://api.tempmail.io/v1/email/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.email;
+            }
+
+            // Fallback generation
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@tempmail.io`;
+        } catch (error) {
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@tempmail.io`;
+        }
+    }
+
+    async getTempMailIOEmails(email) {
+        try {
+            const response = await fetch(`https://api.tempmail.io/v1/email/${email}/messages`);
+
+            if (response.ok) {
+                const data = await response.json();
+                return (data.messages || []).map(msg => ({
+                    id: `tmpio_${msg.id}`,
+                    from: msg.from,
+                    subject: msg.subject,
+                    content: msg.body || msg.text || 'No content',
+                    time: new Date(msg.created_at || Date.now()),
+                    read: false
+                }));
+            }
+            return [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    // GuerillaMail API Implementation (Most reliable fallback)
+    async generateGuerrillaEmail() {
+        try {
+            const response = await fetch('https://api.guerrillamail.com/ajax.php?f=get_email_address&lang=en', {
+                method: 'GET'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.email_addr;
+            }
+
+            // Fallback generation
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@guerrillamail.com`;
+        } catch (error) {
+            const username = this.generateRandomString(10) + Math.floor(Math.random() * 9999);
+            return `${username}@guerrillamail.com`;
+        }
+    }
+
+    async getGuerrillaEmails(email) {
+        try {
+            const [login] = email.split('@');
+            const response = await fetch(`https://api.guerrillamail.com/ajax.php?f=get_email_list&offset=0&seq=1&lang=en`);
+
+            if (response.ok) {
+                const data = await response.json();
+                return (data.list || []).map(msg => ({
+                    id: `guerrilla_${msg.mail_id}`,
+                    from: msg.mail_from,
+                    subject: msg.mail_subject,
+                    content: msg.mail_excerpt || 'Click to view full content',
+                    time: new Date(msg.mail_timestamp * 1000),
+                    read: msg.mail_read === '1'
+                }));
+            }
+            return [];
+        } catch (error) {
+            console.error('GuerillaMail API error:', error);
+            return [];
+        }
+    }
+
+    displayEmails(emails) {
+        const emailList = document.getElementById('emailList');
+
+        if (emails.length === 0) {
+            emailList.innerHTML = '<div class="no-emails">No emails found. Waiting for new messages...</div>';
+            return;
+        }
+
+        emailList.innerHTML = '';
+
+        emails.forEach(email => {
+            const emailItem = document.createElement('div');
+            emailItem.className = `email-item ${!email.read ? 'unread' : ''}`;
+
+            const codes = this.extractVerificationCodes(email.content + ' ' + email.subject);
+
+            emailItem.innerHTML = `
+                <div class="email-header">
+                    <div class="email-subject">${this.escapeHtml(email.subject)}</div>
+                    <div class="email-time">${this.formatTime(email.time)}</div>
+                </div>
+                <div class="email-from">From: ${this.escapeHtml(email.from)}</div>
+                ${codes.length > 0 ? `
+                    <div class="email-codes">
+                        ${codes.map(code => `<span class="code-badge" onclick="event.stopPropagation(); navigator.clipboard.writeText('${code}'); this.textContent = 'Copied!'; setTimeout(() => this.textContent = '${code}', 1000)">${code}</span>`).join(' ')}
+                    </div>
+                ` : ''}
+                <div class="email-preview">${this.escapeHtml(this.truncateText(email.content, 100))}</div>
+            `;
+
+            emailItem.addEventListener('click', () => {
+                this.showEmailModal(email);
+            });
+
+            emailList.appendChild(emailItem);
+        });
+    }
+
+    showEmailModal(email) {
+        const modal = document.getElementById('emailModal');
+        const content = document.getElementById('emailContent');
+
+        const codes = this.extractVerificationCodes(email.content + ' ' + email.subject);
+
+        content.innerHTML = `
+            <h2>${this.escapeHtml(email.subject)}</h2>
+            <div style="margin: 15px 0; padding: 15px; background: var(--background-color); border-radius: var(--border-radius);">
+                <strong>From:</strong> ${this.escapeHtml(email.from)}<br>
+                <strong>Time:</strong> ${this.formatTime(email.time)}
+                ${codes.length > 0 ? `<br><strong>Verification Codes:</strong> ${codes.map(code => `<span class="code-highlight" onclick="navigator.clipboard.writeText('${code}'); this.textContent = 'Copied!'; setTimeout(() => this.textContent = '${code}', 1000)">${code}</span>`).join(' ')}` : ''}
+            </div>
+            <div style="line-height: 1.6; margin-top: 20px; white-space: pre-wrap;">
+                ${this.escapeHtml(email.content)}
+            </div>
+        `;
+
+        modal.style.display = 'block';
+        email.read = true;
+    }
+
+    closeModal() {
+        document.getElementById('emailModal').style.display = 'none';
+    }
+
+    setupAutoRefresh() {
+        document.getElementById('autoRefresh').addEventListener('change', (e) => {
+            this.toggleAutoRefresh(e.target.checked);
+        });
+    }
+
+    toggleAutoRefresh(enabled) {
+        if (enabled) {
+            this.autoRefreshInterval = setInterval(() => {
+                if (this.currentEmail) {
+                    this.refreshEmails();
+                }
+            }, 10000);
+            this.showNotification('Auto refresh enabled (10s)', 'success');
+        } else {
+            if (this.autoRefreshInterval) {
+                clearInterval(this.autoRefreshInterval);
+                this.autoRefreshInterval = null;
+            }
+            this.showNotification('Auto refresh disabled', 'info');
+        }
+    }
+
+    isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    truncateText(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+
+    formatTime(date) {
+        if (!(date instanceof Date)) {
+            date = new Date(date);
+        }
+
+        const now = new Date();
+        const diffInMs = now - date;
+        const diffInMinutes = Math.floor(diffInMs / 60000);
+        const diffInHours = Math.floor(diffInMinutes / 60);
+        const diffInDays = Math.floor(diffInHours / 24);
+
+        if (diffInMinutes < 1) {
+            return 'Just now';
+        } else if (diffInMinutes < 60) {
+            return `${diffInMinutes}m ago`;
+        } else if (diffInHours < 24) {
+            return `${diffInHours}h ago`;
+        } else if (diffInDays < 7) {
+            return `${diffInDays}d ago`;
+        } else {
+            return date.toLocaleDateString();
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 6px 10px;
+            background: var(--surface-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border-left: 3px solid var(--primary-color);
+            z-index: 1002;
+            max-width: 200px;
+            font-size: 0.75rem;
+            animation: slideIn 0.3s ease-out;
+        `;
+
+        if (type === 'error') {
+            notification.style.borderLeftColor = 'var(--danger-color)';
+        } else if (type === 'warning') {
+            notification.style.borderLeftColor = 'var(--accent-color)';
+        }
+
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease-in forwards';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    document.body.removeChild(notification);
+                }
+            }, 300);
+        }, 2500);
+    }
+}
+
+// Add slide animations for notifications and popup styles
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    .email-popup {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: var(--surface-color);
+        border: 1px solid var(--primary-color);
+        border-radius: 4px;
+        box-shadow: var(--shadow);
+        z-index: 1003;
+        max-width: 200px;
+        font-size: 0.7rem;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    .popup-header {
+        background: var(--primary-color);
+        color: white;
+        padding: 3px 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 3px 3px 0 0;
+        font-size: 0.65rem;
+    }
+
+    .popup-close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 10px;
+        cursor: pointer;
+        padding: 0;
+        width: 12px;
+        height: 12px;
+    }
+
+    .popup-content {
+        padding: 6px;
+    }
+
+    .popup-from, .popup-subject {
+        margin-bottom: 3px;
+        font-size: 0.65rem;
+    }
+
+    .popup-subject {
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+
+    .popup-codes {
+        margin: 3px 0;
+        padding: 3px;
+        background: var(--background-color);
+        border-radius: 3px;
+        border-left: 2px solid var(--accent-color);
+    }
+
+    .code-highlight, .code-badge {
+        background: var(--accent-color);
+        color: white;
+        padding: 1px 3px;
+        border-radius: 2px;
+        margin: 0 2px;
+        cursor: pointer;
+        font-weight: bold;
+        display: inline-block;
+        font-family: monospace;
+        font-size: 0.6rem;
+    }
+
+    .code-highlight:hover, .code-badge:hover {
+        background: #F57C00;
+    }
+
+    .popup-preview {
+        color: var(--text-secondary);
+        font-size: 0.6rem;
+        margin-top: 3px;
+        line-height: 1.2;
+    }
+
+    .email-codes {
+        margin: 8px 0;
+        padding: 5px 0;
+    }
+`;
+document.head.appendChild(style);
+
+document.addEventListener('DOMContentLoaded', () => {
+    new YuenDispoMail();
+});

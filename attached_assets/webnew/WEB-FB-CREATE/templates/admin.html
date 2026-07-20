@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEYN — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #050810;
+    color: #e2e8f0;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245,158,11,0.04) 0%, transparent 60%);
+  }
+
+  /* ── Header ── */
+  header {
+    background: rgba(8,12,22,0.97);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo-mark {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 800; color: #000;
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.1), 0 4px 16px rgba(245,158,11,0.3);
+    flex-shrink: 0;
+  }
+
+  .logo-text { font-size: 16px; font-weight: 800; color: #f1f5f9; letter-spacing: -0.5px; }
+  .logo-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.07); margin: 0 4px; }
+  .admin-badge {
+    font-size: 10px; font-weight: 700; color: #f59e0b;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 8px; padding: 3px 10px; letter-spacing: 0.8px;
+  }
+
+  .header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .btn-hdr {
+    padding: 6px 14px; border-radius: 8px; font-family: 'Inter', sans-serif;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;
+  }
+  .btn-hdr-user {
+    background: rgba(0,230,118,0.06); border: 1px solid rgba(0,230,118,0.2); color: #00e676;
+  }
+  .btn-hdr-user:hover { background: rgba(0,230,118,0.12); border-color: rgba(0,230,118,0.4); }
+  .btn-hdr-logout {
+    background: transparent; border: 1px solid rgba(239,68,68,0.2); color: #f87171;
+  }
+  .btn-hdr-logout:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.4); }
+
+  /* ── Nav ── */
+  nav {
+    background: rgba(8,12,22,0.9);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+    position: sticky;
+    top: 60px;
+    z-index: 90;
+  }
+
+  .nav-tab {
+    padding: 14px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    user-select: none;
+    letter-spacing: 0.1px;
+  }
+  .nav-tab.active { color: #f59e0b; border-bottom-color: #f59e0b; }
+  .nav-tab:hover:not(.active) { color: #94a3b8; }
+  .nav-tab.create-tab { color: rgba(96,165,250,0.45); }
+  .nav-tab.create-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+  .nav-tab.create-tab:hover:not(.active) { color: rgba(96,165,250,0.8); }
+
+  /* ── Pages ── */
+  .page { display: none; padding: 28px 24px; max-width: 1100px; }
+  .page.active { display: block; }
+
+  /* ── Section title ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .section-label::before {
+    content: '';
+    display: inline-block; width: 3px; height: 10px;
+    background: #f59e0b; border-radius: 2px; flex-shrink: 0;
+  }
+
+  /* ── Stats ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: linear-gradient(160deg, rgba(13,18,32,0.98) 0%, rgba(8,12,22,0.98) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: 2px solid rgba(245,158,11,0.3);
+    border-radius: 16px;
+    padding: 22px 18px;
+    text-align: center;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 48px;
+    background: linear-gradient(180deg, rgba(245,158,11,0.05) 0%, transparent 100%);
+    pointer-events: none;
+  }
+  .stat-card:hover { border-color: rgba(255,255,255,0.13); box-shadow: 0 8px 24px rgba(0,0,0,0.4); transform: translateY(-1px); }
+  .stat-card .num { font-size: 34px; font-weight: 800; color: #00e676; letter-spacing: -1.5px; line-height: 1; }
+  .stat-card .lbl { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  .stat-card.warn .num { color: #fbbf24; }
+  .stat-card.danger .num { color: #f87171; }
+  .stat-card.blue .num { color: #60a5fa; }
+
+  /* ── Users ── */
+  .user-filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+
+  .filter-btn {
+    padding: 5px 13px; border-radius: 99px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: transparent; color: #334155;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  .filter-btn.active { border-color: rgba(245,158,11,0.4); color: #f59e0b; background: rgba(245,158,11,0.08); }
+  .filter-btn:hover:not(.active) { color: #64748b; border-color: rgba(255,255,255,0.12); }
+
+  .users-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .user-card {
+    background: linear-gradient(160deg, rgba(13,18,32,0.98) 0%, rgba(8,12,22,0.98) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 3px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    transition: all .18s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  .user-card:hover { border-color: rgba(255,255,255,0.13); box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
+  .user-card.pending  { border-left-color: #fbbf24; }
+  .user-card.approved { border-left-color: #00e676; }
+  .user-card.rejected, .user-card.revoked { border-left-color: #f87171; opacity: .6; }
+
+  .user-info { flex: 1; min-width: 160px; }
+  .user-name  { font-size: 14px; color: #f1f5f9; font-weight: 600; }
+  .user-meta  { font-size: 11px; color: #334155; margin-top: 3px; font-family: monospace; }
+  .user-reason { font-size: 12px; color: #475569; margin-top: 4px; }
+
+  .user-key {
+    font-size: 10px; color: #1e293b;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px; padding: 4px 9px;
+    font-family: monospace; cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .user-key:hover { color: #f59e0b; border-color: rgba(245,158,11,0.3); }
+
+  .status-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 3px 9px; border-radius: 99px; text-transform: uppercase; white-space: nowrap;
+  }
+  .badge-approved { background: rgba(0,230,118,0.1); color: #00e676; border: 1px solid rgba(0,230,118,0.2); }
+  .badge-pending  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+  .badge-rejected { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+  .badge-revoked  { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+
+  .user-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .act-btn {
+    padding: 5px 12px; border-radius: 7px; border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .act-approve { background: rgba(0,230,118,0.1); color: #00e676; border: 1px solid rgba(0,230,118,0.2); }
+  .act-approve:hover { background: rgba(0,230,118,0.18); }
+  .act-reject  { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+  .act-reject:hover  { background: rgba(248,113,113,0.18); }
+  .act-revoke  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+  .act-revoke:hover  { background: rgba(251,191,36,0.18); }
+  .act-remove  { background: transparent; color: #334155; border: 1px solid rgba(255,255,255,0.07); }
+  .act-remove:hover  { color: #f87171; border-color: rgba(248,113,113,0.3); }
+  .act-reset-ip { background: rgba(96,165,250,0.08); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
+  .act-reset-ip:hover { background: rgba(96,165,250,0.16); }
+
+  .empty-users { text-align: center; color: #1e293b; padding: 40px; font-size: 13px; font-weight: 500; }
+
+  /* ── Add user row ── */
+  .add-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .add-row input {
+    flex: 1; min-width: 160px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0;
+    padding: 9px 13px; font-family: 'Inter', sans-serif; font-size: 13px;
+    outline: none; transition: border-color .2s;
+  }
+  .add-row input:focus { border-color: rgba(245,158,11,0.4); box-shadow: 0 0 0 3px rgba(245,158,11,0.07); }
+  .add-row input::placeholder { color: #1e293b; }
+  .add-row button {
+    padding: 9px 18px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border: none; border-radius: 9px; color: #000;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all .2s;
+    box-shadow: 0 4px 12px rgba(245,158,11,0.2);
+  }
+  .add-row button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,0.3); }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: rgba(14,20,36,0.95); backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,230,118,0.25); color: #00e676;
+    padding: 11px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: rgba(248,113,113,0.3); color: #f87171; }
+
+  /* ── Domains ── */
+  .domains-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 700px) { .domains-grid { grid-template-columns: 1fr; } }
+  .domain-section { display: flex; flex-direction: column; gap: 8px; }
+
+  .domain-pill {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 9px 13px; font-size: 13px; color: #94a3b8; gap: 10px;
+    transition: border-color .15s;
+  }
+  .domain-pill:hover { border-color: rgba(255,255,255,0.1); }
+  .domain-pill .rm {
+    background: none; border: none; color: #1e293b; cursor: pointer;
+    font-size: 16px; padding: 0 2px; transition: color .15s; line-height: 1;
+  }
+  .domain-pill .rm:hover { color: #f87171; }
+
+  .dm-pass-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .dm-pass-row input {
+    flex: 1; min-width: 120px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0; padding: 8px 12px;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; outline: none; transition: border-color .2s;
+  }
+  .dm-pass-row input:focus { border-color: rgba(245,158,11,0.4); }
+  .dm-pass-row input::placeholder { color: #1e293b; }
+  .dm-pass-row .save-btn {
+    padding: 8px 16px;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 8px; color: #f59e0b;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .dm-pass-row .save-btn:hover { background: rgba(245,158,11,0.18); }
+
+  .custom-domain-form { display: flex; flex-direction: column; gap: 8px; }
+  .custom-domain-form input {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0; padding: 8px 12px;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; outline: none;
+    transition: border-color .2s; width: 100%;
+  }
+  .custom-domain-form input:focus { border-color: rgba(0,230,118,0.35); }
+  .custom-domain-form input::placeholder { color: #1e293b; }
+  .custom-domain-form button {
+    padding: 9px;
+    background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 9px; color: #00e676;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+  }
+  .custom-domain-form button:hover { background: rgba(0,230,118,0.15); }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
+
+  /* ── Create accounts tab ── */
+  #page-create {
+    padding: 0;
+    max-width: none;
+    height: calc(100vh - 112px);
+    overflow: hidden;
+  }
+
+  .cr-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: 100%;
+  }
+
+  .cr-sidebar {
+    background: rgba(10,15,26,0.6);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 20px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .cr-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .cr-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(10,15,26,0.8);
+    flex-shrink: 0;
+    padding: 0 20px;
+  }
+  .cr-tab {
+    padding: 13px 16px; font-size: 12px; font-weight: 500;
+    color: #334155; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all .2s;
+  }
+  .cr-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+  .cr-tab:hover:not(.active) { color: #64748b; }
+
+  .cr-tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+  .cr-tab-content.active { display: flex; }
+
+  #c-log-panel {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+    font-size: 12px; line-height: 1.8;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  .c-log-line { display: flex; gap: 10px; align-items: baseline; }
+  .c-log-ts { color: #1e293b; font-size: 10px; flex-shrink: 0; }
+  .c-log-msg { flex: 1; word-break: break-all; }
+  .c-log-info    .c-log-msg { color: #475569; }
+  .c-log-success .c-log-msg { color: #00e676; }
+  .c-log-warn    .c-log-msg { color: #fbbf24; }
+  .c-log-error   .c-log-msg { color: #f87171; }
+
+  #c-accts-panel {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .c-acct-card {
+    background: linear-gradient(160deg, rgba(18,26,48,0.95) 0%, rgba(10,15,26,0.95) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+    position: relative; transition: border-color .2s, box-shadow .2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .c-acct-card:hover { border-color: rgba(0,230,118,0.2); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+
+  .copy-all-bar {
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px 20px;
+    background: rgba(0,230,118,0.07);
+    border-bottom: 1px solid rgba(0,230,118,0.12);
+    flex-shrink: 0; cursor: pointer; transition: background .2s; gap: 8px;
+  }
+  .copy-all-bar:hover { background: rgba(0,230,118,0.13); }
+  .copy-all-bar:active { background: rgba(0,230,118,0.18); }
+  .copy-all-bar-icon { font-size: 15px; color: #00e676; }
+  .copy-all-bar-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px; font-weight: 700; color: #e2e8f0; letter-spacing: -0.1px;
+  }
+  .copy-all-bar-text span { color: #00e676; }
+  .copy-all-bar.copied .copy-all-bar-text { color: #00e676; }
+
+  .c-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; color: #1e293b;
+    gap: 12px; text-align: center; padding: 40px;
+  }
+
+  .cr-fg { display: flex; flex-direction: column; gap: 5px; }
+  .cr-fg label { font-size: 12px; font-weight: 500; color: #64748b; }
+  .cr-fg select, .cr-fg input {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 9px; color: #e2e8f0; padding: 9px 12px;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; outline: none;
+    transition: border-color .2s; width: 100%; -webkit-appearance: none;
+  }
+  .cr-fg select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+  }
+  .cr-fg select:focus, .cr-fg input:focus { border-color: rgba(96,165,250,0.4); box-shadow: 0 0 0 3px rgba(96,165,250,0.07); }
+  .cr-fg input::placeholder { color: #1e293b; }
+  .cr-fg select option { background: #0e1420; }
+
+  .cr-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .cr-stat {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 10px 8px; text-align: center;
+  }
+  .cr-stat-num { font-size: 20px; font-weight: 700; color: #60a5fa; letter-spacing: -0.5px; }
+  .cr-stat-lbl { font-size: 9px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-top: 2px; }
+
+  .cr-prog-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .cr-prog-meta { display: flex; justify-content: space-between; font-size: 11px; color: #334155; font-weight: 500; }
+  .cr-prog-track { height: 4px; background: rgba(255,255,255,0.05); border-radius: 99px; overflow: hidden; }
+  .cr-prog-fill { height: 100%; background: linear-gradient(90deg,#60a5fa,#3b82f6); border-radius: 99px; transition: width .4s ease; width: 0%; }
+
+  .cr-btn {
+    padding: 11px; border-radius: 10px; border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; letter-spacing: -0.1px; width: 100%; transition: all .2s;
+  }
+  .cr-btn-start { background: linear-gradient(135deg,#60a5fa,#3b82f6); color: #fff; box-shadow: 0 4px 16px rgba(96,165,250,0.25); }
+  .cr-btn-start:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(96,165,250,0.35); }
+  .cr-btn-start:disabled { background: rgba(96,165,250,0.1); color: rgba(96,165,250,0.25); cursor: not-allowed; box-shadow: none; transform: none; }
+  .cr-btn-stop { background: transparent; border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
+  .cr-btn-stop:hover:not(:disabled) { background: rgba(239,68,68,0.08); }
+  .cr-btn-stop:disabled { opacity: 0.25; cursor: not-allowed; }
+  .cr-btn-dl { background: transparent; border: 1px solid rgba(255,255,255,0.08); color: #475569; }
+  .cr-btn-dl:hover { background: rgba(255,255,255,0.04); color: #64748b; }
+
+  .c-copy-btn {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 6px; color: #334155; cursor: pointer; padding: 3px 9px;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 500;
+    transition: all .15s; flex-shrink: 0;
+  }
+  .c-copy-btn:hover { color: #00e676; border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.06); }
+
+  @media (max-width: 768px) {
+    .cr-container { grid-template-columns: 1fr; height: auto; overflow-y: auto; }
+    .cr-main { min-height: 70vh; }
+    #page-create { height: auto; overflow: auto; }
+  }
+
+  /* ── Confirm code section (admin) ── */
+  .c-confirm-section {
+    margin-top: 8px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .c-confirm-label {
+    font-size: 9px; font-weight: 700; color: #334155;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .c-confirm-row { display: flex; gap: 6px; align-items: center; }
+  .c-confirm-input {
+    flex: 1; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+    color: #e2e8f0; padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 15px;
+    font-weight: 600; letter-spacing: 4px; outline: none;
+    transition: border-color .2s, box-shadow .2s; text-align: center;
+  }
+  .c-confirm-input:focus { border-color: rgba(96,165,250,0.5); box-shadow: 0 0 0 3px rgba(96,165,250,0.08); }
+  .c-confirm-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .c-confirm-input.code-ready { border-color: rgba(0,230,118,0.45); box-shadow: 0 0 0 3px rgba(0,230,118,0.08); color: #00e676; }
+  .c-confirm-btn {
+    padding: 8px 14px; border-radius: 8px; border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+    background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.25); color: #60a5fa;
+    flex-shrink: 0; white-space: nowrap;
+  }
+  .c-confirm-btn:hover:not(:disabled) { background: rgba(96,165,250,0.2); border-color: rgba(96,165,250,0.45); }
+  .c-confirm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .c-confirm-status {
+    font-size: 11px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif;
+    display: none; padding: 5px 10px; border-radius: 6px; text-align: center;
+  }
+  .c-confirm-status.confirmed  { display:block; background:rgba(0,230,118,0.1);  border:1px solid rgba(0,230,118,0.2);  color:#00e676; }
+  .c-confirm-status.checkpoint { display:block; background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); color:#fbbf24; }
+  .c-confirm-status.submitted  { display:block; background:rgba(96,165,250,0.1); border:1px solid rgba(96,165,250,0.2);  color:#60a5fa; }
+  .c-confirm-status.error      { display:block; background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);color:#f87171; }
+  .c-confirm-status.loading    { display:block; background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);color:#475569; }
+  .c-confirm-status.fetching   { display:block; background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);color:#475569; animation:fadepulse 1.5s ease-in-out infinite; }
+  @keyframes fadepulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">W</div>
+  <span class="logo-text">WEYN</span>
+  <div class="logo-sep"></div>
+  <span class="admin-badge">ADMIN</span>
+  <div class="header-actions">
+    <button class="btn-hdr btn-hdr-user" onclick="window.location.href='/'">👤 User View</button>
+    <button class="btn-hdr btn-hdr-logout" onclick="logout()">Sign Out</button>
+  </div>
+</header>
+
+<nav>
+  <div class="nav-tab active" onclick="showPage('overview')">Overview</div>
+  <div class="nav-tab" onclick="showPage('users')">Users <span id="pendingBadge" style="display:none;color:#fbbf24;"> ●</span></div>
+  <div class="nav-tab" onclick="showPage('domains')">Domains</div>
+  <div class="nav-tab create-tab" onclick="showPage('create')">Create Accounts</div>
+</nav>
+
+<!-- OVERVIEW -->
+<div class="page active" id="page-overview">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="num" id="ov-total">—</div><div class="lbl">Total Users</div></div>
+    <div class="stat-card"><div class="num" id="ov-approved">—</div><div class="lbl">Approved</div></div>
+    <div class="stat-card warn"><div class="num" id="ov-pending">—</div><div class="lbl">Pending</div></div>
+    <div class="stat-card danger"><div class="num" id="ov-rejected">—</div><div class="lbl">Rejected / Revoked</div></div>
+    <div class="stat-card blue"><div class="num" id="ov-accounts">—</div><div class="lbl">FB Accounts Created</div></div>
+  </div>
+  <div class="section-label">Pending Requests</div>
+  <div id="pendingList" class="users-list"></div>
+</div>
+
+<!-- USERS -->
+<div class="page" id="page-users">
+  <div class="section-label">Add User Directly</div>
+  <div class="add-row">
+    <input type="text" id="newUserName" placeholder="Full name">
+    <input type="number" id="newUserDurVal" placeholder="Duration" min="1" style="max-width:90px;">
+    <select id="newUserDurUnit" style="max-width:90px;">
+      <option value="mins">Mins</option>
+      <option value="hours" selected>Hours</option>
+      <option value="days">Days</option>
+    </select>
+    <button onclick="addUser()">+ Add & Approve</button>
+  </div>
+  <div class="section-label">All Users</div>
+  <div class="user-filters">
+    <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-btn" onclick="setFilter('approved', this)">Approved</button>
+    <button class="filter-btn" onclick="setFilter('pending', this)">Pending</button>
+    <button class="filter-btn" onclick="setFilter('rejected', this)">Rejected</button>
+    <button class="filter-btn" onclick="setFilter('revoked', this)">Revoked</button>
+  </div>
+  <div id="userList" class="users-list"></div>
+</div>
+
+<!-- DOMAINS -->
+<div class="page" id="page-domains">
+  <div class="section-label">Domain Password</div>
+  <div class="dm-pass-row" style="margin-bottom:28px;">
+    <input type="text" id="dmPass" placeholder="Current domain password">
+    <button class="save-btn" onclick="saveDmPass()">Save Password</button>
+  </div>
+
+  <div class="domains-grid">
+    <div>
+      <div class="section-label">Temp Domains — Auto API</div>
+      <div class="add-row">
+        <input type="text" id="newTempDomain" placeholder="e.g. tempmail.net">
+        <button onclick="addTempDomain()">+ Add</button>
+      </div>
+      <div style="margin-bottom:10px;">
+        <button id="syncWeynBtn" onclick="syncWeynDomains()" style="width:100%;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:9px;padding:9px 0;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;">
+          🔄 Sync from weyn-emails.app
+        </button>
+      </div>
+      <div id="tempDomainList" class="domain-section"></div>
+    </div>
+    <div>
+      <div class="section-label">Custom Domains</div>
+      <div class="custom-domain-form">
+        <input type="text" id="newCustomDomain" placeholder="Domain  e.g. weyn.store">
+        <div style="background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.18);border-radius:9px;padding:10px 12px;font-size:12px;color:#93c5fd;line-height:1.7;">
+          <div style="font-weight:700;margin-bottom:4px;color:#60a5fa;">📡 Webhook Endpoint</div>
+          <div>Point your mail server to POST incoming emails to:</div>
+          <div id="webhookUrlPreview" style="font-family:monospace;font-size:11px;color:#bfdbfe;background:rgba(0,0,0,0.3);border-radius:6px;padding:6px 8px;margin-top:6px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</div>
+          <div style="margin-top:6px;font-size:11px;color:#64748b;">Tap the URL above to copy · Supports Mailgun, SendGrid, Postmark, or generic JSON</div>
+        </div>
+        <button onclick="addCustomDomain()">+ Add Custom Domain</button>
+      </div>
+      <div id="customDomainList" class="domain-section" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- Webhook Secret Management -->
+  <div id="webhookSecretSection" style="margin-top:32px;">
+    <div class="section-label">Webhook Setup</div>
+    <div style="background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
+
+      <div style="font-size:12px;color:#64748b;">Your mail server must forward incoming emails to this webhook URL. Copy it and paste it in your mail provider's forwarding/routing settings.</div>
+
+      <!-- Full webhook URL -->
+      <div>
+        <div style="font-size:11px;color:#475569;margin-bottom:4px;">📡 Webhook Endpoint (copy this into your mail server):</div>
+        <div style="display:flex;gap:6px;align-items:stretch;flex-wrap:wrap;">
+          <code id="webhookFullUrl" style="flex:1;font-family:monospace;font-size:11px;color:#bfdbfe;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;min-width:0;" onclick="copyText(this.textContent)">loading…</code>
+          <button onclick="copyText(document.getElementById('webhookFullUrl').textContent)" class="save-btn" style="white-space:nowrap;padding:0 14px;">📋 Copy</button>
+        </div>
+      </div>
+
+      <!-- Setup guide -->
+      <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:9px;padding:12px 14px;font-size:12px;color:#fcd34d;line-height:1.8;">
+        <div style="font-weight:700;margin-bottom:6px;color:#f59e0b;">⚙️ How to configure your mail server</div>
+        <div style="color:#e2e8f0;">For <b>exceweyn.run.place</b> (or any custom domain), you need to set up email routing so that every email arriving at <code style="color:#93c5fd;">*@yourdomain.com</code> is forwarded as an HTTP POST to the webhook URL above.</div>
+        <br>
+        <div style="color:#94a3b8;font-size:11px;line-height:1.9;">
+          <b style="color:#fcd34d;">Option A — Cloudflare Email Routing (free &amp; easy):</b><br>
+          1. Go to Cloudflare → your domain → <b>Email → Email Routing</b><br>
+          2. Enable Email Routing, add a <b>catch-all</b> rule<br>
+          3. Set action = <b>Send to a Worker</b><br>
+          4. Create a Worker that does <code>fetch(webhookUrl, {method:'POST', body: emailJson})</code><br>
+          <br>
+          <b style="color:#fcd34d;">Option B — Mailgun (easiest webhook support):</b><br>
+          1. Add your domain in Mailgun → <b>Receiving → Routes</b><br>
+          2. Create route: match all → <b>Forward → paste your webhook URL above</b><br>
+          3. Set MX records on your domain to Mailgun's servers<br>
+          <br>
+          <b style="color:#fcd34d;">Option C — Forwardemail.net (free):</b><br>
+          1. Add domain → create <b>catch-all webhook</b><br>
+          2. Paste the webhook URL above as the destination<br>
+          3. Set their MX records on your domain DNS<br>
+        </div>
+      </div>
+
+      <!-- Secret key row -->
+      <div>
+        <div style="font-size:11px;color:#475569;margin-bottom:4px;">🔑 Secret Token (embedded in the URL above — keep private):</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <code id="webhookSecretDisplay" style="flex:1;font-family:monospace;font-size:12px;color:#93c5fd;background:rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;word-break:break-all;cursor:pointer;" onclick="copyText(this.textContent)">loading…</code>
+          <button onclick="regenerateWebhookSecret()" class="save-btn" style="white-space:nowrap;">↺ Regenerate</button>
+        </div>
+      </div>
+
+      <!-- Test button -->
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button onclick="testWebhook()" class="save-btn" style="background:linear-gradient(135deg,#059669,#047857);">🧪 Send Test Webhook</button>
+        <span id="webhookTestResult" style="font-size:12px;color:#64748b;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE ACCOUNTS -->
+<div class="page" id="page-create">
+<div class="cr-container">
+
+  <div class="cr-sidebar">
+
+    <div>
+      <div class="section-label">Configuration</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="cr-fg">
+          <label>Name Type</label>
+          <select id="c-nameType">
+            <option value="1">Filipino Names</option>
+            <option value="2">RPW (Fantasy) Names</option>
+          </select>
+        </div>
+        <div class="cr-fg">
+          <label>Gender</label>
+          <select id="c-gender">
+            <option value="3">Mixed</option>
+            <option value="1">Male</option>
+            <option value="2">Female</option>
+          </select>
+        </div>
+        <div class="cr-fg">
+          <label>Email Domain</label>
+          <select id="c-emailDomain" onchange="cOnDomainChange()">
+            <option value="1secmail.com">1secmail.com</option>
+          </select>
+        </div>
+        <div class="cr-fg" id="c-domainPassRow" style="display:none;">
+          <label>Domain Password</label>
+          <input type="password" id="c-domainPassword" placeholder="Enter domain password">
+        </div>
+        <div class="cr-fg">
+          <label>Password Type</label>
+          <select id="c-passwordType" onchange="cOnPassTypeChange()">
+            <option value="auto">Auto-Generated</option>
+            <option value="custom">Custom Password</option>
+          </select>
+        </div>
+        <div class="cr-fg" id="c-customPassRow" style="display:none;">
+          <label>Custom Password</label>
+          <input type="text" id="c-customPassword" placeholder="Enter password">
+        </div>
+        <div class="cr-fg">
+          <label>Number of Accounts</label>
+          <input type="number" id="c-count" value="5" min="1" max="200">
+        </div>
+        <div class="cr-fg">
+          <label style="display:flex;align-items:center;gap:6px;">
+            Proxies
+            <span style="font-size:10px;font-weight:500;color:#94a3b8;background:rgba(0,0,0,0.15);border:1px solid rgba(0,0,0,0.1);border-radius:4px;padding:1px 6px;">required</span>
+          </label>
+          <textarea id="c-proxyList" rows="4"
+            placeholder="One per line:&#10;http://user:pass@host:port&#10;socks5://user:pass@host:port&#10;host:port"
+            style="font-family:monospace;font-size:11px;resize:vertical;width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.12);background:#f8fafc;outline:none;"></textarea>
+          <div style="font-size:10px;color:#94a3b8;margin-top:3px;">Facebook blocks server IPs — residential or mobile proxies required</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Progress</div>
+      <div class="cr-prog-wrap" style="margin-bottom:10px;">
+        <div class="cr-prog-meta">
+          <span id="c-progressLabel">Ready</span>
+          <span id="c-progressPct">0%</span>
+        </div>
+        <div class="cr-prog-track"><div class="cr-prog-fill" id="c-progressBar"></div></div>
+      </div>
+      <div class="cr-stats">
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statCreated">0</div><div class="cr-stat-lbl">Created</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statTotal" style="color:#475569;">—</div><div class="cr-stat-lbl">Target</div></div>
+        <div class="cr-stat"><div class="cr-stat-num" id="c-statTime" style="color:#475569;font-size:16px;">—</div><div class="cr-stat-lbl">Time</div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="cr-btn cr-btn-start" id="c-btnStart" onclick="cStartJob()">▶ Start Creation</button>
+      <button class="cr-btn cr-btn-stop"  id="c-btnStop"  onclick="cStopJob()" disabled>■ Stop</button>
+      <button class="cr-btn cr-btn-dl" onclick="window.location.href='/download'">⬇ Download Results</button>
+    </div>
+
+  </div>
+
+  <div class="cr-main">
+    <div class="cr-tabs">
+      <div class="cr-tab active" id="c-tab-log"   onclick="cSwitchTab('log')">Console Log</div>
+      <div class="cr-tab"        id="c-tab-accts" onclick="cSwitchTab('accts')">Accounts <span id="c-acctCount" style="color:#1e293b;">(0)</span></div>
+    </div>
+
+    <div class="copy-all-bar" id="c-copyAllBar" onclick="cCopyAllAccounts()">
+      <span class="copy-all-bar-icon">⎘</span>
+      <span class="copy-all-bar-text" id="c-copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
+    </div>
+
+    <div class="cr-tab-content active" id="c-tc-log">
+      <div id="c-log-panel">
+        <div class="c-empty" id="c-logEmpty">
+          <div style="font-size:32px;opacity:.3;">⬡</div>
+          <div style="font-size:13px;font-weight:500;color:#1e293b;">Waiting to start…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cr-tab-content" id="c-tc-accts">
+      <div id="c-accts-panel">
+        <div class="c-empty" id="c-acctEmpty">
+          <div style="font-size:32px;opacity:.3;">⬡</div>
+          <div style="font-size:13px;font-weight:500;color:#1e293b;">No accounts created yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div id="toast"></div>
+
+
+<script>
+let allUsers = [];
+let currentFilter = 'all';
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav .nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const tabs = document.querySelectorAll('nav .nav-tab');
+  const map = { overview: 0, users: 1, domains: 2, create: 3 };
+  if (tabs[map[name]]) tabs[map[name]].classList.add('active');
+
+  if (name === 'overview') loadOverview();
+  if (name === 'users')    loadUsers();
+  if (name === 'domains')  loadDomains();
+  if (name === 'create')   cLoadDomains();
+}
+
+function toast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => el.className = '', 2500);
+}
+
+async function api(url, method, body) {
+  const opts = { method: method || 'GET', headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+async function logout() {
+  await api('/admin/logout', 'POST');
+  window.location.reload();
+}
+
+async function loadOverview() {
+  const d = await api('/admin/api/stats');
+  document.getElementById('ov-total').textContent    = d.counts.total;
+  document.getElementById('ov-approved').textContent = d.counts.approved;
+  document.getElementById('ov-pending').textContent  = d.counts.pending;
+  document.getElementById('ov-rejected').textContent = d.counts.rejected + d.counts.revoked;
+  document.getElementById('ov-accounts').textContent = d.total_accounts;
+
+  if (d.counts.pending > 0) document.getElementById('pendingBadge').style.display = '';
+
+  const users = await api('/admin/api/users');
+  const pending = users.filter(u => u.status === 'pending');
+  const list = document.getElementById('pendingList');
+  if (!pending.length) { list.innerHTML = '<div class="empty-users">No pending requests</div>'; return; }
+  list.innerHTML = '';
+  pending.forEach(u => list.appendChild(buildCard(u)));
+}
+
+async function loadUsers() {
+  allUsers = await api('/admin/api/users');
+  renderUsers();
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderUsers();
+}
+
+function renderUsers() {
+  const list = document.getElementById('userList');
+  const filtered = currentFilter === 'all' ? allUsers : allUsers.filter(u => u.status === currentFilter);
+  if (!filtered.length) { list.innerHTML = '<div class="empty-users">No users found</div>'; return; }
+  list.innerHTML = '';
+  filtered.forEach(u => list.appendChild(buildCard(u)));
+}
+
+function buildCard(u) {
+  const card = document.createElement('div');
+  card.className = `user-card ${u.status}`;
+  card.id = `card-${u.user_id}`;
+
+  const ago = u.last_seen
+    ? `Last seen ${Math.round((Date.now()/1000 - u.last_seen)/60)}m ago`
+    : 'Never logged in';
+
+  const badgeClass = { approved:'badge-approved', pending:'badge-pending', rejected:'badge-rejected', revoked:'badge-revoked' }[u.status] || 'badge-pending';
+
+  // Expiry label
+  let expiryHtml = '';
+  if (u.expires_at) {
+    const now = Date.now() / 1000;
+    const diff = u.expires_at - now;
+    if (diff <= 0) {
+      expiryHtml = `<span style="font-size:10px;color:#f87171;font-weight:600;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:2px 8px;">⏱ Expired</span>`;
+    } else {
+      const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), d = Math.floor(diff/86400);
+      const label = d >= 1 ? `${d}d ${h%24}h left` : h >= 1 ? `${h}h ${m}m left` : `${m}m left`;
+      expiryHtml = `<span style="font-size:10px;color:#fbbf24;font-weight:600;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:6px;padding:2px 8px;">⏱ ${label}</span>`;
+    }
+  }
+
+  let actions = '';
+  if (u.status === 'pending') {
+    actions = `
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="number" id="dur-val-${u.user_id}" placeholder="Duration" min="1"
+          style="width:72px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:#e2e8f0;padding:4px 8px;font-size:12px;outline:none;">
+        <select id="dur-unit-${u.user_id}"
+          style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:#e2e8f0;padding:4px 7px;font-size:12px;outline:none;">
+          <option value="mins">Mins</option>
+          <option value="hours" selected>Hours</option>
+          <option value="days">Days</option>
+        </select>
+        <button class="act-btn act-approve" onclick="approveUser('${u.key}','${u.user_id}')">✓ Approve</button>
+        <button class="act-btn act-reject"  onclick="rejectUser('${u.key}','${u.user_id}')">✗ Reject</button>
+      </div>`;
+  } else if (u.status === 'approved') {
+    actions = `<button class="act-btn act-revoke" onclick="revokeUser('${u.user_id}')">⊘ Revoke</button>`;
+    if (u.locked_ip) {
+      actions += ` <button class="act-btn act-reset-ip" onclick="resetIp('${u.user_id}')" title="Locked to: ${esc(u.locked_ip)}">🔓 Reset IP</button>`;
+    }
+  }
+  actions += `<button class="act-btn act-remove" onclick="removeUser('${u.user_id}')">🗑</button>`;
+
+  card.innerHTML = `
+    <div class="user-info">
+      <div class="user-name">${esc(u.name)}</div>
+      <div class="user-meta">${esc(u.user_id)} · ${ago}</div>
+      ${u.reason ? `<div class="user-reason">"${esc(u.reason)}"</div>` : ''}
+      ${expiryHtml}
+    </div>
+    <span class="user-key" title="Click to copy" onclick="copyText('${u.key}')">${u.key}</span>
+    <span class="status-badge ${badgeClass}">${u.status}</span>
+    <div class="user-actions">${actions}</div>
+  `;
+  return card;
+}
+
+async function approveUser(key, uid) {
+  const durVal  = parseInt(document.getElementById(`dur-val-${uid}`)?.value) || 0;
+  const durUnit = document.getElementById(`dur-unit-${uid}`)?.value || 'hours';
+  const body = durVal > 0 ? { duration_value: durVal, duration_unit: durUnit } : {};
+  const d = await api(`/admin/api/approve/${key}`, 'POST', body);
+  if (d.status === 'approved') {
+    const label = durVal > 0 ? ` (${durVal} ${durUnit})` : ' (no limit)';
+    toast(`✓ Approved: ${d.name}${label}`);
+    const u = allUsers.find(x => x.user_id === uid);
+    if (u) { u.status = 'approved'; u.expires_at = d.expires_at || null; }
+    refreshCard(uid, 'approved');
+    loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+async function rejectUser(key, uid) {
+  const d = await api(`/admin/api/reject/${key}`, 'POST');
+  if (d.status === 'rejected') { toast('Rejected.'); refreshCard(uid, 'rejected'); loadOverview(); }
+  else toast(d.error || 'Error', true);
+}
+
+async function revokeUser(uid) {
+  const d = await api(`/admin/api/revoke/${uid}`, 'POST');
+  if (d.status === 'revoked') { toast('Access revoked.'); refreshCard(uid, 'revoked'); }
+  else toast(d.error || 'Error', true);
+}
+
+async function resetIp(uid) {
+  const d = await api(`/admin/api/reset-ip/${uid}`, 'POST');
+  if (d.status === 'reset') { toast('🔓 IP lock removed — user can log in from any device.'); loadUsers(); }
+  else toast(d.error || 'Error', true);
+}
+
+async function removeUser(uid) {
+  if (!confirm('Permanently remove this user?')) return;
+  const d = await api(`/admin/api/remove/${uid}`, 'POST');
+  if (d.status === 'removed') {
+    toast('User removed.');
+    document.getElementById(`card-${uid}`)?.remove();
+    allUsers = allUsers.filter(u => u.user_id !== uid);
+    loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+function refreshCard(uid, newStatus) {
+  const u = allUsers.find(x => x.user_id === uid);
+  if (u) { u.status = newStatus; const old = document.getElementById(`card-${uid}`); if (old) old.replaceWith(buildCard(u)); }
+}
+
+async function addUser() {
+  const name    = document.getElementById('newUserName').value.trim();
+  const durVal  = parseInt(document.getElementById('newUserDurVal').value) || 0;
+  const durUnit = document.getElementById('newUserDurUnit').value || 'hours';
+  if (!name) { toast('Enter a name', true); return; }
+  const body = { name, ...(durVal > 0 ? { duration_value: durVal, duration_unit: durUnit } : {}) };
+  const d = await api('/admin/api/add-user', 'POST', body);
+  if (d.key) {
+    const label = durVal > 0 ? ` · ${durVal} ${durUnit}` : ' · no limit';
+    toast(`✓ Added: ${d.name} — Key: ${d.key}${label}`);
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserDurVal').value = '';
+    loadUsers(); loadOverview();
+  } else toast(d.error || 'Error', true);
+}
+
+let _webhookToken = '';
+let _siteBaseUrl  = location.origin;
+
+function _webhookUrl(token) {
+  return `${_siteBaseUrl}/webhook/email?secret=${token}`;
+}
+
+async function loadWebhookSecret() {
+  try {
+    const [sd, cd] = await Promise.all([
+      api('/admin/api/webhook-secret'),
+      api('/admin/api/site-config'),
+    ]);
+    _siteBaseUrl  = (cd.base_url || location.origin).replace(/\/$/, '');
+    _webhookToken = sd.token || '';
+    document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
+    document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
+    const prev = document.getElementById('webhookUrlPreview');
+    if (prev) prev.textContent = _webhookUrl(_webhookToken);
+  } catch(e) {}
+}
+
+async function regenerateWebhookSecret() {
+  if (!confirm('Regenerate webhook secret? Your existing webhook URLs will stop working.')) return;
+  const d = await api('/admin/api/webhook-secret/regenerate', 'POST');
+  _webhookToken = d.token || '';
+  document.getElementById('webhookSecretDisplay').textContent = _webhookToken;
+  document.getElementById('webhookFullUrl').textContent = _webhookUrl(_webhookToken);
+  const prev = document.getElementById('webhookUrlPreview');
+  if (prev) prev.textContent = _webhookUrl(_webhookToken);
+  toast('✓ Webhook secret regenerated');
+}
+
+async function testWebhook() {
+  const el = document.getElementById('webhookTestResult');
+  el.textContent = '⏳ Sending test…';
+  el.style.color = '#64748b';
+  try {
+    const d = await api('/admin/api/webhook-test', 'POST');
+    if (d.status === 'sent' && d.response_code === 200) {
+      el.textContent = '✅ Webhook reachable! Endpoint is working correctly.';
+      el.style.color = '#4ade80';
+    } else {
+      el.textContent = `⚠️ Got ${d.response_code}: ${JSON.stringify(d.response)}`;
+      el.style.color = '#fbbf24';
+    }
+  } catch(e) {
+    el.textContent = '❌ Error: ' + e.message;
+    el.style.color = '#f87171';
+  }
+}
+
+async function loadDomains() {
+  const [d] = await Promise.all([
+    api('/admin/api/domains'),
+    loadWebhookSecret(),
+  ]);
+  document.getElementById('dmPass').value = d.domain_password || '';
+
+  const tempList = document.getElementById('tempDomainList');
+  tempList.innerHTML = '';
+  (d.temp || []).forEach(dom => tempList.appendChild(domainPill(dom)));
+
+  const customList = document.getElementById('customDomainList');
+  customList.innerHTML = '';
+  (d.custom || []).forEach(e => customList.appendChild(domainPill(e.domain, true)));
+}
+
+function domainPill(domain, isCustom) {
+  const pill = document.createElement('div');
+  pill.className = 'domain-pill';
+  pill.innerHTML = `
+    <span>${isCustom ? '🔒 ' : ''}${esc(domain)}</span>
+    <button class="rm" title="Remove domain" onclick="removeDomain('${esc(domain)}')">×</button>
+  `;
+  return pill;
+}
+
+async function syncWeynDomains() {
+  const btn = document.getElementById('syncWeynBtn');
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try {
+    const d = await api('/admin/api/domains/sync-weyn', 'POST');
+    if (d.added && d.added.length > 0) {
+      toast(`✓ Synced — added: ${d.added.join(', ')}`);
+    } else {
+      toast(`✓ All ${d.total} domains already up to date`);
+    }
+    loadDomains();
+  } catch(e) {
+    toast('Sync failed', true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Sync from weyn-emails.app';
+  }
+}
+
+async function addTempDomain() {
+  const domain = document.getElementById('newTempDomain').value.trim().toLowerCase();
+  if (!domain) { toast('Enter a domain', true); return; }
+  const d = await api('/admin/api/domains/add-temp', 'POST', { domain });
+  if (d.status === 'added') { toast(`✓ Added: ${domain}`); document.getElementById('newTempDomain').value = ''; loadDomains(); }
+  else if (d.status === 'exists') toast('Domain already exists', true);
+  else toast(d.error || 'Error', true);
+}
+
+async function addCustomDomain() {
+  const domain = document.getElementById('newCustomDomain').value.trim().toLowerCase();
+  if (!domain) { toast('Enter a domain', true); return; }
+  const d = await api('/admin/api/domains/add-custom', 'POST', { domain });
+  if (d.status === 'added') {
+    toast(`✓ Added: ${domain}`);
+    document.getElementById('newCustomDomain').value = '';
+    loadDomains();
+  } else if (d.status === 'exists') toast('Domain already exists', true);
+  else toast(d.error || 'Error', true);
+}
+
+async function removeDomain(domain) {
+  if (!confirm(`Remove domain "${domain}"?`)) return;
+  const d = await api('/admin/api/domains/remove', 'POST', { domain });
+  if (d.status === 'removed') { toast(`Removed: ${domain}`); loadDomains(); }
+  else toast('Not found', true);
+}
+
+async function saveDmPass() {
+  const pw = document.getElementById('dmPass').value.trim();
+  if (!pw) { toast('Enter a password', true); return; }
+  const d = await api('/admin/api/domains/set-password', 'POST', { password: pw });
+  if (d.status === 'updated') toast('✓ Domain password updated');
+  else toast(d.error || 'Error', true);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  toast('Copied!');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Create Accounts tab ──────────────────────────────────────────────────────
+
+let cEventSource   = null;
+let cCreatedCount  = 0;
+let cTargetCount   = 0;
+let cStartTime     = null;
+let _cCustomDomains = [];
+let _cTimerTick = null;
+let cAllAccounts   = [];
+let cCurrentJobId  = null;
+const _cAcqtEmails = {};  // uid -> email for retry fetch
+
+function _cStartTicker() {
+  if (_cTimerTick) clearInterval(_cTimerTick);
+  _cTimerTick = setInterval(() => {
+    if (!cStartTime) return;
+    const secs = Math.floor((Date.now() - cStartTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    const el = document.getElementById('c-statTime');
+    if (el) { el.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`; el.style.color = ''; }
+  }, 1000);
+}
+
+function _cStopTicker() {
+  if (_cTimerTick) { clearInterval(_cTimerTick); _cTimerTick = null; }
+}
+
+async function cLoadDomains() {
+  try {
+    const r = await fetch('/api/domains', { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    _cCustomDomains = d.custom || [];
+    const sel = document.getElementById('c-emailDomain');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    (d.temp || []).forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom; o.textContent = dom;
+      sel.appendChild(o);
+    });
+    _cCustomDomains.forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom; o.textContent = dom;
+      sel.appendChild(o);
+    });
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    cOnDomainChange();
+  } catch(e) {}
+}
+
+function cOnDomainChange() {
+  const v = document.getElementById('c-emailDomain').value;
+  document.getElementById('c-domainPassRow').style.display = _cCustomDomains.includes(v) ? 'flex' : 'none';
+}
+
+function cOnPassTypeChange() {
+  const v = document.getElementById('c-passwordType').value;
+  document.getElementById('c-customPassRow').style.display = v === 'custom' ? 'flex' : 'none';
+}
+
+function cSwitchTab(name) {
+  const logContainer  = document.getElementById('c-tc-log');
+  const acctContainer = document.getElementById('c-tc-accts');
+  const logTab        = document.getElementById('c-tab-log');
+  const acctTab       = document.getElementById('c-tab-accts');
+  if (name === 'log') {
+    logContainer.classList.add('active');
+    acctContainer.classList.remove('active');
+    logTab.classList.add('active');
+    acctTab.classList.remove('active');
+  } else {
+    acctContainer.classList.add('active');
+    logContainer.classList.remove('active');
+    acctTab.classList.add('active');
+    logTab.classList.remove('active');
+  }
+}
+
+function cAddLog(msg, level) {
+  const panel = document.getElementById('c-log-panel');
+  const empty = document.getElementById('c-logEmpty');
+  if (empty) empty.remove();
+  const colors = { success:'#00e676', warn:'#fbbf24', error:'#f87171', info:'#475569' };
+  const now = new Date().toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.style.cssText = 'display:flex;gap:10px;align-items:baseline;';
+  line.innerHTML = `<span style="color:#1e293b;font-size:10px;flex-shrink:0;">${now}</span><span style="color:${colors[level]||'#475569'};flex:1;word-break:break-all;">${esc(msg)}</span>`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function cCopyAllAccounts() {
+  const bar   = document.getElementById('c-copyAllBar');
+  const label = document.getElementById('c-copyAllText');
+  const orig  = label.innerHTML;
+  if (!cAllAccounts.length) {
+    label.innerHTML = 'No accounts this session yet';
+    setTimeout(() => { label.innerHTML = orig; }, 2000);
+    return;
+  }
+  const text = cAllAccounts.join('\n');
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  bar.classList.add('copied');
+  label.innerHTML = `✓ Copied ${cAllAccounts.length} account${cAllAccounts.length !== 1 ? 's' : ''} (uid|password)!`;
+  setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
+}
+
+function cAddAccount(data) {
+  const empty = document.getElementById('c-acctEmpty');
+  if (empty) empty.remove();
+  cAllAccounts.push(`${data.uid}|${data.password}`);
+  if (data.uid && data.email) _cAcqtEmails[data.uid] = data.email;
+  const panel = document.getElementById('c-accts-panel');
+  const copyAll = `${data.name} | ${data.email} | ${data.password} | ${data.uid}`;
+
+  const _isAuto = true;
+
+  const card = document.createElement('div');
+  card.id = `c-card-${data.uid}`;
+  card.className = 'c-acct-card';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:10px;font-weight:600;color:#1e293b;font-family:monospace;">#${data.num}</span>
+      <button onclick="cCopyField(this,\`${escAttr(copyAll)}\`)" class="c-copy-btn">Copy All</button>
+    </div>
+    <div style="display:grid;grid-template-columns:60px 1fr;row-gap:8px;align-items:center;">
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Name</span>
+      <span style="font-size:13px;color:#f1f5f9;font-weight:600;">${esc(data.name)}</span>
+
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Email</span>
+      <div style="display:flex;align-items:center;gap:7px;min-width:0;">
+        <span style="font-size:12px;color:#60a5fa;word-break:break-all;flex:1;">${esc(data.email)}</span>
+        <button onclick="cCopyField(this,'${escAttr(data.email)}')" class="c-copy-btn">Copy</button>
+      </div>
+
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Pass</span>
+      <span style="font-size:12px;color:#e2e8f0;font-family:monospace;">${esc(data.password)}</span>
+
+      <span style="font-size:9px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">UID</span>
+      <span style="font-size:12px;color:#00e676;font-family:monospace;">${esc(data.uid)}</span>
+    </div>
+    <div class="c-confirm-section">
+      <span class="c-confirm-label">✉ Confirmation Code</span>
+      <div class="c-confirm-row">
+        <input id="cci-${data.uid}" class="c-confirm-input" type="text"
+               maxlength="8" placeholder="_ _ _ _ _" readonly
+               title="Tap to copy"
+               onclick="if(this.value){navigator.clipboard.writeText(this.value).catch(()=>{});this.select();const s=document.getElementById('ccs-${data.uid}');const o=s&&s.textContent;if(s){s.textContent='✓ Copied!';setTimeout(()=>{if(s)s.textContent=o;},1000);}}"
+               style="cursor:pointer;">
+      </div>
+      <div id="c-retry-row-${data.uid}" style="display:block;margin-top:4px;">
+        <button class="c-confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="cRetryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
+      </div>
+      <div id="ccs-${data.uid}" class="c-confirm-status ${_isAuto ? 'fetching' : ''}">${_isAuto ? '⏳ Fetching code from inbox…' : ''}</div>
+    </div>
+  `;
+  panel.appendChild(card);
+
+  cCreatedCount++;
+  document.getElementById('c-statCreated').textContent = cCreatedCount;
+  document.getElementById('c-acctCount').textContent = `(${cCreatedCount})`;
+  const pct = cTargetCount ? Math.round((cCreatedCount / cTargetCount) * 100) : 0;
+  document.getElementById('c-progressBar').style.width = pct + '%';
+  document.getElementById('c-progressPct').textContent = pct + '%';
+  document.getElementById('c-progressLabel').textContent = `${cCreatedCount} of ${cTargetCount}`;
+  if (cStartTime) {
+    const secs = Math.floor((Date.now() - cStartTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('c-statTime').textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
+    document.getElementById('c-statTime').style.color = '';
+  }
+}
+
+function cCopyField(btn, text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.style.color = '#00e676';
+  btn.textContent = '✓';
+  setTimeout(() => { btn.style.color = ''; btn.textContent = orig; }, 1200);
+}
+
+function cSetRunning(running) {
+  document.getElementById('c-btnStart').disabled = running;
+  document.getElementById('c-btnStop').disabled = !running;
+}
+
+async function cStartJob() {
+  const nameType       = document.getElementById('c-nameType').value;
+  const emailDomain    = document.getElementById('c-emailDomain').value;
+  const domainPassword = document.getElementById('c-domainPassword').value;
+  const count          = parseInt(document.getElementById('c-count').value) || 1;
+  const passwordType   = document.getElementById('c-passwordType').value;
+  const customPassword = document.getElementById('c-customPassword').value;
+  const gender         = document.getElementById('c-gender').value;
+
+  if (passwordType === 'custom' && !customPassword.trim()) { toast('Enter a custom password', true); return; }
+
+  cCreatedCount = 0; cTargetCount = count; cStartTime = Date.now();
+  document.getElementById('c-statCreated').textContent = '0';
+  document.getElementById('c-statTotal').textContent   = count;
+  document.getElementById('c-statTime').textContent    = '0s';
+  document.getElementById('c-statTime').style.color    = '';
+  document.getElementById('c-progressBar').style.width = '0%';
+  document.getElementById('c-progressPct').textContent = '0%';
+  document.getElementById('c-progressLabel').textContent = 'Starting…';
+  cAllAccounts = [];
+  document.getElementById('c-log-panel').innerHTML = '<div class="c-empty" id="c-logEmpty"><div style="font-size:32px;opacity:.3;">⬡</div><div style="font-size:13px;font-weight:500;color:#1e293b;">Starting…</div></div>';
+  document.getElementById('c-accts-panel').innerHTML = '<div class="c-empty" id="c-acctEmpty"><div style="font-size:32px;opacity:.3;">⬡</div><div style="font-size:13px;font-weight:500;color:#1e293b;">No accounts yet</div></div>';
+  document.getElementById('c-acctCount').textContent = '(0)';
+  cSwitchTab('log');
+
+  const proxyList = document.getElementById('c-proxyList').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+
+  const resp = await fetch('/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name_type: nameType, email_domain: emailDomain,
+      domain_password: domainPassword, count, password_type: passwordType,
+      custom_password: customPassword, gender, proxies: proxyList }),
+  });
+
+  if (!resp.ok) { const err = await resp.json(); toast('Error: ' + (err.error || 'Unknown'), true); return; }
+
+  const result = await resp.json();
+  cCurrentJobId = result.job_id;
+
+  cSetRunning(true);
+  _cStartTicker();
+  cAddLog(`Started — ${count} account(s) on ${emailDomain}`, 'info');
+
+  if (cEventSource) cEventSource.close();
+  _cConnectStream(cCurrentJobId);
+}
+
+function _cConnectStream(jobId) {
+  if (cEventSource) { cEventSource.close(); cEventSource = null; }
+  cEventSource = new EventSource('/stream?job_id=' + jobId);
+  cEventSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping') return;
+    if (msg.type === 'log')            cAddLog(msg.msg, msg.level);
+    if (msg.type === 'account')        cAddAccount(msg.data);
+    if (msg.type === 'confirm_code')   cAutofillCode(msg.uid, msg.code);
+    if (msg.type === 'confirm_result') cHandleConfirmResult(msg.uid, msg.status);
+    if (msg.type === 'done') {
+      cAddLog(msg.msg, 'success');
+      cSetRunning(false);
+      _cStopTicker();
+      if (cEventSource) { cEventSource.close(); cEventSource = null; }
+      document.getElementById('c-progressLabel').textContent = 'Completed';
+    }
+  };
+  cEventSource.onerror = () => {
+    if (cEventSource) { cEventSource.close(); cEventSource = null; }
+    fetch('/status?job_id=' + jobId)
+      .then(r => r.ok ? r.json() : Promise.reject('not_ok'))
+      .then(s => {
+        if (s.running) {
+          setTimeout(() => _cConnectStream(jobId), 2000);
+        } else if (s.found) {
+          setTimeout(() => _cConnectStream(jobId), 1000);
+        } else {
+          cSetRunning(false);
+          _cStopTicker();
+        }
+      })
+      .catch(() => {
+        setTimeout(() => _cConnectStream(jobId), 3000);
+      });
+  };
+}
+
+async function cStopJob() {
+  await fetch('/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: cCurrentJobId }),
+  });
+  cSetRunning(false);
+  _cStopTicker();
+  cAddLog('Stop requested.', 'warn');
+  if (cEventSource) { cEventSource.close(); cEventSource = null; }
+}
+
+function cAutofillCode(uid, code) {
+  const input  = document.getElementById(`cci-${uid}`);
+  const status = document.getElementById(`ccs-${uid}`);
+  const retry  = document.getElementById(`c-retry-row-${uid}`);
+  if (input)  { input.value = code; input.classList.add('code-ready'); }
+  if (status) { status.className = 'c-confirm-status loading'; status.textContent = `✉ Code fetched: ${code}`; }
+  if (retry)  retry.style.display = '';
+  cAddLog(`✉ Code ${code} fetched for UID ${uid}`, 'success');
+}
+
+function cHandleConfirmResult(uid, statusVal) {
+  const status = document.getElementById(`ccs-${uid}`);
+  const input  = document.getElementById(`cci-${uid}`);
+  const retry  = document.getElementById(`c-retry-row-${uid}`);
+  if (statusVal === 'confirmed') {
+    if (status) { status.className = 'c-confirm-status confirmed'; status.textContent = '✓ Email confirmed via link!'; }
+    cAddLog(`✓ Confirmed via link: UID ${uid}`, 'success');
+  } else if (statusVal === 'checkpoint') {
+    if (status) { status.className = 'c-confirm-status checkpoint'; status.textContent = '⚠ Checkpoint — try again.'; }
+    if (retry)  retry.style.display = '';
+  } else if (statusVal === 'timeout') {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ No code found — click Retry.'; }
+    if (retry)  retry.style.display = '';
+  } else if (statusVal === 'link_error') {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ Confirm link failed — click Retry.'; }
+    if (retry)  retry.style.display = '';
+  }
+}
+
+async function cRetryConfirm(uid) {
+  const status = document.getElementById(`ccs-${uid}`);
+  const retry  = document.getElementById(`c-retry-row-${uid}`);
+  const input  = document.getElementById(`cci-${uid}`);
+  const email  = _cAcqtEmails[uid] || '';
+
+  if (input)  { input.value = ''; input.classList.remove('code-ready'); }
+  if (status) { status.className = 'c-confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
+
+  cAddLog(`🔄 Retrying inbox fetch for UID ${uid}`, 'info');
+
+  try {
+    const resp = await fetch('/fetch-code-now', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, email }),
+    });
+    const result = await resp.json();
+
+    if (result.code) {
+      if (input)  { input.value = result.code; input.classList.add('code-ready'); }
+      if (status) { status.className = 'c-confirm-status loading'; status.textContent = '✉ Code fetched: ' + result.code; }
+      if (retry)  retry.style.display = '';
+      cAddLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+    } else if (result.status === 'not_found') {
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ No code in inbox — click Retry again.'; }
+      if (retry)  retry.style.display = '';
+    } else if (result.status === 'waiting_webhook') {
+      if (status) { status.className = 'c-confirm-status fetching'; status.textContent = '📡 Waiting for webhook push — check your mail server.'; }
+      if (retry)  retry.style.display = '';
+    } else if (result.status === 'unsupported_domain') {
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ ' + (result.msg || result.error || 'Domain not configured'); }
+      if (retry)  retry.style.display = '';
+    } else {
+      if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ ' + (result.error || 'Retry failed'); }
+      if (retry)  retry.style.display = '';
+    }
+  } catch(e) {
+    if (status) { status.className = 'c-confirm-status error'; status.textContent = '✗ Network error — try again.'; }
+    if (retry)  retry.style.display = '';
+  }
+}
+
+function escAttr(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
+}
+
+loadOverview();
+</script>
+</body>
+</html>
+

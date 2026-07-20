@@ -2246,6 +2246,96 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                 return 'confirmed'
             return None
 
+        # ── A0: Desktop GraphQL mutation (current Facebook flow) ─────────────
+        try:
+            import uuid as _uuid2, json as _json2
+            _desktop_ua2 = (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+            )
+            _conf_page = ses.get(
+                'https://www.facebook.com/confirmemail.php?next=',
+                headers={
+                    'User-Agent': _desktop_ua2,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Referer': 'https://www.facebook.com/',
+                },
+                timeout=10, allow_redirects=True
+            )
+            _conf_html = _conf_page.text
+            _lsd2 = ''
+            _dtsg2 = ''
+            _rev2 = ''
+            _hs2 = ''
+            _hsi2 = ''
+            _jazo2 = ''
+            _m0 = re.search(r'"LSD",\[\],\{"token":"([^"]+)"', _conf_html)
+            if _m0: _lsd2 = _m0.group(1)
+            _m0 = re.search(r'"DTSGInitialData",\[\],\{"token":"([^"]+)"', _conf_html)
+            if _m0: _dtsg2 = _m0.group(1)
+            _m0 = re.search(r'"revision":(\d{7,})', _conf_html)
+            if _m0: _rev2 = _m0.group(1)
+            _m0 = re.search(r'"haste_session":"([^"]+)"', _conf_html)
+            if _m0: _hs2 = _m0.group(1)
+            _m0 = re.search(r'"hsi":"([^"]+)"', _conf_html)
+            if _m0: _hsi2 = _m0.group(1)
+            _m0 = re.search(r'name="jazoest"\s+value="([^"]+)"', _conf_html)
+            if _m0: _jazo2 = _m0.group(1)
+            if not _dtsg2:
+                _m0 = re.search(r'"token"\s*:\s*"([A-Za-z0-9_\-]{20,}:[^"]+)"', _conf_html)
+                if _m0: _dtsg2 = _m0.group(1)
+            if _lsd2:
+                _gql_vars = {
+                    'input': {
+                        'actor_id': uid,
+                        'client_mutation_id': str(_uuid2.uuid4()),
+                        'conf_code': {'sensitive_string_value': code},
+                        'ig_reg_data': None,
+                        'machine_id': None,
+                    }
+                }
+                _gql_payload2 = {
+                    'av': uid, '__user': uid, '__a': '1', '__req': '3',
+                    '__hs': _hs2, 'dpr': '1', '__ccg': 'EXCELLENT',
+                    '__rev': _rev2, '__s': '', '__hsi': _hsi2,
+                    '__dyn': '', '__csr': '', '__comet_req': '102',
+                    'fb_dtsg': _dtsg2, 'jazoest': _jazo2, 'lsd': _lsd2,
+                    '__spin_r': _rev2, '__spin_b': 'trunk',
+                    '__spin_t': str(int(time.time())),
+                    'fb_api_caller_class': 'RelayModern',
+                    'fb_api_req_friendly_name': 'useCAAFBConfirmationFormSubmitMutation',
+                    'server_timestamps': 'true',
+                    'variables': _json2.dumps(_gql_vars),
+                    'doc_id': '24050931851170558',
+                }
+                _conf_resp = ses.post(
+                    'https://www.facebook.com/api/graphql/',
+                    data=_gql_payload2,
+                    headers={
+                        'User-Agent': _desktop_ua2,
+                        'Accept': '*/*',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Origin': 'https://www.facebook.com',
+                        'Referer': 'https://www.facebook.com/confirmemail.php?next=',
+                        'X-Fb-Friendly-Name': 'useCAAFBConfirmationFormSubmitMutation',
+                        'X-Fb-Lsd': _lsd2,
+                    },
+                    timeout=15, allow_redirects=True
+                )
+                try:
+                    _conf_json = _conf_resp.json()
+                except Exception:
+                    _conf_json = {}
+                _conf_data = (_conf_json.get('data') or {}).get('xfb_caa_registration_confirmation_submit', {})
+                if _conf_data.get('user_id') or _conf_data.get('created_user_id'):
+                    return 'confirmed'
+                q = _chk(str(_conf_resp.url), _conf_resp.text)
+                if q:
+                    return q
+        except Exception:
+            pass
+
         # ── A1: Parse the real form and POST with the code ────────────────────
         for _try_url in [
             'https://m.facebook.com/confirmemail.php',

@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEYN — FB Account Creator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #050810;
+    color: #e2e8f0;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100vh;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,230,118,0.05) 0%, transparent 60%);
+  }
+
+  /* ── Header ── */
+  header {
+    background: rgba(8,12,22,0.97);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo-mark {
+    width: 34px;
+    height: 34px;
+    background: linear-gradient(135deg, #00e676, #00b84c);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    color: #000;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.1), 0 4px 16px rgba(0,230,118,0.3);
+  }
+
+  .logo-text {
+    font-size: 16px;
+    font-weight: 800;
+    color: #f1f5f9;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.08);
+    margin: 0 4px;
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: #475569;
+    font-weight: 500;
+  }
+
+  .running-badge {
+    display: none;
+    font-size: 11px;
+    font-weight: 600;
+    color: #00e676;
+    background: rgba(0,230,118,0.1);
+    border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 20px;
+    padding: 3px 10px;
+    animation: fadepulse 1.5s ease-in-out infinite;
+  }
+  .running-badge.visible { display: inline-flex; align-items: center; gap: 5px; }
+  @keyframes fadepulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .user-chip {
+    font-size: 12px;
+    color: #475569;
+    font-weight: 500;
+  }
+
+  .expiry-chip {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,230,118,0.2);
+    background: rgba(0,230,118,0.07);
+    color: #00e676;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .expiry-chip.show { display: inline-flex; }
+  .expiry-chip.warning {
+    border-color: rgba(251,191,36,0.3);
+    background: rgba(251,191,36,0.08);
+    color: #fbbf24;
+  }
+  .expiry-chip.critical {
+    border-color: rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.08);
+    color: #f87171;
+    animation: fadepulse 1.5s ease-in-out infinite;
+  }
+
+  .btn-header {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    border: 1px solid rgba(245,158,11,0.25);
+    background: rgba(245,158,11,0.06);
+    color: #f59e0b;
+  }
+  .btn-header:hover {
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(245,158,11,0.4);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #00e676;
+    box-shadow: 0 0 6px #00e676;
+    animation: fadepulse 2s infinite;
+  }
+  .status-dot.idle { background: #1e293b; box-shadow: none; animation: none; }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: rgba(8,12,22,0.8);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 22px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .section-label::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 10px;
+    background: #00e676;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  select, input[type="text"], input[type="number"], input[type="password"] {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    color: #e2e8f0;
+    padding: 10px 14px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+    width: 100%;
+    -webkit-appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  select:focus, input:focus {
+    border-color: rgba(0,230,118,0.45);
+    box-shadow: 0 0 0 4px rgba(0,230,118,0.08);
+    background: rgba(0,230,118,0.02);
+  }
+  select option { background: #0e1420; }
+  #emailDomain { font-size: 12px; }
+  input::placeholder { color: #1e293b; }
+
+  .domain-pass-row { display: none; flex-direction: column; gap: 5px; }
+  .domain-pass-row.visible { display: flex; }
+  .custom-pass-row { display: none; flex-direction: column; gap: 5px; }
+  .custom-pass-row.visible { display: flex; }
+
+  /* ── Progress ── */
+  .progress-wrap { display: flex; flex-direction: column; gap: 8px; }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #334155;
+    font-weight: 500;
+  }
+
+  .progress-bar-track {
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00e676, #00c853);
+    border-radius: 99px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-box {
+    background: linear-gradient(160deg, rgba(20,30,54,0.9) 0%, rgba(10,15,26,0.9) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-top: 1px solid rgba(0,230,118,0.15);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+    transition: border-color .2s;
+  }
+  .stat-box:hover { border-color: rgba(255,255,255,0.12); }
+  .stat-num {
+    font-size: 22px;
+    font-weight: 800;
+    color: #00e676;
+    letter-spacing: -1px;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    margin-top: 3px;
+  }
+
+  /* ── Buttons ── */
+  .action-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .btn {
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    width: 100%;
+    letter-spacing: -0.1px;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, #00e676 0%, #00b84c 100%);
+    color: #000;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.2px;
+    box-shadow: 0 4px 24px rgba(0,230,118,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .btn-start:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(0,230,118,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .btn-start:active:not(:disabled) { transform: translateY(0); }
+  .btn-start:disabled {
+    background: rgba(0,230,118,0.08);
+    color: rgba(0,230,118,0.2);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-stop {
+    background: transparent;
+    border: 1px solid rgba(239,68,68,0.25);
+    color: #f87171;
+  }
+  .btn-stop:hover:not(:disabled) { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.4); }
+  .btn-stop:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  .btn-download {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #475569;
+  }
+  .btn-download:hover { background: rgba(255,255,255,0.04); color: #64748b; }
+
+  /* ── Main panel ── */
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #060a12;
+  }
+
+  .tabs-bar {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(8,12,22,0.9);
+    flex-shrink: 0;
+    padding: 0 20px;
+    gap: 0;
+  }
+
+  .tab {
+    padding: 14px 18px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    user-select: none;
+    letter-spacing: 0.1px;
+  }
+  .tab.active { color: #00e676; border-bottom-color: #00e676; }
+  .tab:hover:not(.active) { color: #94a3b8; }
+
+  .tab-content { flex: 1; overflow: hidden; display: none; }
+  .tab-content.active { display: flex; flex-direction: column; }
+
+  /* ── Log panel ── */
+  #log-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    font-size: 12px;
+    line-height: 1.8;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  #log-panel::-webkit-scrollbar { width: 3px; }
+  #log-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+
+  .log-line { display: flex; gap: 10px; align-items: baseline; }
+  .log-ts { color: #1e293b; font-size: 10px; flex-shrink: 0; }
+  .log-msg { flex: 1; word-break: break-all; }
+  .log-info    .log-msg { color: #475569; }
+  .log-success .log-msg { color: #00e676; }
+  .log-warn    .log-msg { color: #fbbf24; }
+  .log-error   .log-msg { color: #f87171; }
+
+  .copy-all-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    background: rgba(0,230,118,0.07);
+    border-bottom: 1px solid rgba(0,230,118,0.12);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background .2s;
+    gap: 8px;
+  }
+  .copy-all-bar:hover { background: rgba(0,230,118,0.13); }
+  .copy-all-bar:active { background: rgba(0,230,118,0.18); }
+  .copy-all-bar-icon { font-size: 15px; color: #00e676; }
+  .copy-all-bar-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    letter-spacing: -0.1px;
+  }
+  .copy-all-bar-text span { color: #00e676; }
+  .copy-all-bar.copied .copy-all-bar-text { color: #00e676; }
+
+  /* ── Accounts panel ── */
+  #accounts-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #accounts-panel::-webkit-scrollbar { width: 3px; }
+  #accounts-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+
+  .acct-card {
+    background: linear-gradient(160deg, rgba(18,26,48,0.95) 0%, rgba(10,15,26,0.95) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    transition: border-color .2s, box-shadow .2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .acct-card:hover {
+    border-color: rgba(0,230,118,0.2);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+
+  .acct-num {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 10px;
+    color: #1e293b;
+    font-weight: 600;
+    font-family: monospace;
+  }
+
+  .acct-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .acct-field-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: 56px;
+    flex-shrink: 0;
+  }
+
+  .acct-field-value {
+    font-size: 13px;
+    word-break: break-all;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .acct-name  { color: #f1f5f9; font-weight: 600; }
+  .acct-email { color: #60a5fa; }
+  .acct-pass  { color: #e2e8f0; font-family: monospace; }
+  .acct-uid   { color: #00e676; font-family: monospace; }
+
+  .copy-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 6px;
+    color: #334155;
+    cursor: pointer;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 500;
+    transition: all .15s;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { color: #00e676; border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.06); }
+  .copy-btn.copied { color: #00e676; border-color: rgba(0,230,118,0.3); }
+
+  .acct-copy-all {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: #1e293b;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 0;
+    transition: color .15s;
+  }
+  .acct-copy-all:hover { color: #00e676; }
+
+  /* ── Confirm code section ── */
+  .confirm-section {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .confirm-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .confirm-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .confirm-input {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    outline: none;
+    width: 100%;
+    transition: border-color .2s, box-shadow .2s;
+    text-align: center;
+  }
+  .confirm-input:focus {
+    border-color: rgba(96,165,250,0.5);
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.08);
+  }
+  .confirm-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .confirm-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.25);
+    color: #60a5fa;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .confirm-btn:hover:not(:disabled) {
+    background: rgba(96,165,250,0.2);
+    border-color: rgba(96,165,250,0.45);
+  }
+  .confirm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .confirm-status {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .confirm-status.confirmed {
+    display: block;
+    background: rgba(0,230,118,0.1);
+    border: 1px solid rgba(0,230,118,0.2);
+    color: #00e676;
+  }
+  .confirm-status.checkpoint {
+    display: block;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.2);
+    color: #fbbf24;
+  }
+  .confirm-status.submitted {
+    display: block;
+    background: rgba(96,165,250,0.1);
+    border: 1px solid rgba(96,165,250,0.2);
+    color: #60a5fa;
+  }
+  .confirm-status.error {
+    display: block;
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.2);
+    color: #f87171;
+  }
+  .confirm-status.loading {
+    display: block;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: #475569;
+  }
+  .confirm-status.fetching {
+    display: block;
+    background: rgba(96,165,250,0.06);
+    border: 1px solid rgba(96,165,250,0.15);
+    color: #475569;
+    animation: fadepulse 1.5s ease-in-out infinite;
+  }
+  .confirm-input.code-ready {
+    border-color: rgba(0,230,118,0.45);
+    box-shadow: 0 0 0 3px rgba(0,230,118,0.08);
+    color: #00e676;
+    animation: codePop .4s ease;
+  }
+  @keyframes codePop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.03); }
+    100% { transform: scale(1); }
+  }
+
+  /* ── Empty states ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: #1e293b;
+    gap: 12px;
+    padding: 40px;
+    text-align: center;
+  }
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+  .empty-text { font-size: 13px; font-weight: 500; color: #1e293b; }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; height: auto; overflow: auto; }
+    .sidebar { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .main-panel { min-height: 60vh; }
+    body { overflow: auto; height: auto; }
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">W</div>
+  <span class="logo-text">WEYN</span>
+  <div class="logo-sep"></div>
+  <span class="logo-sub">Account Creator</span>
+  <span class="running-badge" id="runningBadge">
+    <span style="width:6px;height:6px;background:#00e676;border-radius:50%;display:inline-block;"></span>
+    Running
+  </span>
+  <div class="header-right">
+    <span class="user-chip" id="userNameBadge"></span>
+    <span class="expiry-chip" id="expiryChip">
+      <span>⏱</span><span id="expiryLabel">—</span>
+    </span>
+    <button class="btn-header" onclick="window.location.href='/admin'">Admin Panel</button>
+    <div class="status-dot idle" id="statusDot"></div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <div class="sidebar">
+
+    <div>
+      <div class="section-label">Configuration</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+
+        <div class="form-group">
+          <label class="field-label">Name Type</label>
+          <select id="nameType">
+            <option value="1">Filipino Names</option>
+            <option value="2">RPW (Fantasy) Names</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Gender</label>
+          <select id="gender">
+            <option value="3">Mixed</option>
+            <option value="1">Male</option>
+            <option value="2">Female</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Email Domain</label>
+          <select id="emailDomain" onchange="onDomainChange()">
+          </select>
+        </div>
+
+        <div class="domain-pass-row form-group" id="domainPassRow">
+          <label class="field-label">Domain Password</label>
+          <input type="password" id="domainPassword" placeholder="Enter domain password">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Password Type</label>
+          <select id="passwordType" onchange="onPassTypeChange()">
+            <option value="auto">Auto-Generated</option>
+            <option value="custom">Custom Password</option>
+          </select>
+        </div>
+
+        <div class="custom-pass-row form-group" id="customPassRow">
+          <label class="field-label">Custom Password</label>
+          <input type="text" id="customPassword" placeholder="Enter password">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Number of Accounts</label>
+          <input type="number" id="count" value="5" min="1" max="200">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" style="display:flex;align-items:center;gap:6px;">
+            Proxies
+            <span style="font-size:10px;font-weight:500;color:#475569;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:1px 6px;">required</span>
+          </label>
+          <textarea id="proxyList" rows="4"
+            placeholder="One per line:&#10;http://user:pass@host:port&#10;socks5://user:pass@host:port&#10;host:port"
+            style="font-family:'JetBrains Mono',monospace;font-size:11px;resize:vertical;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:#e2e8f0;border-radius:8px;padding:8px 10px;width:100%;outline:none;"></textarea>
+          <div style="font-size:10px;color:#475569;margin-top:4px;">Facebook blocks server IPs — residential or mobile proxies required</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Add Domain</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="form-group">
+          <label class="field-label">Domain Name</label>
+          <input type="text" id="newDomainInput" placeholder="e.g. mail.example.com"
+                 style="font-size:12px;"
+                 onkeydown="if(event.key==='Enter') addUserDomain()">
+        </div>
+        <button class="btn" id="btnAddDomain"
+                style="background:rgba(0,230,118,0.09);border:1px solid rgba(0,230,118,0.2);color:#00e676;font-size:12px;padding:8px 12px;"
+                onclick="addUserDomain()">+ Add Domain</button>
+        <div id="addDomainMsg" style="display:none;font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;text-align:center;"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Progress</div>
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span id="progressLabel" style="color:#475569;">Ready</span>
+          <span id="progressPct" style="color:#334155;">0%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+      </div>
+      <div class="stats-row" style="margin-top:10px;">
+        <div class="stat-box">
+          <div class="stat-num" id="statCreated">0</div>
+          <div class="stat-label">Created</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statTotal" style="color:#475569;">—</div>
+          <div class="stat-label">Target</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statTime" style="color:#475569;font-size:16px;">—</div>
+          <div class="stat-label">Time</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-group">
+      <button class="btn btn-start" id="btnStart" onclick="startJob()">▶ Start Creation</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopJob()" disabled>■ Stop</button>
+      <button class="btn btn-download" onclick="downloadResults()">⬇ Download Results</button>
+    </div>
+
+  </div>
+
+  <div class="main-panel">
+
+    <div class="tabs-bar">
+      <div class="tab active" onclick="switchTab('log')">Console Log</div>
+      <div class="tab" onclick="switchTab('accounts')">Accounts <span id="accountCount" style="color:#1e293b;">(0)</span></div>
+    </div>
+
+    <div class="copy-all-bar" id="copyAllBar" onclick="copyAllAccounts(this)">
+      <span class="copy-all-bar-icon">⎘</span>
+      <span class="copy-all-bar-text" id="copyAllText">Copy All Accounts &nbsp;<span>(uid|password)</span></span>
+    </div>
+
+    <div class="tab-content active" id="tab-log">
+      <div id="log-panel">
+        <div class="empty-state" id="logEmpty">
+          <div class="empty-icon">⬡</div>
+          <div class="empty-text">Waiting to start…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-accounts">
+      <div id="accounts-panel">
+        <div class="empty-state" id="acctEmpty">
+          <div class="empty-icon">⬡</div>
+          <div class="empty-text">No accounts created yet</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+let eventSource = null;
+let currentJobId = null;
+let createdCount = 0;
+let targetCount = 0;
+let startTime = null;
+let _customDomains = [];
+let _timerTick = null;
+let allAccounts = [];
+
+function _startTicker() {
+  if (_timerTick) clearInterval(_timerTick);
+  _timerTick = setInterval(() => {
+    if (!startTime) return;
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    const el = document.getElementById('statTime');
+    if (el) { el.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`; el.style.color = ''; }
+  }, 1000);
+}
+
+function _stopTicker() {
+  if (_timerTick) { clearInterval(_timerTick); _timerTick = null; }
+}
+
+async function loadDomains() {
+  try {
+    const r = await fetch('/api/domains', { cache: 'no-store' });
+    if (!r.ok) { console.warn('[loadDomains] non-OK status', r.status); return; }
+    const d = await r.json();
+    _customDomains = d.custom || [];
+    const sel = document.getElementById('emailDomain');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    (d.temp || []).forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom;
+      const tag = dom === 'harakirimail.com' ? ' (w/code)' : '';
+      o.textContent = dom + tag;
+      sel.appendChild(o);
+    });
+    _customDomains.forEach(dom => {
+      const o = document.createElement('option');
+      o.value = dom;
+      o.textContent = '🔒 ' + dom + ' (w/code)';
+      sel.appendChild(o);
+    });
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    onDomainChange();
+  } catch(e) { console.error('[loadDomains error]', e); }
+}
+
+function _addDomainToDropdown(domain) {
+  const sel = document.getElementById('emailDomain');
+  if ([...sel.options].some(o => o.value === domain)) {
+    sel.value = domain;
+    onDomainChange();
+    return;
+  }
+  const o = document.createElement('option');
+  o.value = domain;
+  o.textContent = domain + ' (w/code)';
+  sel.appendChild(o);
+  sel.value = domain;
+  onDomainChange();
+}
+
+function onDomainChange() {
+  const v = document.getElementById('emailDomain').value;
+  const row = document.getElementById('domainPassRow');
+  row.classList.toggle('visible', _customDomains.includes(v));
+}
+
+const _userName = {{ user_name | tojson }};
+document.addEventListener('DOMContentLoaded', () => {
+  if (_userName) {
+    document.getElementById('userNameBadge').textContent = _userName;
+  }
+  loadDomains();
+  loadKeyInfo();
+});
+
+// ── Key expiry countdown ───────────────────────────────────────────────────
+let _expiryAt = null;
+let _expiryTick = null;
+
+function _fmtExpiry(secsLeft) {
+  if (secsLeft <= 0) return 'EXPIRED';
+  const d = Math.floor(secsLeft / 86400);
+  const h = Math.floor((secsLeft % 86400) / 3600);
+  const m = Math.floor((secsLeft % 3600) / 60);
+  const s = secsLeft % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m ${s}s`;
+}
+
+function _tickExpiry() {
+  if (!_expiryAt) return;
+  const chip  = document.getElementById('expiryChip');
+  const label = document.getElementById('expiryLabel');
+  const left  = Math.max(0, Math.floor(_expiryAt - Date.now() / 1000));
+  label.textContent = _fmtExpiry(left);
+  chip.className = 'expiry-chip show';
+  if (left <= 0) {
+    chip.classList.add('critical');
+  } else if (left <= 3600) {
+    chip.classList.add('critical');
+    chip.classList.remove('warning');
+  } else if (left <= 86400) {
+    chip.classList.add('warning');
+    chip.classList.remove('critical');
+  }
+}
+
+async function loadKeyInfo() {
+  try {
+    const r = await fetch('/api/key-info');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.expires_at) {
+      _expiryAt = d.expires_at;
+      _tickExpiry();
+      if (_expiryTick) clearInterval(_expiryTick);
+      _expiryTick = setInterval(_tickExpiry, 1000);
+    }
+  } catch(e) {}
+}
+
+// ── User domain add ────────────────────────────────────────────────────────
+async function addUserDomain() {
+  const input = document.getElementById('newDomainInput');
+  const btn   = document.getElementById('btnAddDomain');
+  const msg   = document.getElementById('addDomainMsg');
+  const domain = (input.value || '').trim().toLowerCase();
+  if (!domain || !domain.includes('.')) {
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(239,68,68,0.1)';
+    msg.style.border = '1px solid rgba(239,68,68,0.2)';
+    msg.style.color = '#f87171';
+    msg.textContent = 'Enter a valid domain';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const r = await fetch('/api/user/add-domain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain }),
+    });
+    const d = await r.json();
+    if (d.status === 'added') {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(0,230,118,0.1)';
+      msg.style.border = '1px solid rgba(0,230,118,0.2)';
+      msg.style.color = '#00e676';
+      msg.textContent = '✓ ' + domain + ' added';
+      input.value = '';
+      await loadDomains();
+      const _sel = document.getElementById('emailDomain');
+      if ([..._sel.options].some(o => o.value === domain)) {
+        _sel.value = domain;
+        onDomainChange();
+      } else {
+        _addDomainToDropdown(domain);
+      }
+    } else if (d.status === 'exists') {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(251,191,36,0.1)';
+      msg.style.border = '1px solid rgba(251,191,36,0.2)';
+      msg.style.color = '#fbbf24';
+      msg.textContent = 'Domain already exists';
+      _addDomainToDropdown(domain);
+    } else {
+      msg.style.display = 'block';
+      msg.style.background = 'rgba(239,68,68,0.1)';
+      msg.style.border = '1px solid rgba(239,68,68,0.2)';
+      msg.style.color = '#f87171';
+      msg.textContent = d.error || 'Failed to add domain';
+    }
+  } catch(e) {
+    msg.style.display = 'block';
+    msg.style.color = '#f87171';
+    msg.textContent = 'Network error';
+  }
+  btn.disabled = false;
+  btn.textContent = '+ Add Domain';
+  setTimeout(() => { msg.style.display = 'none'; }, 3000);
+}
+
+function onPassTypeChange() {
+  const v = document.getElementById('passwordType').value;
+  document.getElementById('customPassRow').classList.toggle('visible', v === 'custom');
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tabs-bar .tab').forEach((t, i) => {
+    t.classList.toggle('active', ['log','accounts'][i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+function addLog(msg, level) {
+  const panel = document.getElementById('log-panel');
+  const empty = document.getElementById('logEmpty');
+  if (empty) empty.remove();
+  const now = new Date().toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = `log-line log-${level || 'info'}`;
+  line.innerHTML = `<span class="log-ts">${now}</span><span class="log-msg">${escHtml(msg)}</span>`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function addAccount(data) {
+  document.getElementById('acctEmpty').style.display = 'none';
+  const uidPass = `${data.uid}|${data.password}`;
+  allAccounts.push(uidPass);
+  if (data.uid && data.email) _acctEmails[data.uid] = data.email;
+  const panel = document.getElementById('accounts-panel');
+  const card = document.createElement('div');
+  card.className = 'acct-card';
+  const inputId    = `ci-${data.uid}`;
+  const statusId   = `cs-${data.uid}`;
+  const btnId      = `cb-${data.uid}`;
+  const _isAutoFetch  = true;
+  card.innerHTML = `
+    <span class="acct-num">#${data.num}</span>
+    <div class="acct-row">
+      <span class="acct-field-label">Name</span>
+      <span class="acct-field-value acct-name">${escHtml(data.name)}</span>
+    </div>
+    <div class="acct-row">
+      <span class="acct-field-label">Email</span>
+      <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
+        <span class="acct-field-value acct-email" style="flex:1;">${escHtml(data.email)}</span>
+        <button class="copy-btn" style="flex-shrink:0;padding:3px 9px;font-size:10px;" onclick="copyField(this,'${escAttr(data.email)}')">Copy</button>
+      </div>
+    </div>
+    <div class="acct-row">
+      <span class="acct-field-label">Password</span>
+      <span class="acct-field-value acct-pass">${escHtml(data.password)}</span>
+    </div>
+    <div class="acct-row">
+      <span class="acct-field-label">UID</span>
+      <span class="acct-field-value acct-uid">${escHtml(data.uid)}</span>
+    </div>
+    <div class="confirm-section">
+      <span class="confirm-label">✉ Confirmation Code</span>
+      <div class="confirm-row">
+        <input id="${inputId}" class="confirm-input" type="text"
+               maxlength="8" placeholder="_ _ _ _ _" readonly
+               title="Tap to copy"
+               onclick="if(this.value){navigator.clipboard.writeText(this.value).catch(()=>{});this.select();const s=document.getElementById('cs-${data.uid}');const o=s&&s.textContent;if(s){s.textContent='✓ Copied!';setTimeout(()=>{if(s)s.textContent=o;},1000);}}"
+               style="cursor:pointer;">
+      </div>
+      <div id="retry-row-${data.uid}" style="display:block;margin-top:4px;">
+        <button class="confirm-btn" style="background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.28);color:#fbbf24;width:100%;padding:7px 14px;" onclick="retryConfirm('${escAttr(data.uid)}')">🔄 Retry Fetch</button>
+      </div>
+      <div id="${statusId}" class="confirm-status ${_isAutoFetch ? 'fetching' : ''}">${_isAutoFetch ? '⏳ Fetching code from inbox…' : ''}</div>
+    </div>
+    <button class="acct-copy-all" title="Copy uid|pass" onclick="copyField(this, '${escAttr(uidPass)}')">⎘</button>
+  `;
+  panel.appendChild(card);
+  createdCount++;
+  document.getElementById('statCreated').textContent = createdCount;
+  document.getElementById('accountCount').textContent = `(${createdCount})`;
+  updateProgress();
+
+  if (_isAutoFetch) _scheduleAutoRetry(data.uid);
+
+  // Auto-switch to Accounts tab so user sees the code box
+  switchTab('accounts');
+}
+
+const _fetchTimers    = {};
+const _countdownTimers = {};
+const _acctEmails     = {};   // uid -> email, populated in addAccount
+
+function _clearFetchTimer(uid) {
+  if (_fetchTimers[uid])     { clearTimeout(_fetchTimers[uid]);  delete _fetchTimers[uid]; }
+  if (_countdownTimers[uid]) { clearInterval(_countdownTimers[uid]); delete _countdownTimers[uid]; }
+}
+
+// Schedule an auto-retry in 5 seconds, showing a live countdown in the status bar
+function _scheduleAutoRetry(uid) {
+  _clearFetchTimer(uid);
+  const status = document.getElementById(`cs-${uid}`);
+  const retry  = document.getElementById(`retry-row-${uid}`);
+
+  // Show retry button immediately when account is created
+  if (retry) retry.style.display = '';
+
+  let secs = 5;
+  function _tick() {
+    if (status && (status.classList.contains('fetching') || status.classList.contains('error'))) {
+      status.className = 'confirm-status fetching';
+      status.textContent = `⏳ No code yet — retrying in ${secs}s…`;
+    }
+    if (secs <= 0) {
+      if (_countdownTimers[uid]) { clearInterval(_countdownTimers[uid]); delete _countdownTimers[uid]; }
+      retryConfirm(uid);
+    }
+    secs--;
+  }
+  _tick();
+  _countdownTimers[uid] = setInterval(_tick, 1000);
+}
+
+function autofillCode(uid, code) {
+  _clearFetchTimer(uid);
+  const input  = document.getElementById(`ci-${uid}`);
+  const status = document.getElementById(`cs-${uid}`);
+  const retry  = document.getElementById(`retry-row-${uid}`);
+  // Fill the code box — do NOT auto-submit
+  if (input)  { input.value = code; input.classList.add('code-ready'); }
+  if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + code + ' (tap to copy)'; }
+  if (retry)  retry.style.display = '';
+  addLog(`✉ Code ${code} fetched for UID ${uid}`, 'success');
+  switchTab('accounts');
+}
+
+function handleConfirmResult(uid, statusVal) {
+  _clearFetchTimer(uid);
+  const status = document.getElementById(`cs-${uid}`);
+  const retry  = document.getElementById(`retry-row-${uid}`);
+  if (statusVal === 'confirmed') {
+    if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed via link!'; }
+    addLog(`✓ Confirmed via link: UID ${uid}`, 'success');
+  } else if (statusVal === 'checkpoint') {
+    if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint — try again.'; }
+    if (retry)  retry.style.display = '';
+  } else if (statusVal === 'timeout') {
+    // Auto-retry after 5 seconds
+    _scheduleAutoRetry(uid);
+  } else if (statusVal === 'link_error') {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Confirm link failed — click Retry.'; }
+    if (retry)  retry.style.display = '';
+  }
+}
+
+async function retryConfirm(uid) {
+  _clearFetchTimer(uid);
+  const status = document.getElementById(`cs-${uid}`);
+  const retry  = document.getElementById(`retry-row-${uid}`);
+  const input  = document.getElementById(`ci-${uid}`);
+  const email  = _acctEmails[uid] || '';
+
+  if (status) { status.className = 'confirm-status fetching'; status.textContent = '⏳ Fetching code from inbox…'; }
+
+  try {
+    const resp = await fetch('/fetch-code-now', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, email }),
+    });
+    const result = await resp.json();
+
+    if (result.code) {
+      // Code found — fill box, do NOT submit
+      if (input)  { input.value = result.code; input.classList.add('code-ready'); }
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '✉ Code fetched: ' + result.code + ' (tap to copy)'; }
+      if (retry)  retry.style.display = '';
+      addLog(`✉ Code ${result.code} fetched for UID ${uid}`, 'success');
+    } else if (result.status === 'not_found' || result.status === 'waiting_webhook') {
+      // Auto-retry in 5 seconds
+      _scheduleAutoRetry(uid);
+    } else if (result.status === 'unsupported_domain') {
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.msg || result.error || 'Domain not configured'); }
+      if (retry)  retry.style.display = '';
+    } else {
+      // Unknown — auto-retry
+      _scheduleAutoRetry(uid);
+    }
+  } catch(e) {
+    // Network error — auto-retry after 5 seconds
+    _scheduleAutoRetry(uid);
+  }
+}
+
+async function submitCode(uid) {
+  const input  = document.getElementById(`ci-${uid}`);
+  const status = document.getElementById(`cs-${uid}`);
+  const btn    = document.getElementById(`cb-${uid}`);
+  const code   = (input ? input.value : '').trim();
+
+  if (!code || code.length < 5) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = 'Enter the 5–8 digit code first.'; }
+    return;
+  }
+
+  if (input)  { input.disabled = true; }
+  if (btn)    { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  if (status) { status.className = 'confirm-status loading'; status.textContent = '⏳ Submitting to Facebook…'; }
+
+  try {
+    const resp = await fetch('/confirm-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, code }),
+    });
+    const result = await resp.json();
+
+    if (!resp.ok) {
+      if (status) { status.className = 'confirm-status error'; status.textContent = '✗ ' + (result.error || 'Error'); }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
+      return;
+    }
+
+    if (result.status === 'confirmed') {
+      if (status) { status.className = 'confirm-status confirmed'; status.textContent = '✓ Email confirmed successfully!'; }
+      if (btn)    { btn.textContent = 'Done'; }
+      addLog(`✓ Email confirmed: UID ${uid}`, 'success');
+    } else if (result.status === 'checkpoint') {
+      if (status) { status.className = 'confirm-status checkpoint'; status.textContent = '⚠ Checkpoint triggered — try again later.'; }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
+    } else {
+      if (status) { status.className = 'confirm-status submitted'; status.textContent = '↑ Code submitted — check the account manually to verify.'; }
+      if (input)  { input.disabled = false; }
+      if (btn)    { btn.disabled = false; btn.textContent = 'Retry'; }
+    }
+  } catch(e) {
+    if (status) { status.className = 'confirm-status error'; status.textContent = '✗ Network error: ' + e.message; }
+    if (input)  { input.disabled = false; }
+    if (btn)    { btn.disabled = false; btn.textContent = 'Submit'; }
+  }
+}
+
+function copyAllAccounts(el) {
+  const bar   = document.getElementById('copyAllBar');
+  const label = document.getElementById('copyAllText');
+  const orig  = label.innerHTML;
+  if (!allAccounts.length) {
+    label.innerHTML = 'No accounts this session yet';
+    setTimeout(() => { label.innerHTML = orig; }, 2000);
+    return;
+  }
+  const text = allAccounts.join('\n');
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  bar.classList.add('copied');
+  label.innerHTML = `✓ Copied ${allAccounts.length} account${allAccounts.length !== 1 ? 's' : ''} (uid|password)!`;
+  setTimeout(() => { bar.classList.remove('copied'); label.innerHTML = orig; }, 2500);
+}
+
+function copyField(btn, text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  const orig = btn.textContent;
+  btn.classList.add('copied');
+  btn.textContent = '✓';
+  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1200);
+}
+
+function updateProgress() {
+  if (!targetCount) return;
+  const pct = Math.round((createdCount / targetCount) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressLabel').textContent = `${createdCount} of ${targetCount}`;
+  if (startTime) {
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('statTime').textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
+    document.getElementById('statTime').style.color = '';
+  }
+}
+
+function setRunning(running) {
+  document.getElementById('btnStart').disabled = running;
+  document.getElementById('btnStop').disabled = !running;
+  document.getElementById('statusDot').classList.toggle('idle', !running);
+  document.getElementById('runningBadge').classList.toggle('visible', running);
+}
+
+async function startJob() {
+  const nameType       = document.getElementById('nameType').value;
+  const emailDomain    = document.getElementById('emailDomain').value;
+  const domainPassword = document.getElementById('domainPassword').value;
+  const count          = parseInt(document.getElementById('count').value) || 1;
+  const passwordType   = document.getElementById('passwordType').value;
+  const customPassword = document.getElementById('customPassword').value;
+  const gender         = document.getElementById('gender').value;
+  if (passwordType === 'custom' && !customPassword.trim()) { alert('Please enter a custom password.'); return; }
+
+  createdCount = 0; targetCount = count; startTime = Date.now();
+  allAccounts = [];
+  document.getElementById('statCreated').textContent = '0';
+  document.getElementById('statTotal').textContent   = count;
+  document.getElementById('statTime').textContent    = '0s';
+  document.getElementById('statTime').style.color    = '';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('progressPct').textContent = '0%';
+  document.getElementById('progressLabel').textContent = 'Starting…';
+  document.getElementById('log-panel').innerHTML = '<div class="empty-state" id="logEmpty"><div class="empty-icon">⬡</div><div class="empty-text">Starting…</div></div>';
+  const panel = document.getElementById('accounts-panel');
+  panel.innerHTML = '<div class="empty-state" id="acctEmpty"><div class="empty-icon">⬡</div><div class="empty-text">No accounts created yet</div></div>';
+  document.getElementById('accountCount').textContent = '(0)';
+
+  const proxyList = document.getElementById('proxyList').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+
+  const resp = await fetch('/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name_type: nameType, email_domain: emailDomain,
+      domain_password: domainPassword, count, password_type: passwordType,
+      custom_password: customPassword, gender, proxies: proxyList }),
+  });
+  if (!resp.ok) { const err = await resp.json(); alert('Error: ' + (err.error || 'Unknown')); return; }
+
+  const result = await resp.json();
+  currentJobId = result.job_id;
+
+  setRunning(true);
+  _startTicker();
+  addLog(`Job started — creating ${count} account(s) on ${emailDomain}`, 'info');
+  if (eventSource) eventSource.close();
+  _connectStream(currentJobId);
+}
+
+function _connectStream(jobId) {
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  eventSource = new EventSource('/stream?job_id=' + jobId);
+  eventSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping') return;
+    if (msg.type === 'log')     addLog(msg.msg, msg.level);
+    if (msg.type === 'account') addAccount(msg.data);
+    if (msg.type === 'confirm_code') autofillCode(msg.uid, msg.code);
+    if (msg.type === 'confirm_result') handleConfirmResult(msg.uid, msg.status, msg.method);
+    if (msg.type === 'done') {
+      addLog(msg.msg, 'success');
+      setRunning(false);
+      _stopTicker();
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      document.getElementById('progressLabel').textContent = 'Completed';
+    }
+  };
+  eventSource.onerror = () => {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    fetch('/status?job_id=' + jobId)
+      .then(r => r.ok ? r.json() : Promise.reject('not_ok'))
+      .then(s => {
+        if (s.running) {
+          setTimeout(() => _connectStream(jobId), 2000);
+        } else if (s.found) {
+          // Job finished cleanly — reconnect once to get the done event
+          setTimeout(() => _connectStream(jobId), 1000);
+        } else {
+          setRunning(false);
+          _stopTicker();
+        }
+      })
+      .catch(() => {
+        // Network hiccup — always reconnect
+        setTimeout(() => _connectStream(jobId), 3000);
+      });
+  };
+}
+
+async function stopJob() {
+  await fetch('/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: currentJobId }),
+  });
+  setRunning(false);
+  _stopTicker();
+  addLog('Stop requested.', 'warn');
+  if (eventSource) { eventSource.close(); eventSource = null; }
+}
+
+function downloadResults() { window.location.href = '/download'; }
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
+
+
+</script>
+</body>
+</html>
+
