@@ -283,13 +283,45 @@ def _create_one(name_type, gender, password_type, custom_password, num, session_
             _adp = m.requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=2, max_retries=0)
             ses.mount('https://', _adp)
             ses.mount('http://',  _adp)
-            response = ses.get("https://m.facebook.com/reg/", timeout=7)
-            form     = m.extractor(response.text)
 
-            if not form.get("lsd") and not form.get("fb_dtsg"):
+            # Use a plain iPhone Safari UA for the GET — FBAN UA causes a
+            # fbredirect:// deep-link redirect; plain mobile Chrome gets 400.
+            # iPhone Safari returns the full SPA (231 KB) which embeds lsd in
+            # JSON as  "LSD",[],{"token":"..."}  even though there are no
+            # <input> tags (the page is React/Comet, not a server-rendered form).
+            _reg_get_headers = {
+                'User-Agent': (
+                    'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) '
+                    'AppleWebKit/605.1.15 (KHTML, like Gecko) '
+                    'Version/15.0 Mobile/15E148 Safari/604.1'
+                ),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': _dp['locale'],
+                'sec-fetch-dest': 'document',
+                'sec-fetch-mode': 'navigate',
+                'sec-fetch-site': 'none',
+                'upgrade-insecure-requests': '1',
+            }
+            response = ses.get("https://m.facebook.com/reg/",
+                               headers=_reg_get_headers, timeout=15)
+            form = m.extractor(response.text)
+
+            # Modern Facebook reg page is a React SPA — tokens live in
+            # embedded JSON, not <input> tags.  Extract lsd from JSON if the
+            # HTML parser came up empty.
+            if not form.get('lsd'):
+                _m = _re.search(r'"LSD",\[\],\{"token":"([^"]+)"', response.text)
+                if _m:
+                    form['lsd'] = _m.group(1)
+            if not form.get('privacy_mutation_token'):
+                _m = _re.search(r'"privacy_mutation_token":"([^"]+)"', response.text)
+                if _m:
+                    form['privacy_mutation_token'] = _m.group(1)
+
+            if not form.get("lsd"):
                 jq.put({'type': 'log', 'level': 'warn',
                         'msg': 'Could not load reg page, retrying…'})
-                time.sleep(_random.uniform(0.05, 0.15))
+                time.sleep(_random.uniform(0.5, 1.5))
                 continue
 
             if name_type == '2':
