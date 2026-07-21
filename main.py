@@ -2246,141 +2246,163 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                 return 'confirmed'
             return None
 
-        # ── A0: Desktop GraphQL mutation — exact flow from HAR capture ───────
-        # Matches useCAAFBConfirmationFormSubmitMutation as seen in browser HAR.
-        # HAR-verified: doc_id 24050931851170558, qpl_active_flow_ids 250360002/516759801.
-        # jazoest formula confirmed from HAR: "2" + str(sum(ord(c) for c in fb_dtsg)).
+        # ── A0: GraphQL useCAAFBConfirmationFormSubmitMutation ───────────────
+        # Tries m.facebook.com first (same domain the account was created on),
+        # then falls back to www.facebook.com.  Logs every step so failures are
+        # visible in the workflow console.
+        # jazoest formula verified from HAR: "2" + sum(ord(c) for c in fb_dtsg)
         try:
             import uuid as _uuid2, json as _json2
-            _desktop_ua2 = (
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
-            )
-            _conf_get_hdrs = {
-                'User-Agent':      _desktop_ua2,
-                'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Referer':         'https://www.facebook.com/',
-                'Sec-Fetch-Dest':  'document',
-                'Sec-Fetch-Mode':  'navigate',
-                'Sec-Fetch-Site':  'same-origin',
-                'Upgrade-Insecure-Requests': '1',
-            }
-            _conf_page = ses.get(
-                'https://www.facebook.com/confirmemail.php?next=',
-                headers=_conf_get_hdrs,
-                timeout=12, allow_redirects=True
-            )
-            _conf_html = _conf_page.text
 
-            # ── Extract all tokens embedded in the SPA JS bundle ──────────────
-            def _tok(patterns, text=_conf_html):
-                for p in patterns:
-                    m = re.search(p, text)
-                    if m: return m.group(1)
-                return ''
+            def _extract_tokens(html):
+                """Extract lsd, dtsg and other session tokens from any FB page."""
+                def _t(pats):
+                    for p in pats:
+                        m = re.search(p, html)
+                        if m: return m.group(1)
+                    return ''
+                _lsd  = _t([r'"LSD",\[\],\{"token":"([^"]+)"',
+                             r'name="lsd"\s+value="([^"]+)"'])
+                _dtsg = _t([r'"DTSGInitialData",\[\],\{"token":"([^"]+)"',
+                             r'"token"\s*:\s*"([A-Za-z0-9_\-]{20,}:[^"]{5,})"'])
+                _hs   = _t([r'"haste_session"\s*:\s*"([^"]+)"'])
+                _hsi  = _t([r'"hsi"\s*:\s*"(\d+)"'])
+                _rev  = _t([r'"revision"\s*:\s*(\d{7,})',
+                             r'"__spin_r"\s*:\s*(\d{7,})'])
+                return _lsd, _dtsg, _hs, _hsi, _rev
 
-            _lsd2  = _tok([r'"LSD",\[\],\{"token":"([^"]+)"',
-                            r'name="lsd"\s+value="([^"]+)"',
-                            r'"lsd"\s*:\s*"([^"]+)"'])
-            _dtsg2 = _tok([r'"DTSGInitialData",\[\],\{"token":"([^"]+)"',
-                            r'"token"\s*:\s*"([A-Za-z0-9_\-]{20,}:[^"]+)"'])
-            _hs2   = _tok([r'"haste_session"\s*:\s*"([^"]+)"'])
-            _hsi2  = _tok([r'"hsi"\s*:\s*"(\d+)"'])
-            _rev2  = _tok([r'"revision"\s*:\s*(\d{7,})',
-                            r'"__spin_r"\s*:\s*(\d{7,})'])
-            _dyn2  = _tok([r'"__dyn"\s*:\s*"([^"]+)"'])
-            _csr2  = _tok([r'"__csr"\s*:\s*"([^"]+)"'])
-            _hsdp  = _tok([r'"__hsdp"\s*:\s*"([^"]+)"'])
-            _hblp  = _tok([r'"__hblp"\s*:\s*"([^"]+)"'])
-            _sjsp  = _tok([r'"__sjsp"\s*:\s*"([^"]+)"'])
-
-            # jazoest = "2" + sum of ord values of the full fb_dtsg string
-            # (verified from HAR: dtsg sum=5405 → jazoest="25405")
-            _jazo2 = ('2' + str(sum(ord(c) for c in _dtsg2))) if _dtsg2 else ''
-
-            if _lsd2 and _dtsg2:
-                _gql_vars = {
+            def _do_gql_submit(base_url, page_url, lsd, dtsg, hs, hsi, rev, ua, ref):
+                """POST useCAAFBConfirmationFormSubmitMutation and return parsed JSON."""
+                _jazo = ('2' + str(sum(ord(c) for c in dtsg))) if dtsg else ''
+                _vars = {
                     'input': {
-                        'actor_id':          uid,
+                        'actor_id':           uid,
                         'client_mutation_id': str(_uuid2.uuid4()),
                         'conf_code':          {'sensitive_string_value': code},
                         'ig_reg_data':        None,
                         'machine_id':         None,
                     }
                 }
-                _gql_payload2 = {
-                    'av':      uid,
-                    '__user':  uid,
-                    '__a':     '1',
-                    '__req':   '3',
-                    '__hs':    _hs2,
-                    'dpr':     '1',
-                    '__ccg':   'EXCELLENT',
-                    '__rev':   _rev2,
-                    '__s':     '',
-                    '__hsi':   _hsi2,
-                    '__dyn':   _dyn2,
-                    '__csr':   _csr2,
-                    '__comet_req': '102',
-                    'fb_dtsg': _dtsg2,
-                    'jazoest': _jazo2,
-                    'lsd':     _lsd2,
-                    '__spin_r': _rev2,
-                    '__spin_b': 'trunk',
+                _pl = {
+                    'av': uid, '__user': uid, '__a': '1', '__req': '3',
+                    '__hs': hs, 'dpr': '1', '__ccg': 'EXCELLENT',
+                    '__rev': rev, '__s': '', '__hsi': hsi,
+                    '__dyn': '', '__csr': '', '__comet_req': '102',
+                    'fb_dtsg': dtsg, 'jazoest': _jazo, 'lsd': lsd,
+                    '__spin_r': rev, '__spin_b': 'trunk',
                     '__spin_t': str(int(time.time())),
-                    # QPL performance logging — matches HAR exactly
-                    'qpl_active_flow_ids':  '250360002,516759801',
-                    'fb_api_caller_class':  'RelayModern',
+                    'qpl_active_flow_ids': '250360002,516759801',
+                    'fb_api_caller_class': 'RelayModern',
                     'fb_api_req_friendly_name': 'useCAAFBConfirmationFormSubmitMutation',
-                    'server_timestamps':    'true',
-                    'variables':            _json2.dumps(_gql_vars),
-                    'doc_id':               '24050931851170558',
+                    'server_timestamps': 'true',
+                    'variables': _json2.dumps(_vars),
+                    'doc_id': '24050931851170558',
                     'fb_api_analytics_tags': _json2.dumps(
                         ['qpl_active_flow_ids=250360002,516759801']
                     ),
                 }
-                # Add optional page-extracted performance tokens when available
-                if _hsdp: _gql_payload2['__hsdp'] = _hsdp
-                if _hblp: _gql_payload2['__hblp'] = _hblp
-                if _sjsp: _gql_payload2['__sjsp'] = _sjsp
-
-                _conf_post_hdrs = {
-                    'User-Agent':            _desktop_ua2,
-                    'Accept':                '*/*',
-                    'Accept-Language':       'en-US,en;q=0.9',
-                    'Content-Type':          'application/x-www-form-urlencoded',
-                    'Origin':                'https://www.facebook.com',
-                    'Referer':               'https://www.facebook.com/confirmemail.php?next=',
-                    'Sec-Fetch-Dest':        'empty',
-                    'Sec-Fetch-Mode':        'cors',
-                    'Sec-Fetch-Site':        'same-origin',
-                    'X-Fb-Friendly-Name':    'useCAAFBConfirmationFormSubmitMutation',
-                    'X-Fb-Lsd':              _lsd2,
+                _hdrs = {
+                    'User-Agent':          ua,
+                    'Accept':              '*/*',
+                    'Accept-Language':     'en-US,en;q=0.9',
+                    'Content-Type':        'application/x-www-form-urlencoded',
+                    'Origin':              base_url,
+                    'Referer':             ref,
+                    'X-Fb-Friendly-Name':  'useCAAFBConfirmationFormSubmitMutation',
+                    'X-Fb-Lsd':            lsd,
                 }
-                _conf_resp = ses.post(
-                    'https://www.facebook.com/api/graphql/',
-                    data=_gql_payload2,
-                    headers=_conf_post_hdrs,
-                    timeout=15, allow_redirects=True
-                )
+                _r = ses.post(f'{base_url}/api/graphql/', data=_pl,
+                              headers=_hdrs, timeout=15, allow_redirects=True)
                 try:
-                    _conf_json = _conf_resp.json()
+                    return _r.json()
                 except Exception:
-                    _conf_json = {}
-                _conf_data = (
-                    (_conf_json.get('data') or {})
-                    .get('xfb_caa_registration_confirmation_submit', {})
+                    return {}
+
+            # ── Try 1: m.facebook.com (mobile — same domain as registration) ──
+            _mob_ua = _ch.get('User-Agent', 'Mozilla/5.0')
+            _mob_get_hdrs = {
+                **_ch,
+                'Referer': 'https://m.facebook.com/',
+                'sec-fetch-dest': 'document',
+                'sec-fetch-mode': 'navigate',
+                'sec-fetch-site': 'same-origin',
+            }
+            print(f"{C}  [confirm] A0-mobile: fetching m.facebook.com/confirmemail.php…{W}")
+            _mp = ses.get('https://m.facebook.com/confirmemail.php?next=',
+                          headers=_mob_get_hdrs, timeout=12, allow_redirects=True)
+            print(f"{C}  [confirm] A0-mobile: status={_mp.status_code} url={str(_mp.url)[:80]}{W}")
+            _ml, _md, _mh, _mhi, _mr = _extract_tokens(_mp.text)
+            print(f"{C}  [confirm] A0-mobile: lsd={'OK' if _ml else 'MISSING'} dtsg={'OK' if _md else 'MISSING'}{W}")
+
+            if _ml and _md:
+                _mj = _do_gql_submit(
+                    'https://m.facebook.com',
+                    str(_mp.url), _ml, _md, _mh, _mhi, _mr,
+                    _mob_ua,
+                    'https://m.facebook.com/confirmemail.php?next='
                 )
-                if _conf_data.get('user_id') or _conf_data.get('created_user_id'):
+                _md_data = ((_mj.get('data') or {})
+                            .get('xfb_caa_registration_confirmation_submit', {}))
+                print(f"{C}  [confirm] A0-mobile GQL response: {str(_md_data)[:120]}{W}")
+                if _md_data.get('user_id') or _md_data.get('created_user_id'):
+                    print(f"{G}  [confirm] A0-mobile: CONFIRMED ✓{W}")
                     return 'confirmed'
-                # Also check redirect URL for home/checkpoint signals
-                q = _chk(str(_conf_resp.url), _conf_resp.text)
+                # Even if JSON shows null, verify by re-checking confirmemail
+                _vfy = ses.get('https://m.facebook.com/confirmemail.php?next=',
+                               headers=_mob_get_hdrs, timeout=8, allow_redirects=True)
+                _vu = str(_vfy.url).lower()
+                print(f"{C}  [confirm] A0-mobile verify URL: {_vu[:80]}{W}")
+                if 'confirmemail' not in _vu and 'login' not in _vu and 'checkpoint' not in _vu:
+                    print(f"{G}  [confirm] A0-mobile verify: CONFIRMED ✓{W}")
+                    return 'confirmed'
+                if 'checkpoint' in _vu:
+                    return 'checkpoint'
+
+            # ── Try 2: www.facebook.com (desktop) ─────────────────────────────
+            _desk_ua = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                        '(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36')
+            _desk_get_hdrs = {
+                'User-Agent':      _desk_ua,
+                'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer':         'https://www.facebook.com/',
+            }
+            print(f"{C}  [confirm] A0-desktop: fetching www.facebook.com/confirmemail.php…{W}")
+            _dp2 = ses.get('https://www.facebook.com/confirmemail.php?next=',
+                           headers=_desk_get_hdrs, timeout=12, allow_redirects=True)
+            print(f"{C}  [confirm] A0-desktop: status={_dp2.status_code} url={str(_dp2.url)[:80]}{W}")
+            _dl, _dd, _dh, _dhi, _dr = _extract_tokens(_dp2.text)
+            print(f"{C}  [confirm] A0-desktop: lsd={'OK' if _dl else 'MISSING'} dtsg={'OK' if _dd else 'MISSING'}{W}")
+
+            if _dl and _dd:
+                _dj = _do_gql_submit(
+                    'https://www.facebook.com',
+                    str(_dp2.url), _dl, _dd, _dh, _dhi, _dr,
+                    _desk_ua,
+                    'https://www.facebook.com/confirmemail.php?next='
+                )
+                _dd_data = ((_dj.get('data') or {})
+                            .get('xfb_caa_registration_confirmation_submit', {}))
+                print(f"{C}  [confirm] A0-desktop GQL response: {str(_dd_data)[:120]}{W}")
+                if _dd_data.get('user_id') or _dd_data.get('created_user_id'):
+                    print(f"{G}  [confirm] A0-desktop: CONFIRMED ✓{W}")
+                    return 'confirmed'
+                _vfy2 = ses.get('https://www.facebook.com/confirmemail.php?next=',
+                                headers=_desk_get_hdrs, timeout=8, allow_redirects=True)
+                _vu2 = str(_vfy2.url).lower()
+                print(f"{C}  [confirm] A0-desktop verify URL: {_vu2[:80]}{W}")
+                if 'confirmemail' not in _vu2 and 'login' not in _vu2 and 'checkpoint' not in _vu2:
+                    print(f"{G}  [confirm] A0-desktop verify: CONFIRMED ✓{W}")
+                    return 'confirmed'
+                if 'checkpoint' in _vu2:
+                    return 'checkpoint'
+                q = _chk(_vu2, _vfy2.text)
                 if q:
                     return q
-        except Exception:
-            pass
+
+        except Exception as _a0e:
+            print(f"{Y}  [confirm] A0 exception: {_a0e}{W}")
 
         # ── A1: Parse the real form and POST with the code ────────────────────
         for _try_url in [
@@ -2566,6 +2588,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                             print(f"{G}╚{'═'*47}╝{W}")
                             if result_queue:
                                 result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                            _sub_st = _auto_submit_code(_c)
+                            if result_queue:
+                                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                             _stop_poll.set()
                             return
             except Exception:
@@ -2645,6 +2670,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                 print(f"{G}  [harakiri] Code fetched → {_c}{W}")
                 if result_queue:
                     result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                _sub_st = _auto_submit_code(_c)
+                if result_queue:
+                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                 _stop_poll.set()
                 return True
 
@@ -2878,6 +2906,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                                 print(f"{G}  [tempmail.io] Code fetched → {_c}{W}")
                                 if result_queue:
                                     result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                                _sub_st = _auto_submit_code(_c)
+                                if result_queue:
+                                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                                 _stop_poll.set()
                                 _found = True
                                 break
@@ -2891,6 +2922,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                             print(f"{G}  [tempmail.io] Code (last-resort) → {_c}{W}")
                             if result_queue:
                                 result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                            _sub_st = _auto_submit_code(_c)
+                            if result_queue:
+                                result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                             _stop_poll.set()
                             return
                     else:
@@ -2961,6 +2995,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                     print(f"{G}  [weyn-emails] Code found → {_c}{W}")
                     if result_queue:
                         result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                    _sub_st = _auto_submit_code(_c)
+                    if result_queue:
+                        result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                     _stop_poll.set()
                     return True
 
@@ -2971,6 +3008,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                 print(f"{G}  [weyn-emails] Code (last-resort) → {_c}{W}")
                 if result_queue:
                     result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                _sub_st = _auto_submit_code(_c)
+                if result_queue:
+                    result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                 _stop_poll.set()
                 return True
 
@@ -3062,6 +3102,9 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                     print(f"{G}  [webhook] Code received → {_c}{W}")
                     if result_queue:
                         result_queue.put({'type': 'confirm_code', 'uid': uid, 'code': _c})
+                    _sub_st = _auto_submit_code(_c)
+                    if result_queue:
+                        result_queue.put({'type': 'confirm_result', 'uid': uid, 'status': _sub_st})
                     _stop_poll.set()
                     return
             except Exception as _we:
