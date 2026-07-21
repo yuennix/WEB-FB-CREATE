@@ -2246,90 +2246,136 @@ def _full_email_confirm(ses, email, uid, password='', result_queue=None, device_
                 return 'confirmed'
             return None
 
-        # ── A0: Desktop GraphQL mutation (current Facebook flow) ─────────────
+        # ── A0: Desktop GraphQL mutation — exact flow from HAR capture ───────
+        # Matches useCAAFBConfirmationFormSubmitMutation as seen in browser HAR.
+        # HAR-verified: doc_id 24050931851170558, qpl_active_flow_ids 250360002/516759801.
+        # jazoest formula confirmed from HAR: "2" + str(sum(ord(c) for c in fb_dtsg)).
         try:
             import uuid as _uuid2, json as _json2
             _desktop_ua2 = (
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+                '(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
             )
+            _conf_get_hdrs = {
+                'User-Agent':      _desktop_ua2,
+                'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer':         'https://www.facebook.com/',
+                'Sec-Fetch-Dest':  'document',
+                'Sec-Fetch-Mode':  'navigate',
+                'Sec-Fetch-Site':  'same-origin',
+                'Upgrade-Insecure-Requests': '1',
+            }
             _conf_page = ses.get(
                 'https://www.facebook.com/confirmemail.php?next=',
-                headers={
-                    'User-Agent': _desktop_ua2,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Referer': 'https://www.facebook.com/',
-                },
-                timeout=10, allow_redirects=True
+                headers=_conf_get_hdrs,
+                timeout=12, allow_redirects=True
             )
             _conf_html = _conf_page.text
-            _lsd2 = ''
-            _dtsg2 = ''
-            _rev2 = ''
-            _hs2 = ''
-            _hsi2 = ''
-            _jazo2 = ''
-            _m0 = re.search(r'"LSD",\[\],\{"token":"([^"]+)"', _conf_html)
-            if _m0: _lsd2 = _m0.group(1)
-            _m0 = re.search(r'"DTSGInitialData",\[\],\{"token":"([^"]+)"', _conf_html)
-            if _m0: _dtsg2 = _m0.group(1)
-            _m0 = re.search(r'"revision":(\d{7,})', _conf_html)
-            if _m0: _rev2 = _m0.group(1)
-            _m0 = re.search(r'"haste_session":"([^"]+)"', _conf_html)
-            if _m0: _hs2 = _m0.group(1)
-            _m0 = re.search(r'"hsi":"([^"]+)"', _conf_html)
-            if _m0: _hsi2 = _m0.group(1)
-            _m0 = re.search(r'name="jazoest"\s+value="([^"]+)"', _conf_html)
-            if _m0: _jazo2 = _m0.group(1)
-            if not _dtsg2:
-                _m0 = re.search(r'"token"\s*:\s*"([A-Za-z0-9_\-]{20,}:[^"]+)"', _conf_html)
-                if _m0: _dtsg2 = _m0.group(1)
-            if _lsd2:
+
+            # ── Extract all tokens embedded in the SPA JS bundle ──────────────
+            def _tok(patterns, text=_conf_html):
+                for p in patterns:
+                    m = re.search(p, text)
+                    if m: return m.group(1)
+                return ''
+
+            _lsd2  = _tok([r'"LSD",\[\],\{"token":"([^"]+)"',
+                            r'name="lsd"\s+value="([^"]+)"',
+                            r'"lsd"\s*:\s*"([^"]+)"'])
+            _dtsg2 = _tok([r'"DTSGInitialData",\[\],\{"token":"([^"]+)"',
+                            r'"token"\s*:\s*"([A-Za-z0-9_\-]{20,}:[^"]+)"'])
+            _hs2   = _tok([r'"haste_session"\s*:\s*"([^"]+)"'])
+            _hsi2  = _tok([r'"hsi"\s*:\s*"(\d+)"'])
+            _rev2  = _tok([r'"revision"\s*:\s*(\d{7,})',
+                            r'"__spin_r"\s*:\s*(\d{7,})'])
+            _dyn2  = _tok([r'"__dyn"\s*:\s*"([^"]+)"'])
+            _csr2  = _tok([r'"__csr"\s*:\s*"([^"]+)"'])
+            _hsdp  = _tok([r'"__hsdp"\s*:\s*"([^"]+)"'])
+            _hblp  = _tok([r'"__hblp"\s*:\s*"([^"]+)"'])
+            _sjsp  = _tok([r'"__sjsp"\s*:\s*"([^"]+)"'])
+
+            # jazoest = "2" + sum of ord values of the full fb_dtsg string
+            # (verified from HAR: dtsg sum=5405 → jazoest="25405")
+            _jazo2 = ('2' + str(sum(ord(c) for c in _dtsg2))) if _dtsg2 else ''
+
+            if _lsd2 and _dtsg2:
                 _gql_vars = {
                     'input': {
-                        'actor_id': uid,
+                        'actor_id':          uid,
                         'client_mutation_id': str(_uuid2.uuid4()),
-                        'conf_code': {'sensitive_string_value': code},
-                        'ig_reg_data': None,
-                        'machine_id': None,
+                        'conf_code':          {'sensitive_string_value': code},
+                        'ig_reg_data':        None,
+                        'machine_id':         None,
                     }
                 }
                 _gql_payload2 = {
-                    'av': uid, '__user': uid, '__a': '1', '__req': '3',
-                    '__hs': _hs2, 'dpr': '1', '__ccg': 'EXCELLENT',
-                    '__rev': _rev2, '__s': '', '__hsi': _hsi2,
-                    '__dyn': '', '__csr': '', '__comet_req': '102',
-                    'fb_dtsg': _dtsg2, 'jazoest': _jazo2, 'lsd': _lsd2,
-                    '__spin_r': _rev2, '__spin_b': 'trunk',
+                    'av':      uid,
+                    '__user':  uid,
+                    '__a':     '1',
+                    '__req':   '3',
+                    '__hs':    _hs2,
+                    'dpr':     '1',
+                    '__ccg':   'EXCELLENT',
+                    '__rev':   _rev2,
+                    '__s':     '',
+                    '__hsi':   _hsi2,
+                    '__dyn':   _dyn2,
+                    '__csr':   _csr2,
+                    '__comet_req': '102',
+                    'fb_dtsg': _dtsg2,
+                    'jazoest': _jazo2,
+                    'lsd':     _lsd2,
+                    '__spin_r': _rev2,
+                    '__spin_b': 'trunk',
                     '__spin_t': str(int(time.time())),
-                    'fb_api_caller_class': 'RelayModern',
+                    # QPL performance logging — matches HAR exactly
+                    'qpl_active_flow_ids':  '250360002,516759801',
+                    'fb_api_caller_class':  'RelayModern',
                     'fb_api_req_friendly_name': 'useCAAFBConfirmationFormSubmitMutation',
-                    'server_timestamps': 'true',
-                    'variables': _json2.dumps(_gql_vars),
-                    'doc_id': '24050931851170558',
+                    'server_timestamps':    'true',
+                    'variables':            _json2.dumps(_gql_vars),
+                    'doc_id':               '24050931851170558',
+                    'fb_api_analytics_tags': _json2.dumps(
+                        ['qpl_active_flow_ids=250360002,516759801']
+                    ),
+                }
+                # Add optional page-extracted performance tokens when available
+                if _hsdp: _gql_payload2['__hsdp'] = _hsdp
+                if _hblp: _gql_payload2['__hblp'] = _hblp
+                if _sjsp: _gql_payload2['__sjsp'] = _sjsp
+
+                _conf_post_hdrs = {
+                    'User-Agent':            _desktop_ua2,
+                    'Accept':                '*/*',
+                    'Accept-Language':       'en-US,en;q=0.9',
+                    'Content-Type':          'application/x-www-form-urlencoded',
+                    'Origin':                'https://www.facebook.com',
+                    'Referer':               'https://www.facebook.com/confirmemail.php?next=',
+                    'Sec-Fetch-Dest':        'empty',
+                    'Sec-Fetch-Mode':        'cors',
+                    'Sec-Fetch-Site':        'same-origin',
+                    'X-Fb-Friendly-Name':    'useCAAFBConfirmationFormSubmitMutation',
+                    'X-Fb-Lsd':              _lsd2,
                 }
                 _conf_resp = ses.post(
                     'https://www.facebook.com/api/graphql/',
                     data=_gql_payload2,
-                    headers={
-                        'User-Agent': _desktop_ua2,
-                        'Accept': '*/*',
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Origin': 'https://www.facebook.com',
-                        'Referer': 'https://www.facebook.com/confirmemail.php?next=',
-                        'X-Fb-Friendly-Name': 'useCAAFBConfirmationFormSubmitMutation',
-                        'X-Fb-Lsd': _lsd2,
-                    },
+                    headers=_conf_post_hdrs,
                     timeout=15, allow_redirects=True
                 )
                 try:
                     _conf_json = _conf_resp.json()
                 except Exception:
                     _conf_json = {}
-                _conf_data = (_conf_json.get('data') or {}).get('xfb_caa_registration_confirmation_submit', {})
+                _conf_data = (
+                    (_conf_json.get('data') or {})
+                    .get('xfb_caa_registration_confirmation_submit', {})
+                )
                 if _conf_data.get('user_id') or _conf_data.get('created_user_id'):
                     return 'confirmed'
+                # Also check redirect URL for home/checkpoint signals
                 q = _chk(str(_conf_resp.url), _conf_resp.text)
                 if q:
                     return q
